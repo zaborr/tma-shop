@@ -4,7 +4,6 @@ import { createRoot } from 'react-dom/client';
 import { mockEnvForDev } from './mockEnv.js';
 import { init } from './init.js';
 import { App } from './App.js';
-import { EnvUnsupported } from './components/EnvUnsupported.js';
 
 // Must run before init() so a browser launch has a mocked environment.
 mockEnvForDev();
