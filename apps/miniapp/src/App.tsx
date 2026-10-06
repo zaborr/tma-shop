@@ -10,7 +10,13 @@ import { ProductPage } from './pages/ProductPage.js';
 import { CartPage } from './pages/CartPage.js';
 import { OrdersPage } from './pages/OrdersPage.js';
 import { PaymentPage } from './pages/PaymentPage.js';
-import { AdminPage } from './pages/AdminPage.js';
+import { AdminHomePage } from './pages/admin/AdminHomePage.js';
+import { AdminCatalogPage } from './pages/admin/AdminCatalogPage.js';
+import { AdminProductPage } from './pages/admin/AdminProductPage.js';
+import { AdminFeePage } from './pages/admin/AdminFeePage.js';
+import { AdminOrdersPage } from './pages/admin/AdminOrdersPage.js';
+import { AdminOrderPage } from './pages/admin/AdminOrderPage.js';
+import { AdminSummaryPage } from './pages/admin/AdminSummaryPage.js';
 
 function platform(): 'ios' | 'base' {
   try {
@@ -40,7 +46,13 @@ function Shell(): React.JSX.Element {
       <Route path="/cart" element={<CartPage />} />
       <Route path="/orders" element={<OrdersPage />} />
       <Route path="/orders/:id" element={<PaymentPage />} />
-      <Route path="/admin" element={<AdminPage />} />
+      <Route path="/admin" element={<AdminHomePage />} />
+      <Route path="/admin/catalog" element={<AdminCatalogPage />} />
+      <Route path="/admin/products/:id" element={<AdminProductPage />} />
+      <Route path="/admin/fee" element={<AdminFeePage />} />
+      <Route path="/admin/orders" element={<AdminOrdersPage />} />
+      <Route path="/admin/orders/:id" element={<AdminOrderPage />} />
+      <Route path="/admin/summary" element={<AdminSummaryPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

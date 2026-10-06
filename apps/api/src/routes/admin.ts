@@ -100,6 +100,11 @@ export function adminRoutes(): Hono<AppBindings> {
 
   // Orders
   app.get('/orders', async (c) => c.json(await listAllOrders(c.get('db'), c.get('shopId'))));
+  app.get('/orders/:id', zValidator('param', idParam), async (c) => {
+    const order = await getOrder(c.get('db'), c.get('shopId'), c.req.valid('param').id);
+    if (!order) throw ApiError.notFound('Order not found');
+    return c.json(order);
+  });
   app.patch(
     '/orders/:id',
     zValidator('param', idParam),
