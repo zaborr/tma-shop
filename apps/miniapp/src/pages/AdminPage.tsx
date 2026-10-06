@@ -244,6 +244,19 @@ export function AdminPage(): React.JSX.Element {
             multiline
           >
             #{order.id.slice(0, 8)}
+            {order.contactUsername && (
+              <>
+                {' · '}
+                <a
+                  href={`https://t.me/${order.contactUsername}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  @{order.contactUsername}
+                </a>
+              </>
+            )}
           </Cell>
         ))}
       </Section>

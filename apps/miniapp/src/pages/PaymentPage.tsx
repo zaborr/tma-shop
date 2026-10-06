@@ -45,6 +45,9 @@ export function PaymentPage(): React.JSX.Element {
           </Cell>
         ))}
         <Cell after={formatPrice(current.total, current.currency)}>Total</Cell>
+        {current.contactUsername && (
+          <Cell after={`@${current.contactUsername}`}>Contact</Cell>
+        )}
       </Section>
 
       <StatusSection order={current} />

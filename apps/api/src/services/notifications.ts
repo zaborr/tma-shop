@@ -13,6 +13,7 @@ export function buildPaymentReviewMessage(order: Order, customer: string): strin
     '',
     `Order #${order.id.slice(0, 8)}`,
     `Customer: ${customer}`,
+    `Contact: ${order.contactUsername ? `@${order.contactUsername}` : '—'}`,
     `Amount: ${formatAmount(order)}`,
     `Method: ${order.paymentNetwork ?? '—'}`,
     `Tx: ${order.paymentTxHash ?? '—'}`,

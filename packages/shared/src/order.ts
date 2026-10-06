@@ -37,6 +37,8 @@ export const order = z.object({
   paymentTxHash: z.string().nullable(),
   /** Block-explorer link for `paymentTxHash`, when the network is known. */
   paymentTxUrl: z.string().nullable(),
+  /** Customer's Telegram username (without @), given at checkout for contact. */
+  contactUsername: z.string().nullable(),
   createdAt: isoDateTime,
   updatedAt: isoDateTime,
 });

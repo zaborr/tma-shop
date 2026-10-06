@@ -92,6 +92,7 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
     paymentNetwork: row.paymentNetwork,
     paymentTxHash: row.paymentTxHash,
     paymentTxUrl: explorerTxUrl(row.paymentNetwork, row.paymentTxHash),
+    contactUsername: row.contactUsername,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

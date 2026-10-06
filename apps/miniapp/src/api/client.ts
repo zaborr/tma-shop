@@ -115,8 +115,12 @@ export class ApiClient {
   }
 
   // --- orders & payment ---
-  createOrder(): Promise<CreateOrderResponse> {
-    return this.request<CreateOrderResponse>('/orders', { method: 'POST' });
+  /** Creates an order from the cart; `contactUsername` is the customer's Telegram @. */
+  createOrder(contactUsername: string): Promise<CreateOrderResponse> {
+    return this.request<CreateOrderResponse>('/orders', {
+      method: 'POST',
+      body: JSON.stringify({ contactUsername }),
+    });
   }
 
   getOrders(): Promise<Order[]> {
