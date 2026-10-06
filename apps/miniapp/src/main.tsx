@@ -20,6 +20,7 @@ try {
       <App />
     </StrictMode>,
   );
-} catch {
+} catch (error) {
+  console.error('[tma-shop] init failed', error, window.location.href);
   root.render(<EnvUnsupported />);
 }
