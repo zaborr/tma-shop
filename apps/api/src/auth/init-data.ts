@@ -77,7 +77,7 @@ function deriveSecretKey(botToken: string): Buffer {
 function buildDataCheckString(params: URLSearchParams): string {
   const pairs: string[] = [];
   for (const [key, value] of params.entries()) {
-    if (key === 'hash' || key === 'signature') continue;
+    if (key === 'hash') continue;
     pairs.push(`${key}=${value}`);
   }
   pairs.sort();
