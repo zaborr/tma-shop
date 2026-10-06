@@ -208,6 +208,10 @@ export class ApiClient {
     return this.request<void>(`/admin/categories/${categoryId}`, { method: 'DELETE' });
   }
 
+  adminGetOrder(orderId: string): Promise<Order> {
+    return this.request<Order>(`/admin/orders/${orderId}`);
+  }
+
   adminDeleteOrder(orderId: string): Promise<void> {
     return this.request<void>(`/admin/orders/${orderId}`, { method: 'DELETE' });
   }
