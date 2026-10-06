@@ -5,7 +5,8 @@ import { orderStatus, productInput, slug } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth } from '../auth/middleware.js';
 import { createCategory, createProduct, deleteProduct, updateProduct } from '../services/admin.js';
-import { listAllOrders, setOrderStatus } from '../services/orders.js';
+import { getOrder, listAllOrders, markOrderPaid, setOrderStatus } from '../services/orders.js';
+import { ApiError } from '../lib/errors.js';
 
 const idParam = z.object({ id: z.uuid() });
 const categoryInput = z.object({
@@ -53,15 +54,22 @@ export function adminRoutes(): Hono<AppBindings> {
     '/orders/:id',
     zValidator('param', idParam),
     zValidator('json', statusInput),
-    async (c) =>
-      c.json(
-        await setOrderStatus(
-          c.get('db'),
-          c.get('shopId'),
-          c.req.valid('param').id,
-          c.req.valid('json').status,
-        ),
-      ),
+    async (c) => {
+      const db = c.get('db');
+      const shopId = c.get('shopId');
+      const orderId = c.req.valid('param').id;
+      const { status } = c.req.valid('json');
+
+      if (status === 'paid') {
+        // Manual confirmation of a crypto payment: same path as a Stars payment,
+        // so tracked stock is decremented exactly once.
+        const order = await getOrder(db, shopId, orderId);
+        if (!order) throw ApiError.notFound('Order not found');
+        return c.json(await markOrderPaid(db, orderId, order.paymentTxHash ?? 'manual'));
+      }
+
+      return c.json(await setOrderStatus(db, shopId, orderId, status));
+    },
   );
 
   return app;

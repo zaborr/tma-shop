@@ -123,6 +123,10 @@ export const orders = pgTable('orders', {
   total: integer('total').notNull(),
   currency: text('currency').notNull(),
   paymentChargeId: text('payment_charge_id'),
+  /** Crypto payment method label chosen by the customer, e.g. "USDC · Base". */
+  paymentNetwork: text('payment_network'),
+  /** Crypto transaction hash submitted by the customer for manual review. */
+  paymentTxHash: text('payment_tx_hash'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

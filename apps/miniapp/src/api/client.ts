@@ -125,6 +125,14 @@ export class ApiClient {
     return this.request<InvoiceResponse>(`/orders/${orderId}/invoice`, { method: 'POST' });
   }
 
+  /** Reports a crypto payment (chosen wallet + tx hash) for manual verification. */
+  submitPayment(orderId: string, methodId: string, txHash: string): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/payment`, {
+      method: 'POST',
+      body: JSON.stringify({ methodId, txHash }),
+    });
+  }
+
   // --- admin ---
   adminGetOrders(): Promise<Order[]> {
     return this.request<Order[]>('/admin/orders');

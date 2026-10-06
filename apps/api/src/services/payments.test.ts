@@ -17,6 +17,9 @@ const baseOrder: Order = {
   total: 125,
   currency: 'XTR',
   paymentChargeId: null,
+  paymentNetwork: null,
+  paymentTxHash: null,
+  paymentTxUrl: null,
   createdAt: '2026-06-19T12:00:00.000Z',
   updatedAt: '2026-06-19T12:00:00.000Z',
 };

@@ -6,19 +6,29 @@ import { api, ApiClientError } from '../api/client.js';
 import { useCart } from '../providers/CartProvider.js';
 import { useMainButton } from '../hooks/useMainButton.js';
 import { formatPrice } from '../lib/format.js';
+import { useAsync } from '../hooks/useAsync.js';
 import { Loader } from '../components/Loader.js';
 
 export function CartPage(): React.JSX.Element {
   const navigate = useNavigate();
-  const { cart, loading, setQuantity, remove } = useCart();
+  const { cart, loading, setQuantity, remove, refresh } = useCart();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const shop = useAsync(() => api.getShop(), []);
+  const cryptoCheckout = (shop.data?.paymentMethods.length ?? 0) > 0;
 
   const checkout = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
       const { orderId } = await api.createOrder();
+      // The server empties the cart when it creates the order.
+      void refresh();
+      if (cryptoCheckout) {
+        // Manual crypto payment: show wallets and collect the tx hash.
+        navigate(`/orders/${orderId}`, { replace: true });
+        return;
+      }
       const { invoiceLink } = await api.createInvoice(orderId);
       if (openInvoice.isAvailable()) {
         const status = await openInvoice(invoiceLink, 'url');
@@ -32,7 +42,7 @@ export function CartPage(): React.JSX.Element {
     } finally {
       setBusy(false);
     }
-  }, [navigate]);
+  }, [navigate, cryptoCheckout, refresh]);
 
   const hasItems = (cart?.lines.length ?? 0) > 0;
 

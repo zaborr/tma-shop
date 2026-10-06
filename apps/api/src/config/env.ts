@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paymentMethodsSchema } from './payment-methods.js';
 
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
@@ -21,6 +22,8 @@ const envSchema = z.object({
   TELEGRAM_WEBHOOK_SECRET: z.string().min(1).default('dev-webhook-secret'),
   SHOP_ID: z.uuid().optional(),
   CORS_ORIGIN: z.string().default('*'),
+  /** JSON array of crypto wallets for manual-verification checkout. */
+  PAYMENT_METHODS: paymentMethodsSchema,
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -4,7 +4,7 @@ import { telegramUserId } from './user.js';
 
 export const orderStatus = z.enum([
   'pending', // created, not yet paid
-  'awaiting_payment', // invoice issued, waiting for Stars payment
+  'awaiting_payment', // Stars invoice issued, or crypto tx submitted and waiting for manual review
   'paid', // payment confirmed
   'cancelled',
   'fulfilled',
@@ -31,6 +31,12 @@ export const order = z.object({
   currency: currencyCode,
   /** Telegram payment charge id once paid. */
   paymentChargeId: z.string().nullable(),
+  /** Crypto payment method chosen by the customer, e.g. "USDC · Base". */
+  paymentNetwork: z.string().nullable(),
+  /** Transaction hash submitted by the customer for manual verification. */
+  paymentTxHash: z.string().nullable(),
+  /** Block-explorer link for `paymentTxHash`, when the network is known. */
+  paymentTxUrl: z.string().nullable(),
   createdAt: isoDateTime,
   updatedAt: isoDateTime,
 });

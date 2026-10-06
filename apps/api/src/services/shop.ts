@@ -1,5 +1,5 @@
 import { asc, eq } from 'drizzle-orm';
-import type { ShopConfig } from '@tma-shop/shared';
+import type { PaymentMethod, ShopConfig } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import type { Env } from '../config/env.js';
 import { shops } from '../db/schema.js';
@@ -19,8 +19,12 @@ export async function resolveActiveShopId(db: Database, env: Env): Promise<strin
   return shop.id;
 }
 
-export async function getShopConfig(db: Database, shopId: string): Promise<ShopConfig> {
+export async function getShopConfig(
+  db: Database,
+  shopId: string,
+  paymentMethods: PaymentMethod[] = [],
+): Promise<ShopConfig> {
   const shop = await db.query.shops.findFirst({ where: eq(shops.id, shopId) });
   if (!shop) throw ApiError.notFound('Shop not found');
-  return toShopConfigDTO(shop);
+  return toShopConfigDTO(shop, paymentMethods);
 }
