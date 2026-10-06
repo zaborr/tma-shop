@@ -4,10 +4,12 @@ import { paymentMethod, type PaymentMethod } from '@tma-shop/shared';
 /**
  * Crypto wallets the shop accepts, configured with the `PAYMENT_METHODS`
  * environment variable as a JSON array. `id` is optional and derived from the
- * token and network when omitted. Example:
+ * token and network when omitted. One entry may list several networks and/or
+ * tokens separated by `/` (same address), and is expanded into one method per
+ * combination. Example:
  *
- *   [{"network":"Base","token":"USDC","address":"0xabc..."},
- *    {"network":"Solana","token":"USDC","address":"7xKX..."}]
+ *   [{"network":"Ethereum/Base","token":"USDC/EURC","address":"0xabc..."},
+ *    {"network":"Solana","token":"USDC/EURC","address":"7xKX..."}]
  *
  * Payments are not checked on-chain: the customer submits a transaction hash
  * and an admin confirms it manually from the admin panel.
@@ -35,12 +37,23 @@ export const paymentMethodsSchema = z
       });
       return z.NEVER;
     }
-    const methods = result.data.map((method) => ({
-      id: method.id ?? slugify(`${method.token}-${method.network}`),
-      network: method.network.trim(),
-      token: method.token.trim(),
-      address: method.address.trim(),
-    }));
+    const methods = result.data.flatMap((method) => {
+      const networks = splitList(method.network).map(prettyNetwork);
+      const tokens = splitList(method.token).map((token) => token.toUpperCase());
+      const expanded = networks.length * tokens.length > 1;
+      return networks.flatMap((network) =>
+        tokens.map((token) => {
+          const derived = slugify(`${token}-${network}`);
+          return {
+            id: method.id ? (expanded ? `${method.id}-${derived}` : method.id) : derived,
+            network,
+            token,
+            address: method.address.trim(),
+          };
+        }),
+      );
+    });
+    if (methods.length === 0) return [];
     const ids = new Set(methods.map((method) => method.id));
     if (ids.size !== methods.length) {
       ctx.addIssue({ code: 'custom', message: 'PAYMENT_METHODS has duplicate ids' });
@@ -48,6 +61,21 @@ export const paymentMethodsSchema = z
     }
     return methods;
   });
+
+/** "Ethereum/Base" or "USDC, EURC" → trimmed, non-empty parts. */
+function splitList(value: string): string[] {
+  return value
+    .split(/[/,|]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+/** "ETHEREUM" → "Ethereum"; mixed-case names ("BNB Chain") are kept as written. */
+function prettyNetwork(name: string): string {
+  return name.length > 3 && name === name.toUpperCase()
+    ? name.charAt(0) + name.slice(1).toLowerCase()
+    : name;
+}
 
 function slugify(value: string): string {
   return value
