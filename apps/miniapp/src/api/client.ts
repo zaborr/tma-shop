@@ -148,7 +148,43 @@ export class ApiClient {
     });
   }
 
+  /** Asks the shop to change a paid order to these lines (needs admin approval). */
+  requestOrderChange(
+    orderId: string,
+    items: Array<{ productId: string; quantity: number }>,
+  ): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/change`, {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    });
+  }
+
+  withdrawOrderChange(orderId: string): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/change`, { method: 'DELETE' });
+  }
+
   // --- admin ---
+  /** Sets the fixed fee added once to each new order (0 = none) and its label. */
+  adminUpdateOrderFee(orderFee: number, orderFeeLabel: string): Promise<ShopConfig> {
+    return this.request<ShopConfig>('/admin/shop/fee', {
+      method: 'PUT',
+      body: JSON.stringify({ orderFee, orderFeeLabel }),
+    });
+  }
+
+  adminApproveChange(orderId: string): Promise<Order> {
+    return this.request<Order>(`/admin/orders/${orderId}/change/approve`, { method: 'POST' });
+  }
+
+  adminRejectChange(orderId: string): Promise<Order> {
+    return this.request<Order>(`/admin/orders/${orderId}/change/reject`, { method: 'POST' });
+  }
+
+  /** Records that the overpaid difference was sent back to the customer. */
+  adminRecordRefund(orderId: string): Promise<Order> {
+    return this.request<Order>(`/admin/orders/${orderId}/refund`, { method: 'POST' });
+  }
+
   adminGetOrders(): Promise<Order[]> {
     return this.request<Order[]>('/admin/orders');
   }

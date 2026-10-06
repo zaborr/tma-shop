@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { orderStatus, productInput, slug } from '@tma-shop/shared';
+import { orderStatus, productInput, slug, updateOrderFeeRequest } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth } from '../auth/middleware.js';
 import {
@@ -14,12 +14,17 @@ import {
   updateProduct,
 } from '../services/admin.js';
 import {
+  approveOrderChange,
+  clearOrderChange,
   deleteOrder,
   getOrder,
   listAllOrders,
   markOrderPaid,
+  recordRefund,
   setOrderStatus,
 } from '../services/orders.js';
+import { buildChangeDecisionMessage, notifyChats } from '../services/notifications.js';
+import { updateOrderFee } from '../services/shop.js';
 import { ApiError } from '../lib/errors.js';
 
 const idParam = z.object({ id: z.uuid() });
@@ -33,6 +38,18 @@ const statusInput = z.object({ status: orderStatus });
 export function adminRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
   app.use('*', requireAuth, requireAdmin);
+
+  // Shop settings: fixed fee added once to every new order (0 hides it).
+  app.put('/shop/fee', zValidator('json', updateOrderFeeRequest), async (c) =>
+    c.json(
+      await updateOrderFee(
+        c.get('db'),
+        c.get('shopId'),
+        c.req.valid('json'),
+        c.get('env').PAYMENT_METHODS,
+      ),
+    ),
+  );
 
   // Products
   app.get('/products', async (c) => c.json(await listAllProducts(c.get('db'), c.get('shopId'))));
@@ -103,6 +120,23 @@ export function adminRoutes(): Hono<AppBindings> {
 
       return c.json(await setOrderStatus(db, shopId, orderId, status));
     },
+  );
+
+  // Customer change requests: approve (apply + tell them what to pay) or reject.
+  app.post('/orders/:id/change/approve', zValidator('param', idParam), async (c) => {
+    const order = await approveOrderChange(c.get('db'), c.get('shopId'), c.req.valid('param').id);
+    await notifyChats(c.get('env').BOT_TOKEN, [order.userId], buildChangeDecisionMessage(order, true));
+    return c.json(order);
+  });
+  app.post('/orders/:id/change/reject', zValidator('param', idParam), async (c) => {
+    const order = await clearOrderChange(c.get('db'), c.get('shopId'), c.req.valid('param').id);
+    await notifyChats(c.get('env').BOT_TOKEN, [order.userId], buildChangeDecisionMessage(order, false));
+    return c.json(order);
+  });
+
+  // The admin sent the overpaid difference back to the customer.
+  app.post('/orders/:id/refund', zValidator('param', idParam), async (c) =>
+    c.json(await recordRefund(c.get('db'), c.get('shopId'), c.req.valid('param').id)),
   );
 
   app.delete('/orders/:id', zValidator('param', idParam), async (c) => {

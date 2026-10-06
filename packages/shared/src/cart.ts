@@ -19,6 +19,8 @@ export type CartLine = z.infer<typeof cartLine>;
 export const cart = z.object({
   lines: z.array(cartLine),
   currency: currencyCode,
+  /** Per-order fee included in `total` (0 when the cart is empty or no fee is set). */
+  fee: moneyAmount,
   total: moneyAmount,
   itemCount: z.number().int().nonnegative(),
 });

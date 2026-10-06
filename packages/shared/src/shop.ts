@@ -15,6 +15,10 @@ export const shop = z.object({
   botUsername: z.string().max(64).nullable(),
   /** Whether checkout is paid with Telegram Stars. */
   starsEnabled: z.boolean(),
+  /** Fixed fee added once to every order, in minor units of the order's token. 0 = none. */
+  orderFee: z.number().int().nonnegative(),
+  /** How the fee is shown to customers, e.g. "Service fee". */
+  orderFeeLabel: z.string().min(1).max(64),
   createdAt: isoDateTime,
 });
 export type Shop = z.infer<typeof shop>;
@@ -43,6 +47,8 @@ export const shopConfig = shop
     currency: true,
     botUsername: true,
     starsEnabled: true,
+    orderFee: true,
+    orderFeeLabel: true,
   })
   .extend({
     /** Crypto wallets for manual-verification checkout (empty when not configured). */

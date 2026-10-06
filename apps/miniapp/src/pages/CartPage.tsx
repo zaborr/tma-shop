@@ -123,6 +123,11 @@ export function CartPage(): React.JSX.Element {
         ))}
       </Section>
       <Section>
+        {cart && cart.fee > 0 && (
+          <Cell after={formatPrice(cart.fee, cart.currency)}>
+            {shop.data?.orderFeeLabel ?? 'Service fee'}
+          </Cell>
+        )}
         <Cell after={cart ? formatPrice(cart.total, cart.currency) : ''}>Total</Cell>
       </Section>
       <Section

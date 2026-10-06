@@ -21,13 +21,35 @@ export const orderItem = z.object({
 });
 export type OrderItem = z.infer<typeof orderItem>;
 
+/** A customer's requested modification, waiting for admin approval. */
+export const orderChangeRequest = z.object({
+  /** The full new item list (replaces the current items once approved). */
+  items: z.array(orderItem).min(1),
+  total: moneyAmount,
+  requestedAt: z.string(),
+});
+export type OrderChangeRequest = z.infer<typeof orderChangeRequest>;
+
+/** A confirmed payment received, or a refund sent back to the customer. */
+export const paymentLogEntry = z.object({
+  type: z.enum(['payment', 'refund']),
+  amount: moneyAmount,
+  network: z.string().nullable(),
+  txHash: z.string().nullable(),
+  at: z.string(),
+});
+export type PaymentLogEntry = z.infer<typeof paymentLogEntry>;
+
 export const order = z.object({
   id,
   shopId: id,
   userId: telegramUserId,
   status: orderStatus,
   items: z.array(orderItem).min(1),
+  /** Total including `fee`. */
   total: moneyAmount,
+  /** Per-order fee charged once, frozen when the order was created. */
+  fee: moneyAmount,
   currency: currencyCode,
   /** Telegram payment charge id once paid. */
   paymentChargeId: z.string().nullable(),
@@ -39,6 +61,16 @@ export const order = z.object({
   paymentTxUrl: z.string().nullable(),
   /** Customer's Telegram username (without @), given at checkout for contact. */
   contactUsername: z.string().nullable(),
+  /** Confirmed money received, net of refunds. */
+  amountPaid: moneyAmount,
+  /** `total - amountPaid`: >0 still to pay, <0 to refund to the customer. */
+  amountDue: z.number().int(),
+  /** Amount covered by the transaction currently awaiting verification. */
+  amountSubmitted: moneyAmount,
+  /** Pending modification requested by the customer, if any. */
+  changeRequest: orderChangeRequest.nullable(),
+  /** Confirmed payments and refunds, oldest first. */
+  paymentLog: z.array(paymentLogEntry),
   createdAt: isoDateTime,
   updatedAt: isoDateTime,
 });

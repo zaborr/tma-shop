@@ -52,6 +52,8 @@ export function toShopConfigDTO(row: ShopRow, paymentMethods: PaymentMethod[] = 
     currency: row.currency,
     botUsername: row.botUsername,
     starsEnabled: row.starsEnabled,
+    orderFee: row.orderFee,
+    orderFeeLabel: row.orderFeeLabel,
     paymentMethods,
   };
 }
@@ -87,12 +89,18 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
     status: row.status,
     items: items.map(toOrderItemDTO),
     total: row.total,
+    fee: row.fee,
     currency: row.currency,
     paymentChargeId: row.paymentChargeId,
     paymentNetwork: row.paymentNetwork,
     paymentTxHash: row.paymentTxHash,
     paymentTxUrl: explorerTxUrl(row.paymentNetwork, row.paymentTxHash),
     contactUsername: row.contactUsername,
+    amountPaid: row.amountPaid,
+    amountDue: row.total - row.amountPaid,
+    amountSubmitted: row.amountSubmitted,
+    changeRequest: row.changeRequest ?? null,
+    paymentLog: row.paymentLog,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

@@ -56,6 +56,27 @@ export const invoiceResponse = z.object({
 });
 export type InvoiceResponse = z.infer<typeof invoiceResponse>;
 
+/** Admin sets the per-order fee (0 hides it) and its label. */
+export const updateOrderFeeRequest = z.object({
+  orderFee: z.number().int().nonnegative().max(100_000_000),
+  orderFeeLabel: z.string().trim().min(1).max(64),
+});
+export type UpdateOrderFeeRequest = z.infer<typeof updateOrderFeeRequest>;
+
+/** Customer asks to change a paid order: the complete new list of lines. */
+export const requestOrderChangeRequest = z.object({
+  items: z
+    .array(
+      z.object({
+        productId: id,
+        quantity: z.number().int().positive().max(999),
+      }),
+    )
+    .min(1, 'Keep at least one product (or ask the shop to cancel the order)')
+    .max(100),
+});
+export type RequestOrderChangeRequest = z.infer<typeof requestOrderChangeRequest>;
+
 /** Customer reports a crypto payment: which wallet they paid and the tx hash. */
 export const submitPaymentRequest = z.object({
   methodId: z.string().min(1).max(64),

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Cell, Input, List, Section, Textarea } from '@telegram-apps/telegram-ui';
-import type { Category, OrderStatus, Product, ProductInput } from '@tma-shop/shared';
+import type { Category, Order, OrderStatus, Product, ProductInput } from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useSession } from '../providers/SessionProvider.js';
@@ -21,6 +21,126 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   fulfilled: 'Fulfilled',
 };
 
+function statusLabel(order: Order): string {
+  if (order.changeRequest) return '✏️ Change requested';
+  if (order.status === 'pending' && order.amountPaid > 0) return 'Difference not paid yet';
+  if (order.status === 'paid' && order.amountDue < 0) return '↩️ Refund owed';
+  return STATUS_LABEL[order.status];
+}
+
+/** Payment, amounts and change-request details shown under each admin order. */
+function OrderDetails({
+  order,
+  twoTap,
+  tapLabel,
+}: {
+  order: Order;
+  twoTap: (key: string, action: () => Promise<unknown>) => Promise<void>;
+  tapLabel: (key: string, text: string, confirmText?: string) => string;
+}): React.JSX.Element {
+  const change = order.changeRequest;
+  const amounts = [
+    order.amountPaid > 0 ? `Paid ${formatPrice(order.amountPaid, order.currency)}` : null,
+    order.amountSubmitted > 0
+      ? `To verify ${formatPrice(order.amountSubmitted, order.currency)}`
+      : null,
+    order.amountPaid > 0 && order.amountDue > 0
+      ? `Due ${formatPrice(order.amountDue, order.currency)}`
+      : null,
+  ].filter(Boolean);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, whiteSpace: 'normal' }}>
+      {order.paymentTxHash && (
+        <span style={{ wordBreak: 'break-all' }}>
+          {order.paymentNetwork ?? ''}
+          {' · '}
+          {order.paymentTxUrl ? (
+            <a href={order.paymentTxUrl} target="_blank" rel="noreferrer">
+              {order.paymentTxHash}
+            </a>
+          ) : (
+            order.paymentTxHash
+          )}
+        </span>
+      )}
+      {amounts.length > 0 && <span>{amounts.join(' · ')}</span>}
+
+      {order.amountDue < 0 && order.status !== 'cancelled' && (
+        <div>
+          <Button
+            size="s"
+            mode="bezeled"
+            onClick={() =>
+              void twoTap(`refund:${order.id}`, () => api.adminRecordRefund(order.id))
+            }
+          >
+            {tapLabel(
+              `refund:${order.id}`,
+              `Mark refunded · ${formatPrice(-order.amountDue, order.currency)}`,
+            )}
+          </Button>
+        </div>
+      )}
+
+      {change && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            padding: 8,
+            borderRadius: 8,
+            background: 'var(--tgui--secondary_bg_color, rgba(127, 127, 127, 0.1))',
+          }}
+        >
+          <strong>✏️ Change requested</strong>
+          {change.items.map((item) => (
+            <span key={item.productId}>
+              {item.quantity}× {item.title}
+            </span>
+          ))}
+          <span>
+            {formatPrice(order.total, order.currency)} → {formatPrice(change.total, order.currency)}
+            {' · '}
+            {change.total > order.amountPaid + order.amountSubmitted
+              ? `customer pays ${formatPrice(
+                  change.total - order.amountPaid - order.amountSubmitted,
+                  order.currency,
+                )}`
+              : change.total < order.amountPaid + order.amountSubmitted
+                ? `you refund ${formatPrice(
+                    order.amountPaid + order.amountSubmitted - change.total,
+                    order.currency,
+                  )}`
+                : 'same amount'}
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button
+              size="s"
+              mode="filled"
+              onClick={() =>
+                void twoTap(`approve:${order.id}`, () => api.adminApproveChange(order.id))
+              }
+            >
+              {tapLabel(`approve:${order.id}`, 'Approve')}
+            </Button>
+            <Button
+              size="s"
+              mode="plain"
+              onClick={() =>
+                void twoTap(`reject:${order.id}`, () => api.adminRejectChange(order.id))
+              }
+            >
+              {tapLabel(`reject:${order.id}`, 'Reject')}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function toInput(product: Product, isActive: boolean): ProductInput {
   return {
     categoryId: product.categoryId,
@@ -40,7 +160,7 @@ export function AdminPage(): React.JSX.Element {
   const [reloadKey, setReloadKey] = useState(0);
   const reload = (): void => setReloadKey((k) => k + 1);
 
-  const shop = useAsync(() => api.getShop(), []);
+  const shop = useAsync(() => api.getShop(), [reloadKey]);
   const orders = useAsync(() => api.adminGetOrders(), [reloadKey]);
   const products = useAsync(() => api.adminGetProducts(), [reloadKey]);
   const categories = useAsync(() => api.getCategories(), [reloadKey]);
@@ -87,6 +207,15 @@ export function AdminPage(): React.JSX.Element {
             {error}
           </Cell>
         </Section>
+      )}
+
+      {shop.data && (
+        <OrderFeeForm
+          key={`${shop.data.orderFee}-${shop.data.orderFeeLabel}`}
+          fee={shop.data.orderFee}
+          label={shop.data.orderFeeLabel}
+          onSave={(fee, label) => run(() => api.adminUpdateOrderFee(fee, label))}
+        />
       )}
 
       <ProductForm
@@ -177,21 +306,9 @@ export function AdminPage(): React.JSX.Element {
         {orders.data?.map((order) => (
           <Cell
             key={order.id}
-            subtitle={`${STATUS_LABEL[order.status]} · ${formatPrice(order.total, order.currency)}`}
+            subtitle={`${statusLabel(order)} · ${formatPrice(order.total, order.currency)}`}
             description={
-              order.paymentTxHash ? (
-                <span style={{ wordBreak: 'break-all', whiteSpace: 'normal' }}>
-                  {order.paymentNetwork ?? ''}
-                  {' · '}
-                  {order.paymentTxUrl ? (
-                    <a href={order.paymentTxUrl} target="_blank" rel="noreferrer">
-                      {order.paymentTxHash}
-                    </a>
-                  ) : (
-                    order.paymentTxHash
-                  )}
-                </span>
-              ) : undefined
+              <OrderDetails order={order} twoTap={twoTap} tapLabel={tapLabel} />
             }
             after={
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -205,7 +322,10 @@ export function AdminPage(): React.JSX.Element {
                       )
                     }
                   >
-                    {tapLabel(`paid:${order.id}`, 'Mark paid')}
+                    {tapLabel(
+                      `paid:${order.id}`,
+                      `Mark paid · ${formatPrice(order.amountSubmitted || order.amountDue, order.currency)}`,
+                    )}
                   </Button>
                 )}
                 {order.status === 'paid' && (
@@ -602,3 +722,69 @@ function CategoriesSection({
     </Section>
   );
 }
+
+/** Fixed fee added once to every new order; 0 hides it everywhere. */
+function OrderFeeForm({
+  fee,
+  label,
+  onSave,
+}: {
+  fee: number;
+  label: string;
+  onSave: (fee: number, label: string) => Promise<void>;
+}): React.JSX.Element {
+  const [amount, setAmount] = useState(fee > 0 ? toMajor(fee) : '0');
+  const [name, setName] = useState(label);
+  const [busy, setBusy] = useState(false);
+
+  const value = amount.trim().replace(',', '.');
+  const invalid = !/^\d+(\.\d{1,2})?$/.test(value) || !name.trim();
+  const cents = invalid ? 0 : Math.round(Number(value) * 100);
+
+  const save = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      await onSave(cents, name.trim());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section
+      header="Order fee"
+      footer={
+        fee > 0
+          ? `Each new order includes "${label}" once, in the order's currency (USDC or EURC). Set 0 to remove it.`
+          : 'No fee is charged now, and it is not shown to customers. Set an amount to add it once to every new order.'
+      }
+    >
+      <Input
+        header="Amount (e.g. 1.50 — 0 for none)"
+        type="text"
+        inputMode="decimal"
+        status={invalid ? 'error' : 'default'}
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+      />
+      <Input
+        header="Name shown to customers"
+        placeholder="Service fee"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+      <div style={{ padding: 16 }}>
+        <Button
+          stretched
+          mode="bezeled"
+          loading={busy}
+          disabled={invalid || (cents === fee && name.trim() === label)}
+          onClick={() => void save()}
+        >
+          Save fee
+        </Button>
+      </div>
+    </Section>
+  );
+}
+
