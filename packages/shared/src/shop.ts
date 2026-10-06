@@ -28,7 +28,7 @@ export const paymentMethod = z.object({
   id: z.string().min(1).max(64),
   /** Network name shown to the customer, e.g. `Base`, `Solana`, `Polygon`. */
   network: z.string().min(1).max(64),
-  /** Token symbol, e.g. `USDC` or `USDT`. */
+  /** Token symbol, e.g. `USDC` or `EURC`. */
   token: z.string().min(1).max(16),
   /** Receiving wallet address on that network. */
   address: z.string().min(1).max(128),

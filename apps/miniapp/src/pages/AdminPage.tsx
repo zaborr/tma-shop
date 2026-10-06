@@ -7,9 +7,10 @@ import { useSession } from '../providers/SessionProvider.js';
 import { formatPrice } from '../lib/format.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
+import { ProductImage } from '../components/ProductImage.js';
 
 /** Tokens a product can be priced in. Prices are stored in cents (1290 = 12.90). */
-const TOKENS = ['USDC', 'USDT'] as const;
+const TOKENS = ['USDC', 'EURC'] as const;
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   pending: 'Not paid yet',
@@ -44,6 +45,7 @@ export function AdminPage(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   // Two-tap confirmation (native confirm dialogs are unreliable in Telegram webviews).
   const [armed, setArmed] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Product | null>(null);
 
   if (!isAdmin) return <ErrorView message="Admins only" />;
 
@@ -82,7 +84,16 @@ export function AdminPage(): React.JSX.Element {
         </Section>
       )}
 
-      <NewProductForm defaultToken={defaultToken} onCreated={reload} />
+      <ProductForm
+        key={editing?.id ?? 'new'}
+        product={editing}
+        defaultToken={defaultToken}
+        onSaved={() => {
+          setEditing(null);
+          reload();
+        }}
+        onCancel={() => setEditing(null)}
+      />
 
       <Section
         header="Products"
@@ -94,11 +105,22 @@ export function AdminPage(): React.JSX.Element {
         {products.data?.map((product) => (
           <Cell
             key={product.id}
+            before={<ProductImage url={product.imageUrl} alt={product.title} size={48} />}
             subtitle={`${formatPrice(product.price, product.currency)} · ${
               product.stock === null ? 'not stock-tracked' : `${product.stock} in stock`
             }${product.isActive ? '' : ' · 🙈 hidden'}`}
             after={
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <Button
+                  size="s"
+                  mode="bezeled"
+                  onClick={() => {
+                    setEditing(product);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                >
+                  Edit
+                </Button>
                 <Button
                   size="s"
                   mode="bezeled"
@@ -209,55 +231,78 @@ export function AdminPage(): React.JSX.Element {
   );
 }
 
-function NewProductForm({
+/** Major units ("12.90") from a price stored in cents. */
+function toMajor(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+/** Create a product, or edit `product` when given. */
+function ProductForm({
+  product,
   defaultToken,
-  onCreated,
+  onSaved,
+  onCancel,
 }: {
+  product: Product | null;
   defaultToken: (typeof TOKENS)[number];
-  onCreated: () => void;
+  onSaved: () => void;
+  onCancel: () => void;
 }): React.JSX.Element {
-  const [title, setTitle] = useState('');
-  const [slug, setSlug] = useState('');
-  const [price, setPrice] = useState('');
-  const [token, setToken] = useState<string | null>(null);
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState(product?.title ?? '');
+  const [slug, setSlug] = useState(product?.slug ?? '');
+  const [price, setPrice] = useState(product ? toMajor(product.price) : '');
+  const [token, setToken] = useState<string>(product?.currency ?? defaultToken);
+  const [stock, setStock] = useState(
+    product && product.stock !== null ? String(product.stock) : '',
+  );
+  const [imageUrl, setImageUrl] = useState(product?.imageUrl ?? '');
+  const [description, setDescription] = useState(product?.description ?? '');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const currency = token ?? defaultToken;
+  const image = imageUrl.trim();
+  const imageInvalid = image !== '' && !/^https:\/\/\S+$/i.test(image);
+  const stockValue = stock.trim();
+  const stockInvalid = stockValue !== '' && !/^\d+$/.test(stockValue);
 
   const submit = async (): Promise<void> => {
     setBusy(true);
     setMessage(null);
     const input: ProductInput = {
-      categoryId: null,
+      categoryId: product?.categoryId ?? null,
       slug: slug.trim(),
       title: title.trim(),
       description: description.trim(),
       // Typed in token units (12.90) and stored in cents.
       price: Math.round((Number(price.replace(',', '.')) || 0) * 100),
-      currency,
-      imageUrl: null,
-      stock: null,
-      isActive: true,
+      currency: token,
+      imageUrl: image === '' ? null : image,
+      stock: stockValue === '' ? null : Number(stockValue),
+      isActive: product?.isActive ?? true,
     };
     try {
-      const created = await api.adminCreateProduct(input);
-      setMessage(`Created "${created.title}"`);
-      setTitle('');
-      setSlug('');
-      setPrice('');
-      setDescription('');
-      onCreated();
+      const saved = product
+        ? await api.adminUpdateProduct(product.id, input)
+        : await api.adminCreateProduct(input);
+      setMessage(`${product ? 'Saved' : 'Created'} "${saved.title}"`);
+      if (!product) {
+        setTitle('');
+        setSlug('');
+        setPrice('');
+        setStock('');
+        setImageUrl('');
+        setDescription('');
+      }
+      onSaved();
     } catch (err) {
-      setMessage(err instanceof ApiClientError ? err.message : 'Failed to create product');
+      setMessage(err instanceof ApiClientError ? err.message : 'Could not save the product');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Section header="Add product">
+    <Section header={product ? `Edit product: ${product.title}` : 'Add product'}>
       <Input header="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
       <Input header="Slug (kebab-case)" value={slug} onChange={(e) => setSlug(e.target.value)} />
       <Cell
@@ -268,7 +313,7 @@ function NewProductForm({
               <Button
                 key={t}
                 size="s"
-                mode={t === currency ? 'filled' : 'bezeled'}
+                mode={t === token ? 'filled' : 'bezeled'}
                 onClick={() => setToken(t)}
               >
                 {t}
@@ -277,25 +322,56 @@ function NewProductForm({
           </div>
         }
       >
-        {currency}
+        {token}
       </Cell>
       <Input
-        header={`Price (${currency}, e.g. 12.90)`}
+        header={`Price (${token}, e.g. 12.90)`}
         type="text"
         inputMode="decimal"
         value={price}
         onChange={(e) => setPrice(e.target.value)}
       />
+      <Input
+        header={stockInvalid ? 'Stock — whole number, or empty' : 'Stock (empty = unlimited)'}
+        type="text"
+        inputMode="numeric"
+        status={stockInvalid ? 'error' : 'default'}
+        value={stock}
+        onChange={(e) => setStock(e.target.value)}
+      />
+      <Input
+        header={imageInvalid ? 'Image URL — must start with https://' : 'Image URL (optional)'}
+        type="url"
+        placeholder="https://…/photo.jpg"
+        status={imageInvalid ? 'error' : 'default'}
+        value={imageUrl}
+        onChange={(e) => setImageUrl(e.target.value)}
+      />
+      {image !== '' && !imageInvalid && (
+        <div style={{ padding: '8px 16px' }}>
+          <ProductImage url={image} alt="Preview" size={96} />
+        </div>
+      )}
       <Textarea
         header="Description"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
       />
-      <div style={{ padding: 16 }}>
-        <Button stretched loading={busy} disabled={!title || !slug} onClick={() => void submit()}>
-          Create product
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <Button
+          stretched
+          loading={busy}
+          disabled={!title || !slug || imageInvalid || stockInvalid}
+          onClick={() => void submit()}
+        >
+          {product ? 'Save changes' : 'Create product'}
         </Button>
-        {message && <Cell>{message}</Cell>}
+        {product && (
+          <Button stretched mode="plain" onClick={onCancel}>
+            Cancel editing
+          </Button>
+        )}
+        {message && <Cell multiline>{message}</Cell>}
       </div>
     </Section>
   );

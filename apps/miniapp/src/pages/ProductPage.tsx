@@ -8,6 +8,7 @@ import { useMainButton } from '../hooks/useMainButton.js';
 import { formatPrice } from '../lib/format.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
+import { ProductImage } from '../components/ProductImage.js';
 
 export function ProductPage(): React.JSX.Element {
   const { id = '' } = useParams();
@@ -47,6 +48,7 @@ export function ProductPage(): React.JSX.Element {
   return (
     <List>
       <Section>
+        <ProductImage url={product.imageUrl} alt={product.title} />
         <div style={{ padding: 16 }}>
           <Title level="2" weight="2">
             {product.title}

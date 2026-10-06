@@ -15,7 +15,13 @@ export function CartPage(): React.JSX.Element {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const shop = useAsync(() => api.getShop(), []);
-  const cryptoCheckout = (shop.data?.paymentMethods.length ?? 0) > 0;
+  // Telegram Stars only for a Stars-priced cart in a shop with no crypto wallets;
+  // everything else goes to the manual crypto payment page.
+  const starsCheckout =
+    shop.data !== null &&
+    shop.data.starsEnabled &&
+    shop.data.paymentMethods.length === 0 &&
+    cart?.currency === 'XTR';
 
   const checkout = useCallback(async () => {
     setBusy(true);
@@ -24,7 +30,7 @@ export function CartPage(): React.JSX.Element {
       const { orderId } = await api.createOrder();
       // The server empties the cart when it creates the order.
       void refresh();
-      if (cryptoCheckout) {
+      if (!starsCheckout) {
         // Manual crypto payment: show wallets and collect the tx hash.
         navigate(`/orders/${orderId}`, { replace: true });
         return;
@@ -42,14 +48,16 @@ export function CartPage(): React.JSX.Element {
     } finally {
       setBusy(false);
     }
-  }, [navigate, cryptoCheckout, refresh]);
+  }, [navigate, starsCheckout, refresh]);
 
   const hasItems = (cart?.lines.length ?? 0) > 0;
 
   useMainButton({
     text: cart ? `Checkout · ${formatPrice(cart.total, cart.currency)}` : 'Checkout',
     visible: hasItems,
-    loading: busy,
+    // Wait for the shop config so checkout never picks the wrong payment flow.
+    enabled: shop.data !== null,
+    loading: busy || shop.loading,
     onClick: checkout,
   });
 

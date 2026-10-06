@@ -24,7 +24,7 @@ export function PaymentPage(): React.JSX.Element {
   if (!order.data || !shop.data) return <Loader />;
 
   const current = order.data;
-  // Pay in the order's token (USDC/USDT); legacy orders in USD accept any wallet.
+  // Pay in the order's token (USDC/EURC); legacy USD/XTR orders accept any wallet.
   const tokenMethods = shop.data.paymentMethods.filter((m) => m.token === current.currency);
   const methods =
     current.currency === 'USD' || current.currency === 'XTR'

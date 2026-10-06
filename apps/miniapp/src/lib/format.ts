@@ -19,8 +19,8 @@ export function pluralize(count: number, one: string, many: string): string {
 }
 
 /**
- * Amount the customer must send in a stablecoin (USDC/USDT are pegged 1:1 to
- * USD), from a total stored in cents. Shown without thousands separators so it
+ * Amount the customer must send in the order's token (USDC, EURC…), from a
+ * total stored in cents of that token. Shown without thousands separators so it
  * can be typed or pasted straight into a wallet.
  */
 export function formatTokenAmount(amount: number, token: string): string {
