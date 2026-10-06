@@ -13,25 +13,19 @@ import {
  */
 export async function init(debug: boolean): Promise<void> {
   setDebug(debug);
-  initSDK();
 
-  // Restore initData state from the launch parameters.
-  initData.restore();
+  initSDK();
 
   if (backButton.isSupported()) {
     backButton.mount();
   }
 
-  if (!miniApp.isMounted()) {
-    miniApp.mount();
-  }
+  if (miniApp.mount.isAvailable()) {
+    await miniApp.mount();
 
-  if (miniApp.bindCssVars.isAvailable()) {
-    miniApp.bindCssVars();
-  }
-
-  if (!themeParams.isMounted()) {
-    themeParams.mount();
+    if (miniApp.bindCssVars.isAvailable()) {
+      miniApp.bindCssVars();
+    }
   }
 
   if (themeParams.bindCssVars.isAvailable()) {
@@ -45,4 +39,6 @@ export async function init(debug: boolean): Promise<void> {
       viewport.bindCssVars();
     }
   }
+
+  initData.restore();
 }
