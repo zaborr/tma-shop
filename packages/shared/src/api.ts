@@ -24,6 +24,26 @@ export const updateCartItemRequest = z.object({
 });
 export type UpdateCartItemRequest = z.infer<typeof updateCartItemRequest>;
 
+/** Telegram username rules: 5–32 chars, letters, digits and underscores. */
+export const telegramUsername = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/^@/, ''))
+  .pipe(
+    z
+      .string()
+      .regex(
+        /^[A-Za-z0-9_]{5,32}$/,
+        'Enter a valid Telegram username (5–32 letters, digits or _)',
+      ),
+  );
+
+/** Checkout details sent when creating an order. */
+export const createOrderRequest = z.object({
+  contactUsername: telegramUsername,
+});
+export type CreateOrderRequest = z.input<typeof createOrderRequest>;
+
 /** Order is created from the caller's current server-side cart. */
 export const createOrderResponse = z.object({
   orderId: id,

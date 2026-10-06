@@ -137,7 +137,11 @@ describeDb('API integration', () => {
     expect(cart.itemCount).toBe(2);
 
     // Create order
-    const create = await app.request('/api/orders', { method: 'POST', headers: auth });
+    const create = await app.request('/api/orders', {
+      method: 'POST',
+      headers: { ...auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contactUsername: '@test_user' }),
+    });
     expect(create.status).toBe(201);
     const { orderId } = (await create.json()) as { orderId: string };
 

@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import {
+  createOrderRequest,
   submitPaymentRequest,
   type CreateOrderResponse,
   type InvoiceResponse,
@@ -28,9 +29,10 @@ export function orderRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
   app.use('*', requireAuth);
 
-  app.post('/', async (c) => {
+  app.post('/', zValidator('json', createOrderRequest), async (c) => {
     const { sub } = c.get('claims');
-    const order = await createOrderFromCart(c.get('db'), c.get('shopId'), sub);
+    const { contactUsername } = c.req.valid('json');
+    const order = await createOrderFromCart(c.get('db'), c.get('shopId'), sub, contactUsername);
     const response: CreateOrderResponse = { orderId: order.id };
     return c.json(response, 201);
   });

@@ -29,6 +29,13 @@
       "when": 1791340000000,
       "tag": "0003_drop_stars",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791350000000,
+      "tag": "0004_contact_username",
+      "breakpoints": true
     }
   ]
 }

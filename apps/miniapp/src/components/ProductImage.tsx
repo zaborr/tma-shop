@@ -12,18 +12,48 @@ export function ProductImage({
 }: {
   url: string | null;
   alt: string;
-  /** Square thumbnail size in px; omit for a full-width banner. */
+  /** Square thumbnail size in px; omit for a full, uncropped banner. */
   size?: number;
 }): React.JSX.Element | null {
   const [failed, setFailed] = useState(false);
   if (!url || failed) return null;
 
-  const style: React.CSSProperties =
-    size === undefined
-      ? { display: 'block', width: '100%', maxHeight: 320, objectFit: 'cover' }
-      : { display: 'block', width: size, height: size, objectFit: 'cover', borderRadius: 10 };
+  if (size !== undefined) {
+    // Square thumbnail: crop to fill.
+    return (
+      <img
+        src={url}
+        alt={alt}
+        loading="lazy"
+        style={{ display: 'block', width: size, height: size, objectFit: 'cover', borderRadius: 10 }}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
 
+  // Banner: show the whole photo (no cropping), fitted to the width and capped
+  // in height, centred on a neutral background.
   return (
-    <img src={url} alt={alt} loading="lazy" style={style} onError={() => setFailed(true)} />
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        background: 'var(--tg-theme-secondary-bg-color, rgba(127, 127, 127, 0.08))',
+      }}
+    >
+      <img
+        src={url}
+        alt={alt}
+        style={{
+          display: 'block',
+          maxWidth: '100%',
+          maxHeight: '60vh',
+          width: 'auto',
+          height: 'auto',
+          objectFit: 'contain',
+        }}
+        onError={() => setFailed(true)}
+      />
+    </div>
   );
 }

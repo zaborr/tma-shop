@@ -59,6 +59,7 @@ export async function createOrderFromCart(
   db: Database,
   shopId: string,
   userId: number,
+  contactUsername: string | null = null,
 ): Promise<Order> {
   return db.transaction(async (tx) => {
     const shop = await tx.query.shops.findFirst({ where: eq(shops.id, shopId) });
@@ -104,6 +105,7 @@ export async function createOrderFromCart(
         status: 'pending',
         total: draft.total,
         currency,
+        contactUsername,
       })
       .returning();
     if (!order) throw new Error('Failed to create order');

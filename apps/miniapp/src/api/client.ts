@@ -18,6 +18,12 @@ export interface ProductPage {
   total: number;
 }
 
+export interface CategoryInput {
+  slug: string;
+  title: string;
+  sortOrder: number;
+}
+
 export class ApiClientError extends Error {
   constructor(
     public readonly status: number,
@@ -109,8 +115,12 @@ export class ApiClient {
   }
 
   // --- orders & payment ---
-  createOrder(): Promise<CreateOrderResponse> {
-    return this.request<CreateOrderResponse>('/orders', { method: 'POST' });
+  /** Creates an order from the cart; `contactUsername` is the customer's Telegram @. */
+  createOrder(contactUsername: string): Promise<CreateOrderResponse> {
+    return this.request<CreateOrderResponse>('/orders', {
+      method: 'POST',
+      body: JSON.stringify({ contactUsername }),
+    });
   }
 
   getOrders(): Promise<Order[]> {
@@ -141,6 +151,25 @@ export class ApiClient {
   // --- admin ---
   adminGetOrders(): Promise<Order[]> {
     return this.request<Order[]>('/admin/orders');
+  }
+
+  adminCreateCategory(input: CategoryInput): Promise<Category> {
+    return this.request<Category>('/admin/categories', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  adminUpdateCategory(categoryId: string, input: CategoryInput): Promise<Category> {
+    return this.request<Category>(`/admin/categories/${categoryId}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** Deletes a category; its products stay, without a category. */
+  adminDeleteCategory(categoryId: string): Promise<void> {
+    return this.request<void>(`/admin/categories/${categoryId}`, { method: 'DELETE' });
   }
 
   adminDeleteOrder(orderId: string): Promise<void> {

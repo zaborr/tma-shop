@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { openInvoice } from '@telegram-apps/sdk-react';
-import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, Input, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
 import { api, ApiClientError } from '../api/client.js';
 import { useCart } from '../providers/CartProvider.js';
+import { useSession } from '../providers/SessionProvider.js';
 import { useMainButton } from '../hooks/useMainButton.js';
 import { formatPrice } from '../lib/format.js';
 import { useAsync } from '../hooks/useAsync.js';
@@ -14,6 +15,11 @@ export function CartPage(): React.JSX.Element {
   const { cart, loading, setQuantity, remove, refresh } = useCart();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useSession();
+  // Pre-filled with the customer's Telegram @username when they have one.
+  const [contact, setContact] = useState(user?.username ? `@${user.username}` : '');
+  const contactName = contact.trim().replace(/^@/, '');
+  const contactValid = /^[A-Za-z0-9_]{5,32}$/.test(contactName);
   const shop = useAsync(() => api.getShop(), []);
   // Telegram Stars only for a Stars-priced cart in a shop with no crypto wallets;
   // everything else goes to the manual crypto payment page.
@@ -27,7 +33,11 @@ export function CartPage(): React.JSX.Element {
     setBusy(true);
     setError(null);
     try {
-      const { orderId } = await api.createOrder();
+      if (!contactValid) {
+        setError('Enter your Telegram username so the shop can contact you.');
+        return;
+      }
+      const { orderId } = await api.createOrder(contactName);
       // The server empties the cart when it creates the order.
       void refresh();
       if (!starsCheckout) {
@@ -48,7 +58,7 @@ export function CartPage(): React.JSX.Element {
     } finally {
       setBusy(false);
     }
-  }, [navigate, starsCheckout, refresh]);
+  }, [navigate, starsCheckout, refresh, contactValid, contactName]);
 
   const hasItems = (cart?.lines.length ?? 0) > 0;
 
@@ -56,7 +66,7 @@ export function CartPage(): React.JSX.Element {
     text: cart ? `Checkout · ${formatPrice(cart.total, cart.currency)}` : 'Checkout',
     visible: hasItems,
     // Wait for the shop config so checkout never picks the wrong payment flow.
-    enabled: shop.data !== null,
+    enabled: shop.data !== null && contactValid,
     loading: busy || shop.loading,
     onClick: checkout,
   });
@@ -114,6 +124,22 @@ export function CartPage(): React.JSX.Element {
       </Section>
       <Section>
         <Cell after={cart ? formatPrice(cart.total, cart.currency) : ''}>Total</Cell>
+      </Section>
+      <Section
+        header="Your Telegram username"
+        footer={
+          contactValid
+            ? 'The shop will contact you here about your order.'
+            : 'Required: 5–32 letters, digits or _ (you can find it in Telegram → Settings).'
+        }
+      >
+        <Input
+          header="Telegram username"
+          placeholder="@username"
+          status={contact.trim() === '' || contactValid ? 'default' : 'error'}
+          value={contact}
+          onChange={(e) => setContact(e.target.value)}
+        />
       </Section>
     </List>
   );

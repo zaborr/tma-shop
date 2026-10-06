@@ -127,6 +127,8 @@ export const orders = pgTable('orders', {
   paymentNetwork: text('payment_network'),
   /** Crypto transaction hash submitted by the customer for manual review. */
   paymentTxHash: text('payment_tx_hash'),
+  /** Customer's Telegram username (without @) given at checkout. */
+  contactUsername: text('contact_username'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
