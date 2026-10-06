@@ -9,6 +9,7 @@ import { CatalogPage } from './pages/CatalogPage.js';
 import { ProductPage } from './pages/ProductPage.js';
 import { CartPage } from './pages/CartPage.js';
 import { OrdersPage } from './pages/OrdersPage.js';
+import { PaymentPage } from './pages/PaymentPage.js';
 import { AdminPage } from './pages/AdminPage.js';
 
 function platform(): 'ios' | 'base' {
@@ -38,6 +39,7 @@ function Shell(): React.JSX.Element {
       <Route path="/product/:id" element={<ProductPage />} />
       <Route path="/cart" element={<CartPage />} />
       <Route path="/orders" element={<OrdersPage />} />
+      <Route path="/orders/:id" element={<PaymentPage />} />
       <Route path="/admin" element={<AdminPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

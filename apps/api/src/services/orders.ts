@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { Order } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { cartItems, orderItems, orders, products, shops } from '../db/schema.js';
@@ -191,6 +191,51 @@ export async function markOrderPaid(
 
     return toOrderDTO(updated, items);
   });
+}
+
+/**
+ * Records a crypto payment reported by the customer: the wallet they paid into
+ * and the transaction hash. Moves the order to `awaiting_payment` so an admin
+ * can verify it on-chain and confirm it manually. The customer may resubmit
+ * (e.g. to fix a typo) until an admin confirms the payment.
+ */
+export async function submitCryptoPayment(
+  db: Database,
+  shopId: string,
+  orderId: string,
+  userId: number,
+  paymentNetwork: string,
+  txHash: string,
+): Promise<Order> {
+  const order = await db.query.orders.findFirst({
+    where: and(eq(orders.shopId, shopId), eq(orders.id, orderId), eq(orders.userId, userId)),
+  });
+  if (!order) throw ApiError.notFound('Order not found');
+  if (order.status !== 'pending' && order.status !== 'awaiting_payment') {
+    throw ApiError.conflict('not_payable', `Order is ${order.status} and cannot take a payment`);
+  }
+
+  // A transaction can only pay for one order.
+  const reused = await db.query.orders.findFirst({
+    where: and(eq(orders.paymentTxHash, txHash), ne(orders.id, order.id)),
+  });
+  if (reused) {
+    throw ApiError.conflict('tx_already_used', 'This transaction was already used for another order');
+  }
+
+  const [updated] = await db
+    .update(orders)
+    .set({
+      status: 'awaiting_payment',
+      paymentNetwork,
+      paymentTxHash: txHash,
+      updatedAt: new Date(),
+    })
+    .where(eq(orders.id, order.id))
+    .returning();
+  if (!updated) throw new Error('Failed to update order');
+  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, updated.id));
+  return toOrderDTO(updated, items);
 }
 
 async function attachItems(db: Database, rows: (typeof orders.$inferSelect)[]): Promise<Order[]> {

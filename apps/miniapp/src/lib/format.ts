@@ -17,3 +17,12 @@ export function formatPrice(amount: number, currency: string): string {
 export function pluralize(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
+
+/**
+ * Amount the customer must send in a stablecoin (USDC/USDT are pegged 1:1 to
+ * USD), from a total stored in cents. Shown without thousands separators so it
+ * can be typed or pasted straight into a wallet.
+ */
+export function formatTokenAmount(amount: number, token: string): string {
+  return `${(amount / 100).toFixed(2)} ${token}`;
+}

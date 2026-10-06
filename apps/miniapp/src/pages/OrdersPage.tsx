@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { Badge, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
 import type { OrderStatus } from '@tma-shop/shared';
 import { api } from '../api/client.js';
@@ -7,14 +8,15 @@ import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 
 const STATUS_META: Record<OrderStatus, { label: string; type: 'number' | 'dot' }> = {
-  pending: { label: 'Pending', type: 'dot' },
-  awaiting_payment: { label: 'Awaiting payment', type: 'dot' },
+  pending: { label: 'Awaiting payment', type: 'dot' },
+  awaiting_payment: { label: 'Verifying payment', type: 'dot' },
   paid: { label: 'Paid', type: 'dot' },
   cancelled: { label: 'Cancelled', type: 'dot' },
   fulfilled: { label: 'Fulfilled', type: 'dot' },
 };
 
 export function OrdersPage(): React.JSX.Element {
+  const navigate = useNavigate();
   const { data: orders, loading, error } = useAsync(() => api.getOrders(), []);
 
   if (loading) return <Loader />;
@@ -33,6 +35,7 @@ export function OrdersPage(): React.JSX.Element {
         {orders.map((order) => (
           <Cell
             key={order.id}
+            onClick={() => navigate(`/orders/${order.id}`)}
             subtitle={pluralize(order.items.length, 'item', 'items')}
             after={formatPrice(order.total, order.currency)}
             description={<Badge type="dot" />}

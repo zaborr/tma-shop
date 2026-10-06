@@ -84,6 +84,7 @@ describeDb('API integration', () => {
       TELEGRAM_WEBHOOK_SECRET: 'whsec-test',
       SHOP_ID: shopId,
       CORS_ORIGIN: '*',
+      PAYMENT_METHODS: [],
     };
     app = createApp({ env, db });
   });

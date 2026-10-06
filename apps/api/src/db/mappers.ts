@@ -2,11 +2,13 @@ import type {
   Category,
   Order,
   OrderItem,
+  PaymentMethod,
   Product,
   SessionUser,
   ShopConfig,
 } from '@tma-shop/shared';
 import type { categories, orderItems, orders, products, shops, users } from './schema.js';
+import { explorerTxUrl } from '../config/payment-methods.js';
 
 type ProductRow = typeof products.$inferSelect;
 type CategoryRow = typeof categories.$inferSelect;
@@ -42,7 +44,7 @@ export function toCategoryDTO(row: CategoryRow): Category {
   };
 }
 
-export function toShopConfigDTO(row: ShopRow): ShopConfig {
+export function toShopConfigDTO(row: ShopRow, paymentMethods: PaymentMethod[] = []): ShopConfig {
   return {
     id: row.id,
     name: row.name,
@@ -50,6 +52,7 @@ export function toShopConfigDTO(row: ShopRow): ShopConfig {
     currency: row.currency,
     botUsername: row.botUsername,
     starsEnabled: row.starsEnabled,
+    paymentMethods,
   };
 }
 
@@ -86,6 +89,9 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
     total: row.total,
     currency: row.currency,
     paymentChargeId: row.paymentChargeId,
+    paymentNetwork: row.paymentNetwork,
+    paymentTxHash: row.paymentTxHash,
+    paymentTxUrl: explorerTxUrl(row.paymentNetwork, row.paymentTxHash),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

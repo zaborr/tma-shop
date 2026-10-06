@@ -54,6 +54,15 @@ export class TelegramApi {
     });
   }
 
+  /** Sends a plain-text message. The user must have started the bot first. */
+  sendMessage(chatId: number, text: string): Promise<unknown> {
+    return this.call<unknown>('sendMessage', {
+      chat_id: chatId,
+      text,
+      link_preview_options: { is_disabled: true },
+    });
+  }
+
   answerPreCheckoutQuery(
     preCheckoutQueryId: string,
     ok: boolean,

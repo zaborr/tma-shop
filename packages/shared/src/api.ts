@@ -36,6 +36,18 @@ export const invoiceResponse = z.object({
 });
 export type InvoiceResponse = z.infer<typeof invoiceResponse>;
 
+/** Customer reports a crypto payment: which wallet they paid and the tx hash. */
+export const submitPaymentRequest = z.object({
+  methodId: z.string().min(1).max(64),
+  txHash: z
+    .string()
+    .trim()
+    .min(8, 'Transaction hash looks too short')
+    .max(200, 'Transaction hash looks too long')
+    .regex(/^[A-Za-z0-9]+$/, 'Paste only the transaction hash (letters and numbers)'),
+});
+export type SubmitPaymentRequest = z.infer<typeof submitPaymentRequest>;
+
 export const apiError = z.object({
   error: z.object({
     code: z.string(),

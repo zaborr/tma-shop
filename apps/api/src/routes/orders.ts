@@ -1,11 +1,24 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import type { CreateOrderResponse, InvoiceResponse } from '@tma-shop/shared';
+import { eq } from 'drizzle-orm';
+import {
+  submitPaymentRequest,
+  type CreateOrderResponse,
+  type InvoiceResponse,
+} from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { requireAuth } from '../auth/middleware.js';
-import { createOrderFromCart, getOrder, listOrders } from '../services/orders.js';
+import {
+  createOrderFromCart,
+  getOrder,
+  listOrders,
+  submitCryptoPayment,
+} from '../services/orders.js';
 import { createStarsInvoice } from '../services/payments.js';
+import { notifyAdminsOfPayment } from '../services/notifications.js';
+import { paymentMethodLabel } from '../config/payment-methods.js';
+import { users } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 
 const idParam = z.object({ id: z.uuid() });
@@ -46,6 +59,38 @@ export function orderRoutes(): Hono<AppBindings> {
     const response: InvoiceResponse = { invoiceLink };
     return c.json(response);
   });
+
+  // Customer reports a crypto payment (wallet + tx hash) for manual review.
+  app.post(
+    '/:id/payment',
+    zValidator('param', idParam),
+    zValidator('json', submitPaymentRequest),
+    async (c) => {
+      const { sub } = c.get('claims');
+      const env = c.get('env');
+      const db = c.get('db');
+      const { methodId, txHash } = c.req.valid('json');
+
+      const method = env.PAYMENT_METHODS.find((m) => m.id === methodId);
+      if (!method) throw ApiError.badRequest('unknown_method', 'Unknown payment method');
+
+      const order = await submitCryptoPayment(
+        db,
+        c.get('shopId'),
+        c.req.valid('param').id,
+        sub,
+        paymentMethodLabel(method),
+        txHash,
+      );
+
+      const user = await db.query.users.findFirst({ where: eq(users.telegramId, sub) });
+      const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Customer';
+      const customer = `${name}${user?.username ? ` (@${user.username})` : ''} · id ${sub}`;
+      await notifyAdminsOfPayment(env.BOT_TOKEN, env.ADMIN_TELEGRAM_IDS, order, customer);
+
+      return c.json(order);
+    },
+  );
 
   return app;
 }

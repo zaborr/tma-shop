@@ -157,6 +157,7 @@ tma-shop/
 | `TELEGRAM_WEBHOOK_SECRET`  | Secret token for the webhook                      | —       |
 | `SHOP_ID`                  | Active shop id (optional; resolved automatically) | —       |
 | `CORS_ORIGIN`              | Allowed Mini App origin(s)                        | `*`     |
+| `PAYMENT_METHODS`          | JSON array of crypto wallets for manual-verification checkout (see `.env.example`); empty = Stars checkout | `[]` |
 
 ---
 
