@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, ne } from 'drizzle-orm';
 import type { Category, Product, ProductInput } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { categories, orderItems, products } from '../db/schema.js';
@@ -15,11 +15,27 @@ export async function listAllProducts(db: Database, shopId: string): Promise<Pro
   return rows.map(toProductDTO);
 }
 
+/** Rejects a slug already used by another product of the shop. */
+async function assertProductSlugFree(
+  db: Database,
+  shopId: string,
+  slug: string,
+  exceptId?: string,
+): Promise<void> {
+  const filters = [eq(products.shopId, shopId), eq(products.slug, slug)];
+  if (exceptId) filters.push(ne(products.id, exceptId));
+  const taken = await db.query.products.findFirst({ where: and(...filters) });
+  if (taken) {
+    throw ApiError.conflict('slug_taken', `A product with the slug "${slug}" already exists`);
+  }
+}
+
 export async function createProduct(
   db: Database,
   shopId: string,
   input: ProductInput,
 ): Promise<Product> {
+  await assertProductSlugFree(db, shopId, input.slug);
   const [row] = await db
     .insert(products)
     .values({ shopId, ...input })
@@ -34,6 +50,7 @@ export async function updateProduct(
   productId: string,
   input: ProductInput,
 ): Promise<Product> {
+  await assertProductSlugFree(db, shopId, input.slug, productId);
   const [row] = await db
     .update(products)
     .set({ ...input })
@@ -72,15 +89,66 @@ export async function deleteProduct(
   return { archived: false };
 }
 
+export interface CategoryInput {
+  slug: string;
+  title: string;
+  sortOrder: number;
+}
+
+/** Rejects a slug already used by another category of the shop. */
+async function assertCategorySlugFree(
+  db: Database,
+  shopId: string,
+  slug: string,
+  exceptId?: string,
+): Promise<void> {
+  const filters = [eq(categories.shopId, shopId), eq(categories.slug, slug)];
+  if (exceptId) filters.push(ne(categories.id, exceptId));
+  const taken = await db.query.categories.findFirst({ where: and(...filters) });
+  if (taken) {
+    throw ApiError.conflict('slug_taken', `A category with the slug "${slug}" already exists`);
+  }
+}
+
 export async function createCategory(
   db: Database,
   shopId: string,
-  input: { slug: string; title: string; sortOrder: number },
+  input: CategoryInput,
 ): Promise<Category> {
+  await assertCategorySlugFree(db, shopId, input.slug);
   const [row] = await db
     .insert(categories)
     .values({ shopId, ...input })
     .returning();
   if (!row) throw new Error('Failed to create category');
   return toCategoryDTO(row);
+}
+
+export async function updateCategory(
+  db: Database,
+  shopId: string,
+  categoryId: string,
+  input: CategoryInput,
+): Promise<Category> {
+  await assertCategorySlugFree(db, shopId, input.slug, categoryId);
+  const [row] = await db
+    .update(categories)
+    .set({ ...input })
+    .where(and(eq(categories.shopId, shopId), eq(categories.id, categoryId)))
+    .returning();
+  if (!row) throw ApiError.notFound('Category not found');
+  return toCategoryDTO(row);
+}
+
+/** Deletes a category; its products stay in the shop without a category. */
+export async function deleteCategory(
+  db: Database,
+  shopId: string,
+  categoryId: string,
+): Promise<void> {
+  const deleted = await db
+    .delete(categories)
+    .where(and(eq(categories.shopId, shopId), eq(categories.id, categoryId)))
+    .returning({ id: categories.id });
+  if (deleted.length === 0) throw ApiError.notFound('Category not found');
 }

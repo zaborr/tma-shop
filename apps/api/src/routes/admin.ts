@@ -7,8 +7,10 @@ import { requireAdmin, requireAuth } from '../auth/middleware.js';
 import {
   createCategory,
   createProduct,
+  deleteCategory,
   deleteProduct,
   listAllProducts,
+  updateCategory,
   updateProduct,
 } from '../services/admin.js';
 import {
@@ -60,6 +62,24 @@ export function adminRoutes(): Hono<AppBindings> {
   app.post('/categories', zValidator('json', categoryInput), async (c) =>
     c.json(await createCategory(c.get('db'), c.get('shopId'), c.req.valid('json')), 201),
   );
+  app.put(
+    '/categories/:id',
+    zValidator('param', idParam),
+    zValidator('json', categoryInput),
+    async (c) =>
+      c.json(
+        await updateCategory(
+          c.get('db'),
+          c.get('shopId'),
+          c.req.valid('param').id,
+          c.req.valid('json'),
+        ),
+      ),
+  );
+  app.delete('/categories/:id', zValidator('param', idParam), async (c) => {
+    await deleteCategory(c.get('db'), c.get('shopId'), c.req.valid('param').id);
+    return c.body(null, 204);
+  });
 
   // Orders
   app.get('/orders', async (c) => c.json(await listAllOrders(c.get('db'), c.get('shopId'))));
