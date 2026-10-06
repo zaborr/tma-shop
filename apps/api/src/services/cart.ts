@@ -70,7 +70,8 @@ export async function getCart(db: Database, shopId: string, userId: number): Pro
 
   return {
     lines,
-    currency: shop?.currency ?? 'XTR',
+    // A cart holds a single currency (enforced in addItem); fall back to the shop's.
+    currency: lines[0]?.product.currency ?? shop?.currency ?? 'USDC',
     total: lines.reduce((sum, line) => sum + line.subtotal, 0),
     itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
   };
@@ -91,6 +92,21 @@ export async function addItem(
   });
   const newQty = (existing?.quantity ?? 0) + quantity;
   assertStock(product, newQty);
+
+  // One order is paid with one token, so a cart cannot mix currencies.
+  const other = await db
+    .select({ currency: products.currency })
+    .from(cartItems)
+    .innerJoin(products, eq(cartItems.productId, products.id))
+    .where(and(eq(cartItems.cartId, cart.id), eq(products.isActive, true)));
+  const mismatch = other.find((row) => row.currency !== product.currency);
+  if (mismatch) {
+    throw ApiError.conflict(
+      'mixed_currency',
+      `Your cart has ${mismatch.currency} products and this one is priced in ${product.currency}. ` +
+        'Check out or empty the cart first.',
+    );
+  }
 
   await db
     .insert(cartItems)

@@ -24,7 +24,12 @@ export function PaymentPage(): React.JSX.Element {
   if (!order.data || !shop.data) return <Loader />;
 
   const current = order.data;
-  const methods = shop.data.paymentMethods;
+  // Pay in the order's token (USDC/USDT); legacy orders in USD accept any wallet.
+  const tokenMethods = shop.data.paymentMethods.filter((m) => m.token === current.currency);
+  const methods =
+    current.currency === 'USD' || current.currency === 'XTR'
+      ? shop.data.paymentMethods
+      : tokenMethods;
   const payable = current.status === 'pending' || current.status === 'awaiting_payment';
 
   return (
@@ -54,8 +59,8 @@ export function PaymentPage(): React.JSX.Element {
       )}
       {payable && methods.length === 0 && (
         <Placeholder
-          header="No crypto payment methods"
-          description="The shop has not configured any wallet yet."
+          header={`No ${current.currency} wallet configured`}
+          description="Contact the shop to pay this order."
         >
           <span style={{ fontSize: 48 }}>💳</span>
         </Placeholder>

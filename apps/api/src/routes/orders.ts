@@ -11,6 +11,7 @@ import type { AppBindings } from '../context.js';
 import { requireAuth } from '../auth/middleware.js';
 import {
   createOrderFromCart,
+  deleteOrder,
   getOrder,
   listOrders,
   submitCryptoPayment,
@@ -44,6 +45,12 @@ export function orderRoutes(): Hono<AppBindings> {
     const order = await getOrder(c.get('db'), c.get('shopId'), c.req.valid('param').id, sub);
     if (!order) throw ApiError.notFound('Order not found');
     return c.json(order);
+  });
+
+  app.delete('/:id', zValidator('param', idParam), async (c) => {
+    const { sub } = c.get('claims');
+    await deleteOrder(c.get('db'), c.get('shopId'), c.req.valid('param').id, sub);
+    return c.body(null, 204);
   });
 
   app.post('/:id/invoice', zValidator('param', idParam), async (c) => {

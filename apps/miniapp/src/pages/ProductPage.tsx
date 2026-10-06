@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Cell, List, Section, Text, Title } from '@telegram-apps/telegram-ui';
-import { api } from '../api/client.js';
+import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useCart } from '../providers/CartProvider.js';
 import { useMainButton } from '../hooks/useMainButton.js';
@@ -14,6 +14,7 @@ export function ProductPage(): React.JSX.Element {
   const navigate = useNavigate();
   const { add } = useCart();
   const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   const { data: product, loading, error } = useAsync(() => api.getProduct(id), [id]);
   const outOfStock = product?.stock !== null && product !== null && (product?.stock ?? 0) <= 0;
@@ -21,9 +22,12 @@ export function ProductPage(): React.JSX.Element {
   const onAdd = useCallback(async () => {
     if (!product) return;
     setAdding(true);
+    setAddError(null);
     try {
       await add(product.id, 1);
       navigate('/cart');
+    } catch (err) {
+      setAddError(err instanceof ApiClientError ? err.message : 'Could not add to cart');
     } finally {
       setAdding(false);
     }
@@ -53,6 +57,13 @@ export function ProductPage(): React.JSX.Element {
           <Text style={{ display: 'block', marginTop: 12 }}>{product.description}</Text>
         </div>
       </Section>
+      {addError && (
+        <Section>
+          <Cell multiline style={{ color: 'var(--tgui--destructive_text_color)' }}>
+            {addError}
+          </Cell>
+        </Section>
+      )}
       <Section>
         <Cell after={product.stock === null ? 'In stock' : `${product.stock} left`}>
           Availability

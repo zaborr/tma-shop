@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { Button, Cell, Input, List, Section, Textarea } from '@telegram-apps/telegram-ui';
-import type { OrderStatus, ProductInput } from '@tma-shop/shared';
+import type { OrderStatus, Product, ProductInput } from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useSession } from '../providers/SessionProvider.js';
 import { formatPrice } from '../lib/format.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
+
+/** Tokens a product can be priced in. Prices are stored in cents (1290 = 12.90). */
+const TOKENS = ['USDC', 'USDT'] as const;
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   pending: 'Not paid yet',
@@ -16,6 +19,20 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   fulfilled: 'Fulfilled',
 };
 
+function toInput(product: Product, isActive: boolean): ProductInput {
+  return {
+    categoryId: product.categoryId,
+    slug: product.slug,
+    title: product.title,
+    description: product.description,
+    price: product.price,
+    currency: product.currency,
+    imageUrl: product.imageUrl,
+    stock: product.stock,
+    isActive,
+  };
+}
+
 export function AdminPage(): React.JSX.Element {
   const { isAdmin } = useSession();
   const [reloadKey, setReloadKey] = useState(0);
@@ -23,72 +40,86 @@ export function AdminPage(): React.JSX.Element {
 
   const shop = useAsync(() => api.getShop(), []);
   const orders = useAsync(() => api.adminGetOrders(), [reloadKey]);
-  const products = useAsync(() => api.getProducts({ limit: 100 }), [reloadKey]);
-  const [productError, setProductError] = useState<string | null>(null);
+  const products = useAsync(() => api.adminGetProducts(), [reloadKey]);
+  const [error, setError] = useState<string | null>(null);
+  // Two-tap confirmation (native confirm dialogs are unreliable in Telegram webviews).
   const [armed, setArmed] = useState<string | null>(null);
 
   if (!isAdmin) return <ErrorView message="Admins only" />;
 
-  const setStatus = async (id: string, status: OrderStatus): Promise<void> => {
-    await api.adminSetOrderStatus(id, status);
-    reload();
-  };
-
-  // Two-tap confirmation (native confirm dialogs are unreliable in Telegram webviews).
-  const confirm = async (id: string, status: OrderStatus): Promise<void> => {
-    const key = `${id}:${status}`;
-    if (armed !== key) {
-      setArmed(key);
-      return;
-    }
-    setArmed(null);
-    await setStatus(id, status);
-  };
-  const label = (id: string, status: OrderStatus, text: string): string =>
-    armed === `${id}:${status}` ? 'Tap again to confirm' : text;
-
-  const removeProduct = async (id: string): Promise<void> => {
-    const key = `${id}:delete`;
-    if (armed !== key) {
-      setArmed(key);
-      return;
-    }
-    setArmed(null);
-    setProductError(null);
+  const run = async (action: () => Promise<unknown>): Promise<void> => {
+    setError(null);
     try {
-      await api.adminDeleteProduct(id);
+      await action();
       reload();
     } catch (err) {
-      setProductError(err instanceof ApiClientError ? err.message : 'Could not delete the product');
+      setError(err instanceof ApiClientError ? err.message : 'Something went wrong');
     }
   };
+
+  /** Runs `action` on the second tap of the button identified by `key`. */
+  const twoTap = async (key: string, action: () => Promise<unknown>): Promise<void> => {
+    if (armed !== key) {
+      setArmed(key);
+      return;
+    }
+    setArmed(null);
+    await run(action);
+  };
+
+  const tapLabel = (key: string, text: string, confirmText = 'Tap again to confirm'): string =>
+    armed === key ? confirmText : text;
+
+  const defaultToken = TOKENS.find((t) => t === shop.data?.currency) ?? 'USDC';
 
   return (
     <List>
-      <NewProductForm currency={shop.data?.currency ?? 'XTR'} onCreated={reload} />
+      {error && (
+        <Section>
+          <Cell multiline style={{ color: 'var(--tgui--destructive_text_color)' }}>
+            {error}
+          </Cell>
+        </Section>
+      )}
+
+      <NewProductForm defaultToken={defaultToken} onCreated={reload} />
 
       <Section
         header="Products"
-        footer="Products that already have orders are archived: hidden from the shop, kept in order history."
+        footer="Hidden products are not shown in the shop. Deleting a product that already has orders hides it instead, so order history stays intact."
       >
         {products.loading && <Loader />}
         {products.error && <ErrorView message={products.error} />}
-        {productError && (
-          <Cell multiline style={{ color: 'var(--tgui--destructive_text_color)' }}>
-            {productError}
-          </Cell>
-        )}
-        {products.data?.items.length === 0 && <Cell>No products</Cell>}
-        {products.data?.items.map((product) => (
+        {products.data?.length === 0 && <Cell>No products</Cell>}
+        {products.data?.map((product) => (
           <Cell
             key={product.id}
             subtitle={`${formatPrice(product.price, product.currency)} · ${
               product.stock === null ? 'not stock-tracked' : `${product.stock} in stock`
-            }`}
+            }${product.isActive ? '' : ' · 🙈 hidden'}`}
             after={
-              <Button size="s" mode="plain" onClick={() => void removeProduct(product.id)}>
-                {armed === `${product.id}:delete` ? 'Tap again to delete' : 'Delete'}
-              </Button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <Button
+                  size="s"
+                  mode="bezeled"
+                  onClick={() =>
+                    void run(() =>
+                      api.adminUpdateProduct(product.id, toInput(product, !product.isActive)),
+                    )
+                  }
+                >
+                  {product.isActive ? 'Hide' : 'Show'}
+                </Button>
+                <Button
+                  size="s"
+                  mode="plain"
+                  onClick={() =>
+                    void twoTap(`product:${product.id}`, () => api.adminDeleteProduct(product.id))
+                  }
+                >
+                  {tapLabel(`product:${product.id}`, 'Delete', 'Tap again to delete')}
+                </Button>
+              </div>
             }
             multiline
           >
@@ -126,16 +157,20 @@ export function AdminPage(): React.JSX.Element {
                   <Button
                     size="s"
                     mode="filled"
-                    onClick={() => void confirm(order.id, 'paid')}
+                    onClick={() =>
+                      void twoTap(`paid:${order.id}`, () =>
+                        api.adminSetOrderStatus(order.id, 'paid'),
+                      )
+                    }
                   >
-                    {label(order.id, 'paid', 'Mark paid')}
+                    {tapLabel(`paid:${order.id}`, 'Mark paid')}
                   </Button>
                 )}
                 {order.status === 'paid' && (
                   <Button
                     size="s"
                     mode="bezeled"
-                    onClick={() => void setStatus(order.id, 'fulfilled')}
+                    onClick={() => void run(() => api.adminSetOrderStatus(order.id, 'fulfilled'))}
                   >
                     Fulfill
                   </Button>
@@ -144,11 +179,24 @@ export function AdminPage(): React.JSX.Element {
                   <Button
                     size="s"
                     mode="plain"
-                    onClick={() => void confirm(order.id, 'cancelled')}
+                    onClick={() =>
+                      void twoTap(`cancel:${order.id}`, () =>
+                        api.adminSetOrderStatus(order.id, 'cancelled'),
+                      )
+                    }
                   >
-                    {label(order.id, 'cancelled', 'Cancel')}
+                    {tapLabel(`cancel:${order.id}`, 'Cancel')}
                   </Button>
                 )}
+                <Button
+                  size="s"
+                  mode="plain"
+                  onClick={() =>
+                    void twoTap(`delete:${order.id}`, () => api.adminDeleteOrder(order.id))
+                  }
+                >
+                  {tapLabel(`delete:${order.id}`, 'Delete', 'Tap again to delete')}
+                </Button>
               </div>
             }
             multiline
@@ -162,18 +210,21 @@ export function AdminPage(): React.JSX.Element {
 }
 
 function NewProductForm({
-  currency,
+  defaultToken,
   onCreated,
 }: {
-  currency: string;
+  defaultToken: (typeof TOKENS)[number];
   onCreated: () => void;
 }): React.JSX.Element {
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [price, setPrice] = useState('');
+  const [token, setToken] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  const currency = token ?? defaultToken;
 
   const submit = async (): Promise<void> => {
     setBusy(true);
@@ -183,11 +234,8 @@ function NewProductForm({
       slug: slug.trim(),
       title: title.trim(),
       description: description.trim(),
-      // Fiat prices are typed in major units (12.90) and stored in cents.
-      price:
-        currency === 'XTR'
-          ? Math.round(Number(price) || 0)
-          : Math.round((Number(price) || 0) * 100),
+      // Typed in token units (12.90) and stored in cents.
+      price: Math.round((Number(price.replace(',', '.')) || 0) * 100),
       currency,
       imageUrl: null,
       stock: null,
@@ -212,9 +260,29 @@ function NewProductForm({
     <Section header="Add product">
       <Input header="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
       <Input header="Slug (kebab-case)" value={slug} onChange={(e) => setSlug(e.target.value)} />
+      <Cell
+        subtitle="Price currency"
+        after={
+          <div style={{ display: 'flex', gap: 8 }}>
+            {TOKENS.map((t) => (
+              <Button
+                key={t}
+                size="s"
+                mode={t === currency ? 'filled' : 'bezeled'}
+                onClick={() => setToken(t)}
+              >
+                {t}
+              </Button>
+            ))}
+          </div>
+        }
+      >
+        {currency}
+      </Cell>
       <Input
-        header={currency === 'XTR' ? 'Price (Stars)' : `Price (${currency}, e.g. 12.90)`}
-        type="number"
+        header={`Price (${currency}, e.g. 12.90)`}
+        type="text"
+        inputMode="decimal"
         value={price}
         onChange={(e) => setPrice(e.target.value)}
       />

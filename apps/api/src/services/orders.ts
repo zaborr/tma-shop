@@ -75,9 +75,18 @@ export async function createOrderFromCart(
           .where(eq(cartItems.cartId, cart.id))
       : [];
 
+    const activeLines = lines.filter((l) => l.product.isActive);
+    const currencies = new Set(activeLines.map((l) => l.product.currency));
+    if (currencies.size > 1) {
+      throw ApiError.badRequest(
+        'mixed_currency',
+        'The cart mixes currencies; remove the items priced in the other token',
+      );
+    }
+    const currency = activeLines[0]?.product.currency ?? shop.currency;
+
     const draft = buildOrderDraft(
-      lines
-        .filter((l) => l.product.isActive)
+      activeLines
         .map((l) => ({
           productId: l.product.id,
           title: l.product.title,
@@ -94,7 +103,7 @@ export async function createOrderFromCart(
         userId,
         status: 'pending',
         total: draft.total,
-        currency: shop.currency,
+        currency,
       })
       .returning();
     if (!order) throw new Error('Failed to create order');
@@ -236,6 +245,35 @@ export async function submitCryptoPayment(
   if (!updated) throw new Error('Failed to update order');
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, updated.id));
   return toOrderDTO(updated, items);
+}
+
+/** Statuses a customer may delete: nothing paid or under verification. */
+const CUSTOMER_DELETABLE: Order['status'][] = ['pending', 'cancelled'];
+
+/**
+ * Deletes an order (its items cascade). Admins (no `userId`) may delete any
+ * order; customers only their own, and only while nothing has been paid or
+ * submitted for verification, so a payment never loses its record.
+ */
+export async function deleteOrder(
+  db: Database,
+  shopId: string,
+  orderId: string,
+  userId?: number,
+): Promise<void> {
+  const filters = [eq(orders.shopId, shopId), eq(orders.id, orderId)];
+  if (userId !== undefined) filters.push(eq(orders.userId, userId));
+  const order = await db.query.orders.findFirst({ where: and(...filters) });
+  if (!order) throw ApiError.notFound('Order not found');
+
+  if (userId !== undefined && !CUSTOMER_DELETABLE.includes(order.status)) {
+    throw ApiError.conflict(
+      'not_deletable',
+      'Orders with a submitted or confirmed payment cannot be deleted. Contact the shop.',
+    );
+  }
+
+  await db.delete(orders).where(eq(orders.id, order.id));
 }
 
 async function attachItems(db: Database, rows: (typeof orders.$inferSelect)[]): Promise<Order[]> {
