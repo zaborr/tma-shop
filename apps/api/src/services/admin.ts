@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { Category, Product, ProductInput } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
-import { categories, products } from '../db/schema.js';
+import { categories, orderItems, products } from '../db/schema.js';
 import { toCategoryDTO, toProductDTO } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
 
@@ -33,16 +33,33 @@ export async function updateProduct(
   return toProductDTO(row);
 }
 
+/**
+ * Removes a product from the shop. Products that already appear in an order
+ * cannot be hard-deleted (order history keeps a reference to them), so those
+ * are archived instead: hidden from the catalog and no longer purchasable.
+ */
 export async function deleteProduct(
   db: Database,
   shopId: string,
   productId: string,
-): Promise<void> {
-  const deleted = await db
-    .delete(products)
-    .where(and(eq(products.shopId, shopId), eq(products.id, productId)))
-    .returning({ id: products.id });
-  if (deleted.length === 0) throw ApiError.notFound('Product not found');
+): Promise<{ archived: boolean }> {
+  const where = and(eq(products.shopId, shopId), eq(products.id, productId));
+  const product = await db.query.products.findFirst({ where });
+  if (!product) throw ApiError.notFound('Product not found');
+
+  const ordered = await db
+    .select({ id: orderItems.id })
+    .from(orderItems)
+    .where(eq(orderItems.productId, productId))
+    .limit(1);
+
+  if (ordered.length > 0) {
+    await db.update(products).set({ isActive: false }).where(where);
+    return { archived: true };
+  }
+
+  await db.delete(products).where(where);
+  return { archived: false };
 }
 
 export async function createCategory(

@@ -145,6 +145,11 @@ export class ApiClient {
     });
   }
 
+  /** Deletes a product, or archives it when it already appears in an order. */
+  adminDeleteProduct(productId: string): Promise<void> {
+    return this.request<void>(`/admin/products/${productId}`, { method: 'DELETE' });
+  }
+
   adminCreateProduct(input: ProductInput): Promise<Product> {
     return this.request<Product>('/admin/products', {
       method: 'POST',
