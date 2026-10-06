@@ -23,6 +23,8 @@ export function AdminPage(): React.JSX.Element {
 
   const shop = useAsync(() => api.getShop(), []);
   const orders = useAsync(() => api.adminGetOrders(), [reloadKey]);
+  const products = useAsync(() => api.getProducts({ limit: 100 }), [reloadKey]);
+  const [productError, setProductError] = useState<string | null>(null);
   const [armed, setArmed] = useState<string | null>(null);
 
   if (!isAdmin) return <ErrorView message="Admins only" />;
@@ -45,9 +47,55 @@ export function AdminPage(): React.JSX.Element {
   const label = (id: string, status: OrderStatus, text: string): string =>
     armed === `${id}:${status}` ? 'Tap again to confirm' : text;
 
+  const removeProduct = async (id: string): Promise<void> => {
+    const key = `${id}:delete`;
+    if (armed !== key) {
+      setArmed(key);
+      return;
+    }
+    setArmed(null);
+    setProductError(null);
+    try {
+      await api.adminDeleteProduct(id);
+      reload();
+    } catch (err) {
+      setProductError(err instanceof ApiClientError ? err.message : 'Could not delete the product');
+    }
+  };
+
   return (
     <List>
       <NewProductForm currency={shop.data?.currency ?? 'XTR'} onCreated={reload} />
+
+      <Section
+        header="Products"
+        footer="Products that already have orders are archived: hidden from the shop, kept in order history."
+      >
+        {products.loading && <Loader />}
+        {products.error && <ErrorView message={products.error} />}
+        {productError && (
+          <Cell multiline style={{ color: 'var(--tgui--destructive_text_color)' }}>
+            {productError}
+          </Cell>
+        )}
+        {products.data?.items.length === 0 && <Cell>No products</Cell>}
+        {products.data?.items.map((product) => (
+          <Cell
+            key={product.id}
+            subtitle={`${formatPrice(product.price, product.currency)} · ${
+              product.stock === null ? 'not stock-tracked' : `${product.stock} in stock`
+            }`}
+            after={
+              <Button size="s" mode="plain" onClick={() => void removeProduct(product.id)}>
+                {armed === `${product.id}:delete` ? 'Tap again to delete' : 'Delete'}
+              </Button>
+            }
+            multiline
+          >
+            {product.title}
+          </Cell>
+        ))}
+      </Section>
 
       <Section header="All orders">
         {orders.loading && <Loader />}
