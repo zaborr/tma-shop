@@ -10,35 +10,33 @@ import {
 
 /**
  * Initializes the Telegram SDK (v3) and mounts the components the app relies on.
+ * Each mount is guarded with `isSupported`/`isAvailable` so the call is a no-op
+ * in environments where a feature is missing instead of throwing.
  */
-export async function init(debug: boolean): Promise<void> {
+export function init(debug: boolean): void {
   setDebug(debug);
-
   initSDK();
+
+  // Restore initData state from the launch parameters.
+  initData.restore();
 
   if (backButton.isSupported()) {
     backButton.mount();
   }
 
   if (miniApp.mount.isAvailable()) {
-    await miniApp.mount();
-
-    if (miniApp.bindCssVars.isAvailable()) {
-      miniApp.bindCssVars();
-    }
+    miniApp.mount();
+    miniApp.bindCssVars();
   }
 
-  if (themeParams.bindCssVars.isAvailable()) {
+  if (themeParams.mount.isAvailable()) {
+    themeParams.mount();
     themeParams.bindCssVars();
   }
 
   if (viewport.mount.isAvailable()) {
-    await viewport.mount();
-
-    if (viewport.bindCssVars.isAvailable()) {
+    void viewport.mount().then(() => {
       viewport.bindCssVars();
-    }
+    });
   }
-
-  initData.restore();
 }
