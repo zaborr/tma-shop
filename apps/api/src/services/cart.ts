@@ -68,11 +68,15 @@ export async function getCart(db: Database, shopId: string, userId: number): Pro
       subtotal: r.product.price * r.item.quantity,
     }));
 
+  // The per-order fee is added once, only when there is something to buy.
+  const fee = lines.length > 0 ? (shop?.orderFee ?? 0) : 0;
+
   return {
     lines,
     // A cart holds a single currency (enforced in addItem); fall back to the shop's.
     currency: lines[0]?.product.currency ?? shop?.currency ?? 'USDC',
-    total: lines.reduce((sum, line) => sum + line.subtotal, 0),
+    fee,
+    total: lines.reduce((sum, line) => sum + line.subtotal, 0) + fee,
     itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
   };
 }

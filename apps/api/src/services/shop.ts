@@ -19,6 +19,22 @@ export async function resolveActiveShopId(db: Database, env: Env): Promise<strin
   return shop.id;
 }
 
+/** Sets the fixed fee added once to every new order (0 = no fee) and its label. */
+export async function updateOrderFee(
+  db: Database,
+  shopId: string,
+  input: { orderFee: number; orderFeeLabel: string },
+  paymentMethods: PaymentMethod[] = [],
+): Promise<ShopConfig> {
+  const [row] = await db
+    .update(shops)
+    .set({ orderFee: input.orderFee, orderFeeLabel: input.orderFeeLabel })
+    .where(eq(shops.id, shopId))
+    .returning();
+  if (!row) throw ApiError.notFound('Shop not found');
+  return toShopConfigDTO(row, paymentMethods);
+}
+
 export async function getShopConfig(
   db: Database,
   shopId: string,

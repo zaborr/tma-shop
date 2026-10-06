@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
 import {
   createOrderRequest,
+  requestOrderChangeRequest,
   submitPaymentRequest,
   type CreateOrderResponse,
   type InvoiceResponse,
@@ -14,13 +14,19 @@ import {
   createOrderFromCart,
   deleteOrder,
   getOrder,
+  clearOrderChange,
   listOrders,
+  requestOrderChange,
   submitCryptoPayment,
 } from '../services/orders.js';
 import { createStarsInvoice } from '../services/payments.js';
-import { notifyAdminsOfPayment } from '../services/notifications.js';
+import {
+  buildChangeRequestMessage,
+  notifyAdminsOfPayment,
+  notifyChats,
+} from '../services/notifications.js';
+import { describeCustomer } from '../services/customers.js';
 import { paymentMethodLabel } from '../config/payment-methods.js';
-import { users } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 
 const idParam = z.object({ id: z.uuid() });
@@ -92,14 +98,46 @@ export function orderRoutes(): Hono<AppBindings> {
         txHash,
       );
 
-      const user = await db.query.users.findFirst({ where: eq(users.telegramId, sub) });
-      const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Customer';
-      const customer = `${name}${user?.username ? ` (@${user.username})` : ''} · id ${sub}`;
+      const customer = await describeCustomer(db, sub);
       await notifyAdminsOfPayment(env.BOT_TOKEN, env.ADMIN_TELEGRAM_IDS, order, customer);
 
       return c.json(order);
     },
   );
+
+  // Customer asks to modify a paid order; an admin must approve it.
+  app.post(
+    '/:id/change',
+    zValidator('param', idParam),
+    zValidator('json', requestOrderChangeRequest),
+    async (c) => {
+      const { sub } = c.get('claims');
+      const env = c.get('env');
+      const db = c.get('db');
+      const order = await requestOrderChange(
+        db,
+        c.get('shopId'),
+        c.req.valid('param').id,
+        sub,
+        c.req.valid('json').items,
+      );
+      const customer = await describeCustomer(db, sub);
+      await notifyChats(
+        env.BOT_TOKEN,
+        env.ADMIN_TELEGRAM_IDS,
+        buildChangeRequestMessage(order, customer),
+      );
+      return c.json(order);
+    },
+  );
+
+  // Customer withdraws their pending change request.
+  app.delete('/:id/change', zValidator('param', idParam), async (c) => {
+    const { sub } = c.get('claims');
+    return c.json(
+      await clearOrderChange(c.get('db'), c.get('shopId'), c.req.valid('param').id, sub),
+    );
+  });
 
   return app;
 }

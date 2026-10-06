@@ -69,7 +69,9 @@ export function OrdersPage(): React.JSX.Element {
             subtitle={pluralize(order.items.length, 'item', 'items')}
             after={formatPrice(order.total, order.currency)}
             description={
-              DELETABLE.includes(order.status) ? (
+              DELETABLE.includes(order.status) &&
+              order.amountPaid === 0 &&
+              order.amountSubmitted === 0 ? (
                 <Button
                   size="s"
                   mode="plain"
@@ -85,7 +87,13 @@ export function OrdersPage(): React.JSX.Element {
                 <Badge type="dot" />
               )
             }
-            hint={STATUS_META[order.status].label}
+            hint={
+              order.changeRequest
+                ? 'Change requested'
+                : order.status === 'pending' && order.amountPaid > 0
+                  ? 'Difference to pay'
+                  : STATUS_META[order.status].label
+            }
             multiline
           >
             Order #{order.id.slice(0, 8)}

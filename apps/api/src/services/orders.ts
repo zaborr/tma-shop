@@ -1,5 +1,5 @@
-import { and, desc, eq, ne, sql } from 'drizzle-orm';
-import type { Order } from '@tma-shop/shared';
+import { and, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
+import type { Order, OrderChangeRequest, PaymentLogEntry } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { cartItems, orderItems, orders, products, shops } from '../db/schema.js';
 import { toOrderDTO } from '../db/mappers.js';
@@ -103,7 +103,9 @@ export async function createOrderFromCart(
         shopId,
         userId,
         status: 'pending',
-        total: draft.total,
+        // The shop's per-order fee is frozen on the order and charged once.
+        total: draft.total + shop.orderFee,
+        fee: shop.orderFee,
         currency,
         contactUsername,
       })
@@ -169,8 +171,10 @@ export async function setOrderStatus(
 }
 
 /**
- * Marks an order paid and decrements tracked stock, idempotently: a repeated
- * webhook for the same order is a no-op. Returns the up-to-date order.
+ * Confirms the payment currently under review (or, for Stars and legacy orders,
+ * whatever is still due): adds it to `amountPaid`, logs it, and decrements
+ * tracked stock the first time an order is paid. Idempotent for orders that are
+ * not waiting for a payment (a repeated webhook is a no-op).
  */
 export async function markOrderPaid(
   db: Database,
@@ -182,22 +186,43 @@ export async function markOrderPaid(
     if (!order) throw ApiError.notFound('Order not found');
 
     const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
-    if (order.status === 'paid' || order.status === 'fulfilled') {
+    if (order.status !== 'pending' && order.status !== 'awaiting_payment') {
       return toOrderDTO(order, items);
     }
 
+    const received =
+      order.amountSubmitted > 0 ? order.amountSubmitted : Math.max(order.total - order.amountPaid, 0);
+    const amountPaid = order.amountPaid + received;
+    const entry: PaymentLogEntry = {
+      type: 'payment',
+      amount: received,
+      network: order.paymentNetwork,
+      txHash: order.paymentTxHash ?? paymentChargeId,
+      at: new Date().toISOString(),
+    };
+
     const [updated] = await tx
       .update(orders)
-      .set({ status: 'paid', paymentChargeId, updatedAt: new Date() })
+      .set({
+        status: amountPaid >= order.total ? 'paid' : 'pending',
+        amountPaid,
+        amountSubmitted: 0,
+        paymentChargeId,
+        paymentLog: [...order.paymentLog, entry],
+        stockApplied: true,
+        updatedAt: new Date(),
+      })
       .where(eq(orders.id, order.id))
       .returning();
     if (!updated) throw new Error('Failed to update order');
 
-    for (const item of items) {
-      await tx
-        .update(products)
-        .set({ stock: sql`GREATEST(${products.stock} - ${item.quantity}, 0)` })
-        .where(and(eq(products.id, item.productId), sql`${products.stock} IS NOT NULL`));
+    if (!order.stockApplied) {
+      for (const item of items) {
+        await tx
+          .update(products)
+          .set({ stock: sql`GREATEST(${products.stock} - ${item.quantity}, 0)` })
+          .where(and(eq(products.id, item.productId), sql`${products.stock} IS NOT NULL`));
+      }
     }
 
     return toOrderDTO(updated, items);
@@ -225,13 +250,18 @@ export async function submitCryptoPayment(
   if (order.status !== 'pending' && order.status !== 'awaiting_payment') {
     throw ApiError.conflict('not_payable', `Order is ${order.status} and cannot take a payment`);
   }
+  const due = order.total - order.amountPaid;
+  if (due <= 0) throw ApiError.conflict('nothing_due', 'Nothing is left to pay for this order');
 
-  // A transaction can only pay for one order.
+  // A transaction can only pay once: not for another order, and not twice here.
   const reused = await db.query.orders.findFirst({
-    where: and(eq(orders.paymentTxHash, txHash), ne(orders.id, order.id)),
+    where: or(
+      and(eq(orders.paymentTxHash, txHash), ne(orders.id, order.id)),
+      sql`${orders.paymentLog} @> ${JSON.stringify([{ txHash }])}::jsonb`,
+    ),
   });
   if (reused) {
-    throw ApiError.conflict('tx_already_used', 'This transaction was already used for another order');
+    throw ApiError.conflict('tx_already_used', 'This transaction was already used for a payment');
   }
 
   const [updated] = await db
@@ -240,6 +270,7 @@ export async function submitCryptoPayment(
       status: 'awaiting_payment',
       paymentNetwork,
       paymentTxHash: txHash,
+      amountSubmitted: due,
       updatedAt: new Date(),
     })
     .where(eq(orders.id, order.id))
@@ -268,7 +299,8 @@ export async function deleteOrder(
   const order = await db.query.orders.findFirst({ where: and(...filters) });
   if (!order) throw ApiError.notFound('Order not found');
 
-  if (userId !== undefined && !CUSTOMER_DELETABLE.includes(order.status)) {
+  const moneyInvolved = order.amountPaid > 0 || order.amountSubmitted > 0;
+  if (userId !== undefined && (!CUSTOMER_DELETABLE.includes(order.status) || moneyInvolved)) {
     throw ApiError.conflict(
       'not_deletable',
       'Orders with a submitted or confirmed payment cannot be deleted. Contact the shop.',
@@ -276,6 +308,213 @@ export async function deleteOrder(
   }
 
   await db.delete(orders).where(eq(orders.id, order.id));
+}
+
+/** Orders a customer may ask to modify: already paid or under verification. */
+const CHANGEABLE: Order['status'][] = ['paid', 'awaiting_payment'];
+
+/**
+ * Stores a customer's requested modification (the full new item list) for
+ * admin approval. Lines already in the order keep their original unit price;
+ * new products use the current price. Stock is checked against what the order
+ * already holds. Replaces any earlier pending request.
+ */
+export async function requestOrderChange(
+  db: Database,
+  shopId: string,
+  orderId: string,
+  userId: number,
+  lines: Array<{ productId: string; quantity: number }>,
+): Promise<Order> {
+  const order = await db.query.orders.findFirst({
+    where: and(eq(orders.shopId, shopId), eq(orders.id, orderId), eq(orders.userId, userId)),
+  });
+  if (!order) throw ApiError.notFound('Order not found');
+  if (!CHANGEABLE.includes(order.status)) {
+    throw ApiError.conflict(
+      'not_changeable',
+      'Only paid orders, or orders whose payment is being verified, can be changed',
+    );
+  }
+
+  const current = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+  const currentQty = new Map(current.map((item) => [item.productId, item.quantity]));
+  const currentPrice = new Map(current.map((item) => [item.productId, item.unitPrice]));
+
+  // Merge duplicate lines.
+  const wanted = new Map<string, number>();
+  for (const line of lines) {
+    wanted.set(line.productId, (wanted.get(line.productId) ?? 0) + line.quantity);
+  }
+
+  const rows = await db
+    .select()
+    .from(products)
+    .where(and(eq(products.shopId, shopId), inArray(products.id, [...wanted.keys()])));
+  const byId = new Map(rows.map((row) => [row.id, row]));
+
+  const items: OrderChangeRequest['items'] = [];
+  for (const [productId, quantity] of wanted) {
+    const product = byId.get(productId);
+    const inOrder = currentQty.has(productId);
+    if (!product || (!inOrder && !product.isActive)) {
+      throw ApiError.badRequest('unknown_product', 'A product in the change is no longer available');
+    }
+    if (product.currency !== order.currency) {
+      throw ApiError.badRequest(
+        'mixed_currency',
+        `"${product.title}" is priced in ${product.currency}; this order is in ${order.currency}`,
+      );
+    }
+    const held = order.stockApplied ? (currentQty.get(productId) ?? 0) : 0;
+    if (product.stock !== null && quantity > product.stock + held) {
+      throw ApiError.conflict(
+        'out_of_stock',
+        `Only ${product.stock + held} of "${product.title}" available`,
+      );
+    }
+    const unitPrice = currentPrice.get(productId) ?? product.price;
+    items.push({
+      productId,
+      title: product.title,
+      unitPrice,
+      quantity,
+      subtotal: unitPrice * quantity,
+    });
+  }
+
+  const unchanged =
+    items.length === current.length &&
+    items.every((item) => currentQty.get(item.productId) === item.quantity);
+  if (unchanged) throw ApiError.badRequest('no_changes', 'The order is unchanged');
+
+  const changeRequest: OrderChangeRequest = {
+    items,
+    // The order's fee stays the same: it is charged once per order.
+    total: items.reduce((sum, item) => sum + item.subtotal, 0) + order.fee,
+    requestedAt: new Date().toISOString(),
+  };
+  const [updated] = await db
+    .update(orders)
+    .set({ changeRequest, updatedAt: new Date() })
+    .where(eq(orders.id, order.id))
+    .returning();
+  if (!updated) throw new Error('Failed to update order');
+  return toOrderDTO(updated, current);
+}
+
+/** Withdraws (customer) or rejects (admin, no `userId`) a pending change. */
+export async function clearOrderChange(
+  db: Database,
+  shopId: string,
+  orderId: string,
+  userId?: number,
+): Promise<Order> {
+  const filters = [eq(orders.shopId, shopId), eq(orders.id, orderId)];
+  if (userId !== undefined) filters.push(eq(orders.userId, userId));
+  const [updated] = await db
+    .update(orders)
+    .set({ changeRequest: null, updatedAt: new Date() })
+    .where(and(...filters))
+    .returning();
+  if (!updated) throw ApiError.notFound('Order not found');
+  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, updated.id));
+  return toOrderDTO(updated, items);
+}
+
+/**
+ * Applies an approved change: replaces the items and total, moves tracked stock
+ * by the difference (when the order already holds stock) and works out what is
+ * owed. A paid order that now costs more goes back to `pending` so the customer
+ * can pay the difference; one that costs less stays paid with a refund due.
+ */
+export async function approveOrderChange(
+  db: Database,
+  shopId: string,
+  orderId: string,
+): Promise<Order> {
+  return db.transaction(async (tx) => {
+    const order = await tx.query.orders.findFirst({
+      where: and(eq(orders.shopId, shopId), eq(orders.id, orderId)),
+    });
+    if (!order) throw ApiError.notFound('Order not found');
+    const change = order.changeRequest;
+    if (!change) throw ApiError.conflict('no_change', 'There is no change to approve');
+    if (!CHANGEABLE.includes(order.status)) {
+      throw ApiError.conflict('not_changeable', `Order is ${order.status} and cannot be changed`);
+    }
+
+    const current = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+
+    if (order.stockApplied) {
+      const delta = new Map<string, number>();
+      for (const item of current) delta.set(item.productId, -item.quantity);
+      for (const item of change.items) {
+        delta.set(item.productId, (delta.get(item.productId) ?? 0) + item.quantity);
+      }
+      for (const [productId, diff] of delta) {
+        if (diff === 0) continue;
+        const product = await tx.query.products.findFirst({ where: eq(products.id, productId) });
+        if (!product || product.stock === null) continue;
+        if (diff > product.stock) {
+          throw ApiError.conflict(
+            'out_of_stock',
+            `Not enough stock of "${product.title}" (${product.stock} left) to approve`,
+          );
+        }
+        await tx
+          .update(products)
+          .set({ stock: product.stock - diff })
+          .where(eq(products.id, productId));
+      }
+    }
+
+    await tx.delete(orderItems).where(eq(orderItems.orderId, order.id));
+    const inserted = await tx
+      .insert(orderItems)
+      .values(change.items.map((item) => ({ orderId: order.id, ...item })))
+      .returning();
+
+    const status =
+      order.status === 'paid' && change.total > order.amountPaid ? 'pending' : order.status;
+    const [updated] = await tx
+      .update(orders)
+      .set({ total: change.total, changeRequest: null, status, updatedAt: new Date() })
+      .where(eq(orders.id, order.id))
+      .returning();
+    if (!updated) throw new Error('Failed to update order');
+    return toOrderDTO(updated, inserted);
+  });
+}
+
+/** Records that the admin sent back the overpaid amount (`amountPaid > total`). */
+export async function recordRefund(db: Database, shopId: string, orderId: string): Promise<Order> {
+  const order = await db.query.orders.findFirst({
+    where: and(eq(orders.shopId, shopId), eq(orders.id, orderId)),
+  });
+  if (!order) throw ApiError.notFound('Order not found');
+  const refund = order.amountPaid - order.total;
+  if (refund <= 0) throw ApiError.conflict('nothing_to_refund', 'Nothing is owed to the customer');
+
+  const entry: PaymentLogEntry = {
+    type: 'refund',
+    amount: refund,
+    network: null,
+    txHash: null,
+    at: new Date().toISOString(),
+  };
+  const [updated] = await db
+    .update(orders)
+    .set({
+      amountPaid: order.total,
+      paymentLog: [...order.paymentLog, entry],
+      updatedAt: new Date(),
+    })
+    .where(eq(orders.id, order.id))
+    .returning();
+  if (!updated) throw new Error('Failed to update order');
+  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, updated.id));
+  return toOrderDTO(updated, items);
 }
 
 async function attachItems(db: Database, rows: (typeof orders.$inferSelect)[]): Promise<Order[]> {

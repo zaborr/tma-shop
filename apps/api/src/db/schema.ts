@@ -2,6 +2,7 @@ import {
   bigint,
   boolean,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -10,6 +11,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import type { OrderChangeRequest, PaymentLogEntry } from '@tma-shop/shared';
 
 export const userRoleEnum = pgEnum('user_role', ['customer', 'admin']);
 
@@ -28,6 +30,9 @@ export const shops = pgTable('shops', {
   currency: text('currency').notNull().default('XTR'),
   botUsername: text('bot_username'),
   starsEnabled: boolean('stars_enabled').notNull().default(true),
+  /** Fixed fee added once to every order (minor units of the order's token). */
+  orderFee: integer('order_fee').notNull().default(0),
+  orderFeeLabel: text('order_fee_label').notNull().default('Service fee'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -120,7 +125,10 @@ export const orders = pgTable('orders', {
     .notNull()
     .references(() => users.telegramId, { onDelete: 'cascade' }),
   status: orderStatusEnum('status').notNull().default('pending'),
+  /** Total including `fee`. */
   total: integer('total').notNull(),
+  /** Per-order fee charged once, frozen at creation. */
+  fee: integer('fee').notNull().default(0),
   currency: text('currency').notNull(),
   paymentChargeId: text('payment_charge_id'),
   /** Crypto payment method label chosen by the customer, e.g. "USDC · Base". */
@@ -129,6 +137,16 @@ export const orders = pgTable('orders', {
   paymentTxHash: text('payment_tx_hash'),
   /** Customer's Telegram username (without @) given at checkout. */
   contactUsername: text('contact_username'),
+  /** Confirmed money received, net of refunds (minor units of `currency`). */
+  amountPaid: integer('amount_paid').notNull().default(0),
+  /** Amount covered by the transaction currently awaiting verification. */
+  amountSubmitted: integer('amount_submitted').notNull().default(0),
+  /** Whether tracked stock was already decremented for this order's items. */
+  stockApplied: boolean('stock_applied').notNull().default(false),
+  /** Customer's pending modification, awaiting admin approval. */
+  changeRequest: jsonb('change_request').$type<OrderChangeRequest>(),
+  /** Confirmed payments and refunds, oldest first. */
+  paymentLog: jsonb('payment_log').$type<PaymentLogEntry[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
