@@ -20,6 +20,18 @@ try {
       <App />
     </StrictMode>,
   );
-} catch {
-  root.render(<EnvUnsupported />);
+} catch (err) {
+  console.error('[tma-shop] Telegram SDK initialization failed:', err);
+
+  root.render(
+    <div style={{
+      padding: '20px',
+      fontFamily: 'monospace',
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+    }}>
+      <h2>Telegram SDK error</h2>
+      <pre>{err instanceof Error ? `${err.name}: ${err.message}\n\n${err.stack ?? ''}` : String(err)}</pre>
+    </div>,
+  );
 }
