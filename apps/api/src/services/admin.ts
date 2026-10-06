@@ -1,9 +1,19 @@
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { Category, Product, ProductInput } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { categories, orderItems, products } from '../db/schema.js';
 import { toCategoryDTO, toProductDTO } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
+
+/** Every product of the shop, hidden ones included (the catalog only shows active). */
+export async function listAllProducts(db: Database, shopId: string): Promise<Product[]> {
+  const rows = await db
+    .select()
+    .from(products)
+    .where(eq(products.shopId, shopId))
+    .orderBy(asc(products.createdAt));
+  return rows.map(toProductDTO);
+}
 
 export async function createProduct(
   db: Database,

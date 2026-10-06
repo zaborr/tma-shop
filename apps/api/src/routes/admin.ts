@@ -4,8 +4,20 @@ import { z } from 'zod';
 import { orderStatus, productInput, slug } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth } from '../auth/middleware.js';
-import { createCategory, createProduct, deleteProduct, updateProduct } from '../services/admin.js';
-import { getOrder, listAllOrders, markOrderPaid, setOrderStatus } from '../services/orders.js';
+import {
+  createCategory,
+  createProduct,
+  deleteProduct,
+  listAllProducts,
+  updateProduct,
+} from '../services/admin.js';
+import {
+  deleteOrder,
+  getOrder,
+  listAllOrders,
+  markOrderPaid,
+  setOrderStatus,
+} from '../services/orders.js';
 import { ApiError } from '../lib/errors.js';
 
 const idParam = z.object({ id: z.uuid() });
@@ -21,6 +33,7 @@ export function adminRoutes(): Hono<AppBindings> {
   app.use('*', requireAuth, requireAdmin);
 
   // Products
+  app.get('/products', async (c) => c.json(await listAllProducts(c.get('db'), c.get('shopId'))));
   app.post('/products', zValidator('json', productInput), async (c) =>
     c.json(await createProduct(c.get('db'), c.get('shopId'), c.req.valid('json')), 201),
   );
@@ -71,6 +84,11 @@ export function adminRoutes(): Hono<AppBindings> {
       return c.json(await setOrderStatus(db, shopId, orderId, status));
     },
   );
+
+  app.delete('/orders/:id', zValidator('param', idParam), async (c) => {
+    await deleteOrder(c.get('db'), c.get('shopId'), c.req.valid('param').id);
+    return c.body(null, 204);
+  });
 
   return app;
 }

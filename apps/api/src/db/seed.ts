@@ -20,8 +20,9 @@ async function main(): Promise<void> {
     .values({
       name: 'Demo Tea Shop',
       description: 'A universal tma-shop demo storefront. Pay with USDC or other stablecoins.',
-      // Prices are in cents. Crypto checkout asks for the same amount in USDC/USDT.
-      currency: 'USD',
+      // Default currency for new products. Prices are in cents of the token
+      // (1290 = 12.90 USDC); each product can be USDC or USDT.
+      currency: 'USDC',
       botUsername: null,
       starsEnabled: false,
     })
@@ -45,7 +46,7 @@ async function main(): Promise<void> {
       title: 'Sencha Green Tea',
       description: 'Bright, grassy Japanese green tea. 100g.',
       price: 1290,
-      currency: 'USD',
+      currency: 'USDC',
       imageUrl: null,
       stock: 25,
       isActive: true,
@@ -57,7 +58,7 @@ async function main(): Promise<void> {
       title: 'Earl Grey',
       description: 'Classic black tea with bergamot. 100g.',
       price: 990,
-      currency: 'USD',
+      currency: 'USDC',
       imageUrl: null,
       stock: 40,
       isActive: true,
@@ -69,7 +70,7 @@ async function main(): Promise<void> {
       title: 'Aged Pu-erh',
       description: 'Deep, earthy fermented tea, 5 years aged. 50g.',
       price: 2490,
-      currency: 'USD',
+      currency: 'USDC',
       imageUrl: null,
       stock: null, // not stock-tracked
       isActive: true,
@@ -81,7 +82,7 @@ async function main(): Promise<void> {
       title: 'Cast Iron Teapot',
       description: 'Traditional tetsubin, 600ml.',
       price: 5900,
-      currency: 'USD',
+      currency: 'USDC',
       imageUrl: null,
       stock: 8,
       isActive: true,
@@ -93,7 +94,7 @@ async function main(): Promise<void> {
       title: 'Porcelain Gaiwan',
       description: 'White porcelain gaiwan for gongfu brewing, 120ml.',
       price: 1890,
-      currency: 'USD',
+      currency: 'USDC',
       imageUrl: null,
       stock: 15,
       isActive: true,

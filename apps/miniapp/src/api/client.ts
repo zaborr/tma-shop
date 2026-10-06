@@ -121,6 +121,11 @@ export class ApiClient {
     return this.request<Order>(`/orders/${id}`);
   }
 
+  /** Deletes one of the caller's orders (only unpaid or cancelled ones). */
+  deleteOrder(orderId: string): Promise<void> {
+    return this.request<void>(`/orders/${orderId}`, { method: 'DELETE' });
+  }
+
   createInvoice(orderId: string): Promise<InvoiceResponse> {
     return this.request<InvoiceResponse>(`/orders/${orderId}/invoice`, { method: 'POST' });
   }
@@ -136,6 +141,22 @@ export class ApiClient {
   // --- admin ---
   adminGetOrders(): Promise<Order[]> {
     return this.request<Order[]>('/admin/orders');
+  }
+
+  adminDeleteOrder(orderId: string): Promise<void> {
+    return this.request<void>(`/admin/orders/${orderId}`, { method: 'DELETE' });
+  }
+
+  /** All products, hidden ones included. */
+  adminGetProducts(): Promise<Product[]> {
+    return this.request<Product[]>('/admin/products');
+  }
+
+  adminUpdateProduct(productId: string, input: ProductInput): Promise<Product> {
+    return this.request<Product>(`/admin/products/${productId}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
   }
 
   adminSetOrderStatus(orderId: string, status: Order['status']): Promise<Order> {
