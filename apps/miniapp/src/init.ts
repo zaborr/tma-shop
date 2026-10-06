@@ -23,14 +23,20 @@ export function init(debug: boolean): void {
   if (backButton.isSupported()) {
     backButton.mount();
   }
-
-  if (miniApp.mount.isAvailable()) {
+  
+  if (!miniApp.isMounted()) {
     miniApp.mount();
+  }
+
+  if (miniApp.bindCssVars.isAvailable()) {
     miniApp.bindCssVars();
   }
 
-  if (themeParams.mount.isAvailable()) {
+  if (!themeParams.isMounted()) {
     themeParams.mount();
+  }
+
+  if (themeParams.bindCssVars.isAvailable()) {
     themeParams.bindCssVars();
   }
 
