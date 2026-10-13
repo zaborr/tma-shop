@@ -1,7 +1,7 @@
 import { asc, inArray } from 'drizzle-orm';
 import type { ProductOption, VariantInput } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
-import { productVariants, products } from '../db/schema.js';
+import { productVariants, type products } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
 
 export type VariantRow = typeof productVariants.$inferSelect;
