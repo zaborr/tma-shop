@@ -61,6 +61,20 @@ const en = {
   'wallets.solana': 'Solana: {before} → {after}',
   'wallets.checkIt': 'If it was not you or another admin, check it right away: payments would go to the new address.',
 
+  // Automatic payment check
+  'check.autoConfirmed': '✅ Payment checked on the blockchain and confirmed automatically',
+  'check.overpaid': 'The customer paid {amount} more than due: refund it from the order.',
+  'check.failedHeader': '⚠️ Not confirmed automatically: {reason}',
+  'check.not_found': 'the transaction was not found on {network}, or is not confirmed yet.',
+  'check.tx_failed': 'the transaction failed on the blockchain.',
+  'check.no_transfer': 'the transaction does not send this token to the shop address.',
+  'check.too_old': 'the transaction is older than the order.',
+  'check.short': 'received {received}, expected {expected}.',
+  'check.ambiguous': '{count} open orders are waiting for this same amount; check which one it belongs to.',
+  'check.stock_short': 'there is not enough stock left to confirm it.',
+  'check.no_method': 'the shop no longer accepts that network or token.',
+  'check.rpc_error': 'the {network} network could not be reached.',
+
   // Exports
   'export.captionOne': '📊 {shop} — {count} order',
   'export.captionOther': '📊 {shop} — {count} orders',
@@ -119,6 +133,19 @@ const es: Record<BotMessageKey, string> = {
   'wallets.evm': 'Base / Ethereum: {before} → {after}',
   'wallets.solana': 'Solana: {before} → {after}',
   'wallets.checkIt': 'Si no has sido tú ni otro administrador, revísalo ya: los pagos irían a la dirección nueva.',
+
+  'check.autoConfirmed': '✅ Pago comprobado en la blockchain y confirmado automáticamente',
+  'check.overpaid': 'El cliente pagó {amount} de más: devuélveselo desde el pedido.',
+  'check.failedHeader': '⚠️ No se ha confirmado solo: {reason}',
+  'check.not_found': 'la transacción no aparece en {network}, o todavía no está confirmada.',
+  'check.tx_failed': 'la transacción falló en la blockchain.',
+  'check.no_transfer': 'la transacción no envía este token a la dirección de la tienda.',
+  'check.too_old': 'la transacción es anterior al pedido.',
+  'check.short': 'recibido {received}, se esperaba {expected}.',
+  'check.ambiguous': 'hay {count} pedidos abiertos esperando este mismo importe; comprueba de cuál es.',
+  'check.stock_short': 'no queda stock suficiente para confirmarlo.',
+  'check.no_method': 'la tienda ya no acepta esa red o token.',
+  'check.rpc_error': 'no se ha podido conectar con la red {network}.',
 
   'export.captionOne': '📊 {shop} — {count} pedido',
   'export.captionOther': '📊 {shop} — {count} pedidos',

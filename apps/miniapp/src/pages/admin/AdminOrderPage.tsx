@@ -20,7 +20,7 @@ import {
 import { useShopPath } from '../../providers/ShopProvider.js';
 import { AddressSection } from './AddressSection.js';
 import { TrackingText } from '../../components/TrackingText.js';
-import { t } from '../../i18n/index.js';
+import { t, type MessageKey } from '../../i18n/index.js';
 
 const breakAll: React.CSSProperties = { wordBreak: 'break-all', whiteSpace: 'normal' };
 
@@ -130,6 +130,7 @@ function AdminOrder(): React.JSX.Element {
             )}
           </Cell>
         )}
+        {o.paymentCheck && <PaymentCheckCell order={o} actions={actions} />}
       </Section>
 
       <AddressSection order={o} />
@@ -366,5 +367,55 @@ function ActionsSection({
         </Button>
       </div>
     </Section>
+  );
+}
+
+/** Result of the automatic blockchain check, with a button to run it again. */
+function PaymentCheckCell({
+  order,
+  actions,
+}: {
+  order: Order;
+  actions: AdminActions;
+}): React.JSX.Element | null {
+  const check = order.paymentCheck;
+  if (!check) return null;
+  const vars = { network: order.paymentNetwork ?? '—', ...(check.vars ?? {}) };
+  const reasonKeys: Record<string, MessageKey> = {
+    not_found: 'check.not_found',
+    tx_failed: 'check.tx_failed',
+    no_transfer: 'check.no_transfer',
+    too_old: 'check.too_old',
+    short: 'check.short',
+    ambiguous: 'check.ambiguous',
+    stock_short: 'check.stock_short',
+    no_method: 'check.no_method',
+  };
+  const reason = t(reasonKeys[check.reason ?? ''] ?? 'check.rpc_error', vars);
+  const canRecheck = order.status === 'awaiting_payment' && check.status !== 'checking';
+
+  return (
+    <Cell
+      multiline
+      subtitle={t('check.title')}
+      description={
+        canRecheck ? (
+          <Button
+            size="s"
+            mode="bezeled"
+            style={{ marginTop: 8 }}
+            onClick={() => void actions.run(() => api.adminRecheckPayment(order.id))}
+          >
+            {t('check.again')}
+          </Button>
+        ) : undefined
+      }
+    >
+      {check.status === 'checking'
+        ? t('check.checking')
+        : check.status === 'verified'
+          ? t('check.verified')
+          : t('check.failed', { reason })}
+    </Cell>
   );
 }

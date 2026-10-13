@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
 import { Input } from '../components/Field.js';
@@ -51,7 +51,16 @@ export function PaymentPage(): React.JSX.Element {
     onClick: () => navigate(to('/')),
   });
 
-  if (order.loading || shop.loading) return <Loader />;
+  // While the blockchain check runs, refresh the order now and then.
+  const checking = current?.paymentCheck?.status === 'checking';
+  useEffect(() => {
+    if (!checking) return undefined;
+    const timer = setInterval(() => setReloadKey((k) => k + 1), 10_000);
+    return () => clearInterval(timer);
+  }, [checking]);
+
+  // Refreshes keep showing the order instead of flashing a spinner.
+  if ((order.loading && !order.data) || (shop.loading && !shop.data)) return <Loader />;
   if (order.error) return <ErrorView message={order.error} />;
   if (shop.error) return <ErrorView message={shop.error} />;
   if (!current || !shop.data) return <Loader />;
@@ -226,7 +235,13 @@ function StatusDetail({ order }: { order: Order }): React.JSX.Element {
       return (
         <Section
           header={t('order.paymentSubmitted')}
-          footer={t('order.paymentSubmittedHint')}
+          footer={
+            order.paymentCheck?.status === 'failed'
+              ? t('order.checkFailedHint')
+              : order.paymentCheck?.status === 'checking'
+                ? t('order.checkingHint')
+                : t('order.paymentSubmittedHint')
+          }
         >
           <Cell subtitle={t('order.method')}>{order.paymentNetwork ?? '—'}</Cell>
           <Cell subtitle={t('order.transaction')} multiline>

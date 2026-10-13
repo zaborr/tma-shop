@@ -163,6 +163,7 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
     paymentNetwork: row.paymentNetwork,
     paymentTxHash: row.paymentTxHash,
     paymentTxUrl: explorerTxUrl(row.paymentNetwork, row.paymentTxHash),
+    paymentCheck: row.paymentCheck ?? null,
     contactUsername: row.contactUsername,
     trackingNumber: row.trackingNumber,
     statusNote: row.statusNote,

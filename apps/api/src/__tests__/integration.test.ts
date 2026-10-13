@@ -353,13 +353,13 @@ describeDb('API integration', () => {
         }),
       );
 
-    expect((await pay('0xreserve0001')).status).toBe(200);
+    expect((await pay(`0x${'a'.repeat(64)}`)).status).toBe(200);
     expect(await stock()).toBe(before - 1);
 
     expect((await setStatus('pending')).status).toBe(200);
     expect(await stock()).toBe(before);
 
-    expect((await pay('0xreserve0002')).status).toBe(200);
+    expect((await pay(`0x${'b'.repeat(64)}`)).status).toBe(200);
     expect(await stock()).toBe(before - 1);
     expect((await setStatus('paid')).status).toBe(200);
     // Confirming does not take the stock a second time.

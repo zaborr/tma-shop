@@ -23,10 +23,12 @@ import {
 import { createStarsInvoice } from '../services/payments.js';
 import {
   buildChangeRequestMessage,
-  buildPaymentReviewMessage,
   notifyUsers,
 } from '../services/notifications.js';
 import { describeCustomer } from '../services/customers.js';
+import { startPaymentCheck } from '../services/paymentCheck.js';
+import { EVM_TX_RE } from '../chain/evm.js';
+import { SOLANA_SIGNATURE_RE } from '../chain/solana.js';
 import { paymentMethodLabel } from '../config/payment-methods.js';
 import { shopNotificationChatIds } from '../services/shop.js';
 import { ApiError } from '../lib/errors.js';
@@ -93,6 +95,15 @@ export function orderRoutes(): Hono<AppBindings> {
 
       const method = paymentMethodsOf(c.get('shop').paymentSetup).find((m) => m.id === methodId);
       if (!method) throw ApiError.badRequest('unknown_method', 'Unknown payment method');
+      const validHash = method.chain === 'solana' ? SOLANA_SIGNATURE_RE : EVM_TX_RE;
+      if (!validHash.test(txHash)) {
+        throw ApiError.badRequest(
+          'invalid_tx',
+          method.chain === 'solana'
+            ? 'That is not a Solana transaction signature'
+            : 'That is not a transaction hash (0x followed by 64 characters)',
+        );
+      }
 
       const order = await submitCryptoPayment(
         db,
@@ -101,12 +112,12 @@ export function orderRoutes(): Hono<AppBindings> {
         sub,
         paymentMethodLabel(method),
         txHash,
+        method.id,
       );
 
-      const customer = await describeCustomer(db, sub);
-      await notifyUsers(db, env.BOT_TOKEN, shopNotificationChatIds(env, c.get('shop')), (lang) =>
-        buildPaymentReviewMessage(lang, order, customer),
-      );
+      // Checked on the blockchain in the background; admins hear about it
+      // when it is confirmed, or when it needs them.
+      startPaymentCheck(db, env, order.id);
 
       return c.json(order);
     },

@@ -352,6 +352,11 @@ export class ApiClient {
   }
 
   /** Records that the overpaid difference was sent back to the customer. */
+  /** Checks the order's submitted transaction on the blockchain again. */
+  adminRecheckPayment(orderId: string): Promise<Order> {
+    return this.request<Order>(`/admin/orders/${orderId}/recheck`, { method: 'POST' });
+  }
+
   adminRecordRefund(orderId: string): Promise<Order> {
     return this.request<Order>(`/admin/orders/${orderId}/refund`, { method: 'POST' });
   }

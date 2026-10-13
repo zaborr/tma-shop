@@ -6,6 +6,7 @@ import { convertLegacyWallets } from './services/shop.js';
 import { configureBot } from './services/bot.js';
 import { scheduleRetention } from './services/retention.js';
 import { scheduleAutoCancel } from './services/autoCancel.js';
+import { resumePaymentChecks } from './services/paymentCheck.js';
 
 const env = loadEnv();
 const pool = createPool(env.DATABASE_URL);
@@ -25,6 +26,11 @@ scheduleRetention(db);
 
 // Cancels unpaid orders past each shop's deadline, now and every hour.
 scheduleAutoCancel(db, env);
+
+// Payment checks that were running before a restart.
+resumePaymentChecks(db, env).catch((error: unknown) => {
+  console.error('Could not resume payment checks:', error);
+});
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`tma-shop API listening on http://localhost:${info.port}`);
