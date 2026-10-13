@@ -20,6 +20,7 @@ export function buildPaymentReviewMessage(order: Order, customer: string): strin
     `Customer: ${customer}`,
     contactLine(order),
     `Amount: ${money(amount, order.currency)}`,
+    ...(order.shippingZoneName ? [`Shipping: ${order.shippingZoneName}`] : []),
     `Method: ${order.paymentNetwork ?? '—'}`,
     `Tx: ${order.paymentTxHash ?? '—'}`,
   ];

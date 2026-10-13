@@ -25,6 +25,7 @@ function AdminHome(): React.JSX.Element {
   const toReview = all.filter(needsAttention).length;
   const sales = all.filter(isSale).length;
   const fee = config.orderFee;
+  const activeZones = config.shippingZones.filter((z) => z.isActive).length;
 
   return (
     <List>
@@ -86,6 +87,24 @@ function AdminHome(): React.JSX.Element {
           }
         >
           💸 Order fee
+        </Cell>
+        <Cell
+          onClick={() => navigate(to('/admin/shipping'))}
+          subtitle={
+            activeZones > 0
+              ? `${activeZones} zone${activeZones === 1 ? '' : 's'}${
+                  config.addressPublicKey ? '' : ' · ⚠️ no address key'
+                }`
+              : 'Off — no delivery address asked'
+          }
+        >
+          🚚 Shipping zones
+        </Cell>
+        <Cell
+          onClick={() => navigate(to('/admin/address-key'))}
+          subtitle={config.addressKeyFingerprint ? `Key ${config.addressKeyFingerprint}` : 'Not set'}
+        >
+          🔑 Address key
         </Cell>
       </Section>
     </List>

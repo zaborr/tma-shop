@@ -78,6 +78,15 @@ export function PaymentPage(): React.JSX.Element {
         {current.fee > 0 && (
           <Cell after={formatPrice(current.fee, current.currency)}>{feeLabel}</Cell>
         )}
+        {current.shippingZoneName && (
+          <Cell
+            after={
+              current.shipping > 0 ? formatPrice(current.shipping, current.currency) : 'Free'
+            }
+          >
+            {`Shipping · ${current.shippingZoneName}`}
+          </Cell>
+        )}
         <Cell after={formatPrice(current.total, current.currency)}>Total</Cell>
         {current.amountPaid > 0 && (
           <Cell after={formatPrice(current.amountPaid, current.currency)}>Paid so far</Cell>
@@ -399,6 +408,9 @@ function PendingChange({
         </Cell>
       ))}
       {order.fee > 0 && <Cell after={formatPrice(order.fee, order.currency)}>{feeLabel}</Cell>}
+      {order.shipping > 0 && (
+        <Cell after={formatPrice(order.shipping, order.currency)}>Shipping</Cell>
+      )}
       <Cell after={formatPrice(change.total, order.currency)}>New total</Cell>
       <div style={{ padding: 16 }}>
         <Button stretched mode="plain" loading={busy} onClick={() => void withdraw()}>
@@ -485,7 +497,9 @@ function ChangeEditor({
       ),
     };
   });
-  const total = priced.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0) + order.fee;
+  // Fee and shipping are charged once per order and do not change.
+  const total =
+    priced.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0) + order.fee + order.shipping;
   const diff = total - coveredAmount(order);
   // One addable entry per product, or per variant for products with options.
   const addable: DraftLine[] = (catalog.data?.items ?? [])
@@ -575,6 +589,9 @@ function ChangeEditor({
         ))}
         {order.fee > 0 && (
           <Cell after={formatPrice(order.fee, order.currency)}>{feeLabel}</Cell>
+        )}
+        {order.shipping > 0 && (
+          <Cell after={formatPrice(order.shipping, order.currency)}>Shipping</Cell>
         )}
         <Cell after={formatPrice(total, order.currency)}>New total</Cell>
       </Section>

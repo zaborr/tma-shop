@@ -17,6 +17,7 @@ import {
   type AdminActions,
 } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
+import { AddressSection } from './AddressSection.js';
 
 const breakAll: React.CSSProperties = { wordBreak: 'break-all', whiteSpace: 'normal' };
 
@@ -82,6 +83,11 @@ function AdminOrder(): React.JSX.Element {
         {o.fee > 0 && (
           <Cell after={money(o.fee)}>{shop.data?.orderFeeLabel ?? 'Order fee'}</Cell>
         )}
+        {o.shippingZoneName && (
+          <Cell after={o.shipping > 0 ? money(o.shipping) : 'Free'}>
+            {`Shipping · ${o.shippingZoneName}`}
+          </Cell>
+        )}
         <Cell after={<strong>{money(o.total)}</strong>}>Total</Cell>
       </Section>
 
@@ -103,6 +109,8 @@ function AdminOrder(): React.JSX.Element {
           </Cell>
         )}
       </Section>
+
+      <AddressSection order={o} />
 
       {o.changeRequest && <ChangeRequestSection order={o} actions={actions} />}
 

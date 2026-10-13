@@ -1,10 +1,12 @@
 import { and, asc, eq, or } from 'drizzle-orm';
+import { createHash, createPublicKey, randomUUID } from 'node:crypto';
 import type {
   PlatformShopInput,
   ShopAdminView,
   ShopConfig,
   ShopProfileInput,
   ShopSummary,
+  UpdateShippingRequest,
   WalletInput,
 } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
@@ -125,6 +127,70 @@ export async function updateShopWallets(
   }
   return toShopAdminDTO(
     await updateShop(db, shopId, { wallets: cleaned, walletsInitialized: true }),
+  );
+}
+
+/** Replaces the shop's shipping zones; zones keep their id, new ones get one. */
+export async function updateShippingZones(
+  db: Database,
+  shopId: string,
+  zones: UpdateShippingRequest['zones'],
+): Promise<ShopAdminView> {
+  const names = new Set(zones.map((z) => z.name.trim().toLowerCase()));
+  if (names.size !== zones.length) {
+    throw ApiError.badRequest('invalid_zones', 'Two shipping zones have the same name');
+  }
+  const cleaned = zones.map((z) => ({
+    id: z.id ?? randomUUID(),
+    name: z.name.trim(),
+    price: z.price,
+    freeFrom: z.freeFrom,
+    isActive: z.isActive,
+  }));
+  return toShopAdminDTO(await updateShop(db, shopId, { shippingZones: cleaned }));
+}
+
+/** Short fingerprint of a public key: first 16 hex chars of SHA-256 over its DER bytes. */
+export function keyFingerprint(der: Buffer): string {
+  return createHash('sha256').update(der).digest('hex').slice(0, 16);
+}
+
+/**
+ * Sets the shop's address public key (PEM or base64 SPKI, RSA ≥ 2048 bits), or
+ * removes it with null. The private key never reaches the server.
+ */
+export async function updateAddressKey(
+  db: Database,
+  shopId: string,
+  publicKey: string | null,
+): Promise<ShopAdminView> {
+  if (publicKey === null) {
+    return toShopAdminDTO(
+      await updateShop(db, shopId, { addressPublicKey: null, addressKeyFingerprint: null }),
+    );
+  }
+  const base64 = publicKey
+    .replace(/-----(BEGIN|END) PUBLIC KEY-----/g, '')
+    .replace(/\s+/g, '');
+  let der: Buffer;
+  try {
+    der = Buffer.from(base64, 'base64');
+    const key = createPublicKey({ key: der, format: 'der', type: 'spki' });
+    const bits = key.asymmetricKeyDetails?.modulusLength ?? 0;
+    if (key.asymmetricKeyType !== 'rsa' || bits < 2048) {
+      throw new Error('weak');
+    }
+  } catch {
+    throw ApiError.badRequest(
+      'invalid_key',
+      'That is not an RSA public key of 2048 bits or more (SPKI / "BEGIN PUBLIC KEY")',
+    );
+  }
+  return toShopAdminDTO(
+    await updateShop(db, shopId, {
+      addressPublicKey: der.toString('base64'),
+      addressKeyFingerprint: keyFingerprint(der),
+    }),
   );
 }
 

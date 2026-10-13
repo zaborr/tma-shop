@@ -38,8 +38,11 @@ export function orderRoutes(): Hono<AppBindings> {
 
   app.post('/', zValidator('json', createOrderRequest), async (c) => {
     const { sub } = c.get('claims');
-    const { contactUsername } = c.req.valid('json');
-    const order = await createOrderFromCart(c.get('db'), c.get('shopId'), sub, contactUsername);
+    const { contactUsername, shippingZoneId, encryptedAddress } = c.req.valid('json');
+    const order = await createOrderFromCart(c.get('db'), c.get('shopId'), sub, contactUsername, {
+      shippingZoneId,
+      encryptedAddress,
+    });
     const response: CreateOrderResponse = { orderId: order.id };
     return c.json(response, 201);
   });

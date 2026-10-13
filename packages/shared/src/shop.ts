@@ -7,6 +7,18 @@ import { telegramUserId } from './user.js';
  * carts, orders, wallets, fee and admins. Platform super-admins (configured on
  * the API) create shops, hide them and assign their admins.
  */
+/** A shipping zone: a flat cost per order, optionally free from an order amount. */
+export const shippingZone = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().trim().min(1).max(64),
+  /** Cost per order, in minor units of the order's token. */
+  price: z.number().int().nonnegative(),
+  /** Free shipping when the items reach this amount; null = never free. */
+  freeFrom: z.number().int().positive().nullable(),
+  isActive: z.boolean(),
+});
+export type ShippingZone = z.infer<typeof shippingZone>;
+
 export const shop = z.object({
   id,
   /** URL-friendly unique name, e.g. `tea-shop`. */
@@ -28,6 +40,15 @@ export const shop = z.object({
   orderFee: z.number().int().nonnegative(),
   /** How the fee is shown to customers, e.g. "Service fee". */
   orderFeeLabel: z.string().min(1).max(64),
+  /** Shipping zones; with active ones, checkout asks for a zone and an address. */
+  shippingZones: z.array(shippingZone),
+  /**
+   * Public key (RSA-OAEP, base64 SPKI) the customer's device encrypts the
+   * address with. Only the shop admin, holding the private key, can read it.
+   */
+  addressPublicKey: z.string().nullable(),
+  /** Short fingerprint of `addressPublicKey`, to tell keys apart. */
+  addressKeyFingerprint: z.string().nullable(),
   createdAt: isoDateTime,
 });
 export type Shop = z.infer<typeof shop>;
@@ -73,6 +94,9 @@ export const shopConfig = shop
     starsEnabled: true,
     orderFee: true,
     orderFeeLabel: true,
+    shippingZones: true,
+    addressPublicKey: true,
+    addressKeyFingerprint: true,
   })
   .extend({
     /** Crypto wallets for manual-verification checkout (empty when not configured). */
@@ -113,7 +137,38 @@ export const platformShopInput = shopProfileInput.extend({
 });
 export type PlatformShopInput = z.infer<typeof platformShopInput>;
 
+export const updateShippingRequest = z.object({
+  zones: z
+    .array(shippingZone.extend({ id: z.string().min(1).max(64).optional() }))
+    .max(50),
+});
+export type UpdateShippingRequest = z.infer<typeof updateShippingRequest>;
+
+/** Sets (or, with null, removes) the shop's address public key. */
+export const updateAddressKeyRequest = z.object({
+  publicKey: z.string().trim().min(100).max(4000).nullable(),
+});
+export type UpdateAddressKeyRequest = z.infer<typeof updateAddressKeyRequest>;
+
 export const updateWalletsRequest = z.object({
   wallets: z.array(walletInput).max(50),
 });
 export type UpdateWalletsRequest = z.infer<typeof updateWalletsRequest>;
+
+/** What the customer types; encrypted on their device before it is sent. */
+export interface DeliveryAddress {
+  name: string;
+  line1: string;
+  line2: string;
+  postalCode: string;
+  city: string;
+  region: string;
+  country: string;
+  phone: string;
+  notes: string;
+}
+
+/** Shipping cost of an order with `itemsTotal` worth of products in `zone`. */
+export function shippingCost(zone: Pick<ShippingZone, 'price' | 'freeFrom'>, itemsTotal: number): number {
+  return zone.freeFrom !== null && itemsTotal >= zone.freeFrom ? 0 : zone.price;
+}

@@ -12,6 +12,7 @@ import type {
   ShopAdminView,
   ShopConfig,
   ShopProfileInput,
+  ShippingZone,
   ShopSummary,
   WalletInput,
 } from '@tma-shop/shared';
@@ -161,11 +162,17 @@ export class ApiClient {
   }
 
   // --- orders & payment ---
-  /** Creates an order from the cart; `contactUsername` is the customer's Telegram @. */
-  createOrder(contactUsername: string): Promise<CreateOrderResponse> {
+  /**
+   * Creates an order from the cart; `contactUsername` is the customer's Telegram @.
+   * Shops with shipping also need the zone and the encrypted address.
+   */
+  createOrder(
+    contactUsername: string,
+    shipping: { shippingZoneId: string; encryptedAddress: string } | null = null,
+  ): Promise<CreateOrderResponse> {
     return this.request<CreateOrderResponse>('/orders', {
       method: 'POST',
-      body: JSON.stringify({ contactUsername }),
+      body: JSON.stringify({ contactUsername, ...(shipping ?? {}) }),
     });
   }
 
@@ -226,6 +233,21 @@ export class ApiClient {
     return this.request<ShopAdminView>('/admin/shop/wallets', {
       method: 'PUT',
       body: JSON.stringify({ wallets }),
+    });
+  }
+
+  adminUpdateShipping(zones: Array<Omit<ShippingZone, 'id'> & { id?: string }>): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/shipping', {
+      method: 'PUT',
+      body: JSON.stringify({ zones }),
+    });
+  }
+
+  /** Sets the shop's address public key (base64 SPKI), or removes it with null. */
+  adminUpdateAddressKey(publicKey: string | null): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/address-key', {
+      method: 'PUT',
+      body: JSON.stringify({ publicKey }),
     });
   }
 
