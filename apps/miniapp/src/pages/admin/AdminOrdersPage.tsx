@@ -8,6 +8,7 @@ import { formatPrice } from '../../lib/format.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { AdminOnly, formatDate, itemsSummary, needsAttention, statusLabel } from './common.js';
+import { useShopPath } from '../../providers/ShopProvider.js';
 
 type FilterKey = 'all' | 'attention' | 'unpaid' | 'paid' | 'fulfilled' | 'cancelled';
 
@@ -35,6 +36,7 @@ export function AdminOrdersPage(): React.JSX.Element {
 
 function AdminOrders(): React.JSX.Element {
   const navigate = useNavigate();
+  const to = useShopPath();
   const [params, setParams] = useSearchParams();
   const filterParam = params.get('filter');
   const filter: FilterKey = isFilterKey(filterParam) ? filterParam : 'all';
@@ -86,7 +88,7 @@ function AdminOrders(): React.JSX.Element {
         {visible.map((order) => (
           <Cell
             key={order.id}
-            onClick={() => navigate(`/admin/orders/${order.id}`)}
+            onClick={() => navigate(to(`/admin/orders/${order.id}`))}
             subtitle={`${statusLabel(order)} · ${formatDate(order.createdAt)}`}
             description={itemsSummary(order)}
             after={formatPrice(order.total, order.currency)}

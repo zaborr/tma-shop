@@ -26,7 +26,8 @@ import {
   notifyChats,
 } from '../services/notifications.js';
 import { describeCustomer } from '../services/customers.js';
-import { paymentMethodLabel } from '../config/payment-methods.js';
+import { expandWallets, paymentMethodLabel } from '../config/payment-methods.js';
+import { shopNotificationChatIds } from '../services/shop.js';
 import { ApiError } from '../lib/errors.js';
 
 const idParam = z.object({ id: z.uuid() });
@@ -86,7 +87,7 @@ export function orderRoutes(): Hono<AppBindings> {
       const db = c.get('db');
       const { methodId, txHash } = c.req.valid('json');
 
-      const method = env.PAYMENT_METHODS.find((m) => m.id === methodId);
+      const method = expandWallets(c.get('shop').wallets).find((m) => m.id === methodId);
       if (!method) throw ApiError.badRequest('unknown_method', 'Unknown payment method');
 
       const order = await submitCryptoPayment(
@@ -99,7 +100,12 @@ export function orderRoutes(): Hono<AppBindings> {
       );
 
       const customer = await describeCustomer(db, sub);
-      await notifyAdminsOfPayment(env.BOT_TOKEN, env.ADMIN_TELEGRAM_IDS, order, customer);
+      await notifyAdminsOfPayment(
+        env.BOT_TOKEN,
+        shopNotificationChatIds(env, c.get('shop')),
+        order,
+        customer,
+      );
 
       return c.json(order);
     },
@@ -124,7 +130,7 @@ export function orderRoutes(): Hono<AppBindings> {
       const customer = await describeCustomer(db, sub);
       await notifyChats(
         env.BOT_TOKEN,
-        env.ADMIN_TELEGRAM_IDS,
+        shopNotificationChatIds(env, c.get('shop')),
         buildChangeRequestMessage(order, customer),
       );
       return c.json(order);

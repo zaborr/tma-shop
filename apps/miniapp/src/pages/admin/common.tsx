@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Cell, Section } from '@telegram-apps/telegram-ui';
 import type { Order, OrderStatus, Product, ProductInput } from '@tma-shop/shared';
 import { ApiClientError } from '../../api/client.js';
-import { useSession } from '../../providers/SessionProvider.js';
+import { useShop } from '../../providers/ShopProvider.js';
 import { ErrorView } from '../../components/ErrorView.js';
 
 /** Tokens a product can be priced in. Prices are stored in cents (1290 = 12.90). */
@@ -129,9 +129,9 @@ export function ErrorBanner({ message }: { message: string | null }): React.JSX.
   );
 }
 
-/** Renders its children only for admins. */
+/** Renders its children only for this shop's admins (and platform super-admins). */
 export function AdminOnly({ children }: { children: React.ReactNode }): React.JSX.Element {
-  const { isAdmin } = useSession();
-  if (!isAdmin) return <ErrorView message="Admins only" />;
+  const { canManage } = useShop();
+  if (!canManage) return <ErrorView message="Admins only" />;
   return <>{children}</>;
 }

@@ -9,10 +9,12 @@ import { formatPrice } from '../lib/format.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { ProductImage } from '../components/ProductImage.js';
+import { useShopPath } from '../providers/ShopProvider.js';
 
 export function ProductPage(): React.JSX.Element {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const to = useShopPath();
   const { add } = useCart();
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -26,13 +28,13 @@ export function ProductPage(): React.JSX.Element {
     setAddError(null);
     try {
       await add(product.id, 1);
-      navigate('/cart');
+      navigate(to('/cart'));
     } catch (err) {
       setAddError(err instanceof ApiClientError ? err.message : 'Could not add to cart');
     } finally {
       setAdding(false);
     }
-  }, [product, add, navigate]);
+  }, [product, add, navigate, to]);
 
   useMainButton({
     text: outOfStock ? 'Out of stock' : 'Add to cart',

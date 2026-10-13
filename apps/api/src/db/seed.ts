@@ -19,6 +19,7 @@ async function main(): Promise<void> {
     .insert(shops)
     .values({
       name: 'Demo Tea Shop',
+      slug: 'demo-tea-shop',
       description: 'A universal tma-shop demo storefront. Pay with USDC or other stablecoins.',
       // Default currency for new products. Prices are in cents of the token
       // (1290 = 12.90 USDC); each product can be USDC or EURC.

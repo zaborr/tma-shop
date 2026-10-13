@@ -23,11 +23,18 @@ export const requireAuth = createMiddleware<AppBindings>(async (c, next) => {
   await next();
 });
 
-/** Requires the authenticated user to hold the `admin` role. */
+/** Requires the caller to manage the current shop (run after `withShop` and `requireAuth`). */
 export const requireAdmin = createMiddleware<AppBindings>(async (c, next) => {
-  const claims = c.get('claims');
-  if (claims.role !== 'admin') {
-    throw ApiError.forbidden('Admin role required');
+  if (!c.get('canManage')) {
+    throw ApiError.forbidden('Shop admin role required');
+  }
+  await next();
+});
+
+/** Requires a platform super-admin (ADMIN_TELEGRAM_IDS). Run after `requireAuth`. */
+export const requireSuperAdmin = createMiddleware<AppBindings>(async (c, next) => {
+  if (!c.get('env').ADMIN_TELEGRAM_IDS.includes(c.get('claims').sub)) {
+    throw ApiError.forbidden('Platform admin role required');
   }
   await next();
 });

@@ -9,6 +9,8 @@ import { cartRoutes } from './routes/cart.js';
 import { orderRoutes } from './routes/orders.js';
 import { adminRoutes } from './routes/admin.js';
 import { webhookRoutes } from './routes/webhook.js';
+import { shopsRoutes } from './routes/shops.js';
+import { platformRoutes } from './routes/platform.js';
 
 export function createApp(deps: AppDeps): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
@@ -26,7 +28,7 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
     cors({
       origin: origin === '*' ? '*' : origin.split(',').map((o) => o.trim()),
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowHeaders: ['Authorization', 'Content-Type'],
+      allowHeaders: ['Authorization', 'Content-Type', 'X-Shop'],
     }),
   );
 
@@ -41,10 +43,18 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
   // Telegram webhook is not shop-scoped (it reconciles by order id).
   app.route('/webhook', webhookRoutes());
 
-  // All public + authenticated API routes resolve the active shop first.
   const api = new Hono<AppBindings>();
-  api.use('*', withShop);
+
+  // Not tied to a shop.
   api.route('/auth', authRoutes());
+  api.route('/shops', shopsRoutes());
+  api.route('/platform', platformRoutes());
+
+  // Shop routes: the `X-Shop` header (id or slug) picks the shop.
+  for (const path of ['/shop', '/categories', '/products', '/cart', '/orders', '/admin']) {
+    api.use(path, withShop);
+    api.use(`${path}/*`, withShop);
+  }
   api.route('/', catalogRoutes());
   api.route('/cart', cartRoutes());
   api.route('/orders', orderRoutes());

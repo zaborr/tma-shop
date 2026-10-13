@@ -9,6 +9,7 @@ import { copyText } from '../lib/clipboard.js';
 import { formatPrice, formatTokenAmount } from '../lib/format.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
+import { useShopPath } from '../providers/ShopProvider.js';
 
 const breakAll: React.CSSProperties = { wordBreak: 'break-all', whiteSpace: 'normal' };
 const errorStyle: React.CSSProperties = { color: 'var(--tgui--destructive_text_color)' };
@@ -25,6 +26,7 @@ type Done = 'payment' | 'change' | null;
 export function PaymentPage(): React.JSX.Element {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const to = useShopPath();
   const [reloadKey, setReloadKey] = useState(0);
   const [done, setDone] = useState<Done>(null);
   const [editing, setEditing] = useState(false);
@@ -42,7 +44,7 @@ export function PaymentPage(): React.JSX.Element {
   useMainButton({
     text: 'Back to shop',
     visible: current !== null && !needsPayment && !editing,
-    onClick: () => navigate('/'),
+    onClick: () => navigate(to('/')),
   });
 
   if (order.loading || shop.loading) return <Loader />;
@@ -60,7 +62,7 @@ export function PaymentPage(): React.JSX.Element {
 
   return (
     <List>
-      {done && <DoneSection kind={done} onShop={() => navigate('/')} onOrders={() => navigate('/orders')} />}
+      {done && <DoneSection kind={done} onShop={() => navigate(to('/'))} onOrders={() => navigate(to('/orders'))} />}
 
       <Section header={`Order #${current.id.slice(0, 8)}`}>
         {current.items.map((item) => (

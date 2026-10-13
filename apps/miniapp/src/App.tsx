@@ -2,7 +2,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { miniApp, retrieveLaunchParams, useSignal } from '@telegram-apps/sdk-react';
 import { AppRoot, Placeholder } from '@telegram-apps/telegram-ui';
 import { SessionProvider, useSession } from './providers/SessionProvider.js';
-import { CartProvider } from './providers/CartProvider.js';
+import { ShopLayout } from './providers/ShopProvider.js';
 import { useBackButton } from './hooks/useBackButton.js';
 import { Loader } from './components/Loader.js';
 import { CatalogPage } from './pages/CatalogPage.js';
@@ -17,6 +17,11 @@ import { AdminFeePage } from './pages/admin/AdminFeePage.js';
 import { AdminOrdersPage } from './pages/admin/AdminOrdersPage.js';
 import { AdminOrderPage } from './pages/admin/AdminOrderPage.js';
 import { AdminSummaryPage } from './pages/admin/AdminSummaryPage.js';
+import { AdminSettingsPage } from './pages/admin/AdminSettingsPage.js';
+import { AdminWalletsPage } from './pages/admin/AdminWalletsPage.js';
+import { ShopsPage } from './pages/ShopsPage.js';
+import { PlatformPage } from './pages/platform/PlatformPage.js';
+import { PlatformShopPage } from './pages/platform/PlatformShopPage.js';
 
 function platform(): 'ios' | 'base' {
   try {
@@ -41,18 +46,27 @@ function Shell(): React.JSX.Element {
 
   return (
     <Routes>
-      <Route path="/" element={<CatalogPage />} />
-      <Route path="/product/:id" element={<ProductPage />} />
-      <Route path="/cart" element={<CartPage />} />
-      <Route path="/orders" element={<OrdersPage />} />
-      <Route path="/orders/:id" element={<PaymentPage />} />
-      <Route path="/admin" element={<AdminHomePage />} />
-      <Route path="/admin/catalog" element={<AdminCatalogPage />} />
-      <Route path="/admin/products/:id" element={<AdminProductPage />} />
-      <Route path="/admin/fee" element={<AdminFeePage />} />
-      <Route path="/admin/orders" element={<AdminOrdersPage />} />
-      <Route path="/admin/orders/:id" element={<AdminOrderPage />} />
-      <Route path="/admin/summary" element={<AdminSummaryPage />} />
+      <Route path="/" element={<ShopsPage />} />
+      <Route path="/platform" element={<PlatformPage />} />
+      <Route path="/platform/shops/:id" element={<PlatformShopPage />} />
+
+      <Route path="/s/:shopRef" element={<ShopLayout />}>
+        <Route index element={<CatalogPage />} />
+        <Route path="product/:id" element={<ProductPage />} />
+        <Route path="cart" element={<CartPage />} />
+        <Route path="orders" element={<OrdersPage />} />
+        <Route path="orders/:id" element={<PaymentPage />} />
+        <Route path="admin" element={<AdminHomePage />} />
+        <Route path="admin/catalog" element={<AdminCatalogPage />} />
+        <Route path="admin/products/:id" element={<AdminProductPage />} />
+        <Route path="admin/fee" element={<AdminFeePage />} />
+        <Route path="admin/settings" element={<AdminSettingsPage />} />
+        <Route path="admin/wallets" element={<AdminWalletsPage />} />
+        <Route path="admin/orders" element={<AdminOrdersPage />} />
+        <Route path="admin/orders/:id" element={<AdminOrderPage />} />
+        <Route path="admin/summary" element={<AdminSummaryPage />} />
+      </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -64,11 +78,9 @@ export function App(): React.JSX.Element {
   return (
     <AppRoot appearance={isDark ? 'dark' : 'light'} platform={platform()}>
       <SessionProvider>
-        <CartProvider>
-          <HashRouter>
-            <Shell />
-          </HashRouter>
-        </CartProvider>
+        <HashRouter>
+          <Shell />
+        </HashRouter>
       </SessionProvider>
     </AppRoot>
   );

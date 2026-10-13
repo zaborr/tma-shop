@@ -9,9 +9,11 @@ import { useMainButton } from '../hooks/useMainButton.js';
 import { formatPrice } from '../lib/format.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { Loader } from '../components/Loader.js';
+import { useShopPath } from '../providers/ShopProvider.js';
 
 export function CartPage(): React.JSX.Element {
   const navigate = useNavigate();
+  const to = useShopPath();
   const { cart, loading, setQuantity, remove, refresh } = useCart();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,23 +44,23 @@ export function CartPage(): React.JSX.Element {
       void refresh();
       if (!starsCheckout) {
         // Manual crypto payment: show wallets and collect the tx hash.
-        navigate(`/orders/${orderId}`, { replace: true });
+        navigate(to(`/orders/${orderId}`), { replace: true });
         return;
       }
       const { invoiceLink } = await api.createInvoice(orderId);
       if (openInvoice.isAvailable()) {
         const status = await openInvoice(invoiceLink, 'url');
-        navigate(status === 'paid' ? '/orders' : `/orders`);
+        navigate(to('/orders'));
       } else {
         // Outside Telegram (browser dev) we cannot open the native invoice.
-        navigate('/orders');
+        navigate(to('/orders'));
       }
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : 'Checkout failed');
     } finally {
       setBusy(false);
     }
-  }, [navigate, starsCheckout, refresh, contactValid, contactName]);
+  }, [navigate, to, starsCheckout, refresh, contactValid, contactName]);
 
   const hasItems = (cart?.lines.length ?? 0) > 0;
 

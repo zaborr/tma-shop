@@ -10,6 +10,7 @@ import { ErrorView } from '../../components/ErrorView.js';
 import { ProductImage } from '../../components/ProductImage.js';
 import { CategoriesSection } from './CategoriesSection.js';
 import { AdminOnly, ErrorBanner, toInput, useAdminActions, type AdminActions } from './common.js';
+import { useShopPath } from '../../providers/ShopProvider.js';
 
 /** Categories (create, rename, reorder, delete) and the products grouped by category. */
 export function AdminCatalogPage(): React.JSX.Element {
@@ -22,6 +23,7 @@ export function AdminCatalogPage(): React.JSX.Element {
 
 function AdminCatalog(): React.JSX.Element {
   const navigate = useNavigate();
+  const to = useShopPath();
   const [reloadKey, setReloadKey] = useState(0);
   const actions = useAdminActions(() => setReloadKey((k) => k + 1));
   const products = useAsync(() => api.adminGetProducts(), [reloadKey]);
@@ -49,7 +51,7 @@ function AdminCatalog(): React.JSX.Element {
       <ErrorBanner message={actions.error} />
 
       <Section>
-        <Cell onClick={() => navigate('/admin/products/new')}>➕ New product</Cell>
+        <Cell onClick={() => navigate(to('/admin/products/new'))}>➕ New product</Cell>
       </Section>
 
       <CategoriesSection
@@ -74,7 +76,7 @@ function AdminCatalog(): React.JSX.Element {
                   key={product.id}
                   product={product}
                   actions={actions}
-                  onEdit={() => navigate(`/admin/products/${product.id}`)}
+                  onEdit={() => navigate(to(`/admin/products/${product.id}`))}
                 />
               ))}
             </Section>

@@ -12,9 +12,7 @@ const idParam = z.object({ id: z.uuid() });
 export function catalogRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
 
-  app.get('/shop', async (c) =>
-    c.json(await getShopConfig(c.get('db'), c.get('shopId'), c.get('env').PAYMENT_METHODS)),
-  );
+  app.get('/shop', (c) => c.json(getShopConfig(c.get('shop'), c.get('canManage'))));
 
   app.get('/categories', async (c) => c.json(await listCategories(c.get('db'), c.get('shopId'))));
 

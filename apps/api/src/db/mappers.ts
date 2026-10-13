@@ -2,13 +2,14 @@ import type {
   Category,
   Order,
   OrderItem,
-  PaymentMethod,
   Product,
   SessionUser,
+  ShopAdminView,
   ShopConfig,
+  ShopSummary,
 } from '@tma-shop/shared';
 import type { categories, orderItems, orders, products, shops, users } from './schema.js';
-import { explorerTxUrl } from '../config/payment-methods.js';
+import { expandWallets, explorerTxUrl } from '../config/payment-methods.js';
 
 type ProductRow = typeof products.$inferSelect;
 type CategoryRow = typeof categories.$inferSelect;
@@ -44,17 +45,42 @@ export function toCategoryDTO(row: CategoryRow): Category {
   };
 }
 
-export function toShopConfigDTO(row: ShopRow, paymentMethods: PaymentMethod[] = []): ShopConfig {
+export function toShopConfigDTO(row: ShopRow, canManage = false): ShopConfig {
   return {
     id: row.id,
+    slug: row.slug,
     name: row.name,
     description: row.description,
+    imageUrl: row.imageUrl,
+    isVisible: row.isVisible,
     currency: row.currency,
     botUsername: row.botUsername,
     starsEnabled: row.starsEnabled,
     orderFee: row.orderFee,
     orderFeeLabel: row.orderFeeLabel,
-    paymentMethods,
+    paymentMethods: expandWallets(row.wallets),
+    canManage,
+  };
+}
+
+export function toShopSummaryDTO(row: ShopRow, canManage: boolean): ShopSummary {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    description: row.description,
+    imageUrl: row.imageUrl,
+    isVisible: row.isVisible,
+    canManage,
+  };
+}
+
+export function toShopAdminDTO(row: ShopRow): ShopAdminView {
+  return {
+    ...toShopConfigDTO(row, true),
+    sortOrder: row.sortOrder,
+    adminIds: row.adminIds,
+    wallets: row.wallets,
   };
 }
 

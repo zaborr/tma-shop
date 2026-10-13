@@ -50,7 +50,13 @@ describeDb('API integration', () => {
     await db.delete(shops);
     const [shop] = await db
       .insert(shops)
-      .values({ name: 'Test Shop', description: '', currency: 'XTR', starsEnabled: true })
+      .values({
+        name: 'Test Shop',
+        slug: `test-shop-${Date.now()}`,
+        description: '',
+        currency: 'XTR',
+        starsEnabled: true,
+      })
       .returning();
     shopId = shop!.id;
     const [cat] = await db

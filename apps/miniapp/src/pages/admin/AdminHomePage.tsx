@@ -3,6 +3,7 @@ import { Badge, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { AdminOnly, isSale, needsAttention, toMajor } from './common.js';
+import { useShop, useShopPath } from '../../providers/ShopProvider.js';
 
 /** Admin menu: one entry per section, with live counters. */
 export function AdminHomePage(): React.JSX.Element {
@@ -15,33 +16,34 @@ export function AdminHomePage(): React.JSX.Element {
 
 function AdminHome(): React.JSX.Element {
   const navigate = useNavigate();
+  const to = useShopPath();
   const orders = useAsync(() => api.adminGetOrders(), []);
   const products = useAsync(() => api.adminGetProducts(), []);
-  const shop = useAsync(() => api.getShop(), []);
+  const { shop: config } = useShop();
 
   const all = orders.data ?? [];
   const toReview = all.filter(needsAttention).length;
   const sales = all.filter(isSale).length;
-  const fee = shop.data?.orderFee ?? 0;
+  const fee = config.orderFee;
 
   return (
     <List>
       <Section header="Orders">
         <Cell
-          onClick={() => navigate('/admin/orders?filter=attention')}
+          onClick={() => navigate(to('/admin/orders?filter=attention'))}
           subtitle="Payments to verify, change requests, refunds"
           after={toReview > 0 ? <Badge type="number">{toReview}</Badge> : undefined}
         >
           🔔 To review
         </Cell>
         <Cell
-          onClick={() => navigate('/admin/orders')}
+          onClick={() => navigate(to('/admin/orders'))}
           subtitle={orders.data ? `${all.length} orders` : 'Loading…'}
         >
           📦 All orders
         </Cell>
         <Cell
-          onClick={() => navigate('/admin/summary')}
+          onClick={() => navigate(to('/admin/summary'))}
           subtitle={orders.data ? `${sales} paid orders` : 'Loading…'}
         >
           📊 Sales summary
@@ -50,20 +52,36 @@ function AdminHome(): React.JSX.Element {
 
       <Section header="Catalog">
         <Cell
-          onClick={() => navigate('/admin/catalog')}
+          onClick={() => navigate(to('/admin/catalog'))}
           subtitle={products.data ? `${products.data.length} products` : 'Loading…'}
         >
           🗂️ Categories & products
         </Cell>
-        <Cell onClick={() => navigate('/admin/products/new')}>➕ New product</Cell>
+        <Cell onClick={() => navigate(to('/admin/products/new'))}>➕ New product</Cell>
       </Section>
 
       <Section header="Settings">
         <Cell
-          onClick={() => navigate('/admin/fee')}
+          onClick={() => navigate(to('/admin/settings'))}
+          subtitle={config.isVisible ? config.name : `${config.name} · 🙈 hidden`}
+        >
+          🏪 Store profile
+        </Cell>
+        <Cell
+          onClick={() => navigate(to('/admin/wallets'))}
+          subtitle={
+            config.paymentMethods.length > 0
+              ? `${config.paymentMethods.length} payment options`
+              : '⚠️ None — customers can’t pay yet'
+          }
+        >
+          👛 Wallets
+        </Cell>
+        <Cell
+          onClick={() => navigate(to('/admin/fee'))}
           subtitle={
             fee > 0
-              ? `${shop.data?.orderFeeLabel ?? 'Fee'}: ${toMajor(fee)} per order`
+              ? `${config.orderFeeLabel}: ${toMajor(fee)} per order`
               : 'Off'
           }
         >

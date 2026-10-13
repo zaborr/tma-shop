@@ -15,7 +15,6 @@ export function authRoutes(): Hono<AppBindings> {
     const { initData } = c.req.valid('json');
     const env = c.get('env');
     const db = c.get('db');
-    const shopId = c.get('shopId');
 
     const result = validateInitData(initData, env.BOT_TOKEN, {
       maxAgeSeconds: env.INITDATA_MAX_AGE_SECONDS,
@@ -28,8 +27,10 @@ export function authRoutes(): Hono<AppBindings> {
     }
 
     const userRow = await upsertUser(db, result.data.user, env.ADMIN_TELEGRAM_IDS);
+    // Platform super-admin status always follows the current ADMIN_TELEGRAM_IDS.
+    const role = env.ADMIN_TELEGRAM_IDS.includes(userRow.telegramId) ? 'admin' : 'customer';
     const { token, expiresAt } = await signSession(
-      { sub: userRow.telegramId, role: userRow.role, shopId },
+      { sub: userRow.telegramId, role },
       env.JWT_SECRET,
       env.JWT_TTL_SECONDS,
     );
@@ -37,7 +38,7 @@ export function authRoutes(): Hono<AppBindings> {
     const response: AuthResponse = {
       token,
       expiresAt: expiresAt.toISOString(),
-      user: toSessionUserDTO(userRow),
+      user: { ...toSessionUserDTO(userRow), role },
     };
     return c.json(response);
   });
