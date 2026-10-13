@@ -55,6 +55,12 @@ const en = {
     'From now on I will message you here when your orders change: payment confirmed, shipped, delivered…',
   'start.button': 'Open shop',
 
+  // Wallet changes (to every admin)
+  'wallets.changed': '⚠️ The payment addresses of {shop} were changed by {who}.',
+  'wallets.evm': 'Base / Ethereum: {before} → {after}',
+  'wallets.solana': 'Solana: {before} → {after}',
+  'wallets.checkIt': 'If it was not you or another admin, check it right away: payments would go to the new address.',
+
   // Exports
   'export.captionOne': '📊 {shop} — {count} order',
   'export.captionOther': '📊 {shop} — {count} orders',
@@ -108,6 +114,11 @@ const es: Record<BotMessageKey, string> = {
   'start.updates':
     'A partir de ahora te escribiré aquí cuando cambien tus pedidos: pago confirmado, enviado, entregado…',
   'start.button': 'Abrir tienda',
+
+  'wallets.changed': '⚠️ {who} ha cambiado las direcciones de cobro de {shop}.',
+  'wallets.evm': 'Base / Ethereum: {before} → {after}',
+  'wallets.solana': 'Solana: {before} → {after}',
+  'wallets.checkIt': 'Si no has sido tú ni otro administrador, revísalo ya: los pagos irían a la dirección nueva.',
 
   'export.captionOne': '📊 {shop} — {count} pedido',
   'export.captionOther': '📊 {shop} — {count} pedidos',

@@ -18,8 +18,8 @@ import type {
   shops,
   users,
 } from './schema.js';
-import { userLang } from '@tma-shop/shared';
-import { expandWallets, explorerTxUrl } from '../config/payment-methods.js';
+import { EMPTY_PAYMENT_SETUP, paymentMethodsOf, userLang } from '@tma-shop/shared';
+import { explorerTxUrl } from '../config/payment-methods.js';
 
 type ProductRow = typeof products.$inferSelect;
 type CategoryRow = typeof categories.$inferSelect;
@@ -95,7 +95,7 @@ export function toShopConfigDTO(row: ShopRow, canManage = false): ShopConfig {
     shippingZones: row.shippingZones,
     addressPublicKey: row.addressPublicKey,
     addressKeyFingerprint: row.addressKeyFingerprint,
-    paymentMethods: expandWallets(row.wallets),
+    paymentMethods: paymentMethodsOf(row.paymentSetup),
     canManage,
   };
 }
@@ -117,7 +117,7 @@ export function toShopAdminDTO(row: ShopRow): ShopAdminView {
     ...toShopConfigDTO(row, true),
     sortOrder: row.sortOrder,
     adminIds: row.adminIds,
-    wallets: row.wallets,
+    paymentSetup: row.paymentSetup ?? EMPTY_PAYMENT_SETUP,
   };
 }
 

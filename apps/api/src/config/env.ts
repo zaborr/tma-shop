@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { walletsEnvSchema } from './payment-methods.js';
 
 /** Optional variable: an empty value counts as not set. */
 const optional = <T extends z.ZodType>(schema: T) =>
@@ -40,8 +39,6 @@ const envSchema = z.object({
   RENDER_EXTERNAL_URL: optional(z.url()),
   SHOP_ID: z.uuid().optional(),
   CORS_ORIGIN: z.string().default('*'),
-  /** Legacy: JSON array of wallets, imported once into the first shop. */
-  PAYMENT_METHODS: walletsEnvSchema,
 });
 
 export type Env = z.infer<typeof envSchema>;

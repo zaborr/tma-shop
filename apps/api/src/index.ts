@@ -2,7 +2,7 @@ import { serve } from '@hono/node-server';
 import { loadEnv } from './config/env.js';
 import { createDb, createPool } from './db/client.js';
 import { createApp } from './app.js';
-import { importLegacyWallets } from './services/shop.js';
+import { convertLegacyWallets } from './services/shop.js';
 import { configureBot } from './services/bot.js';
 import { scheduleRetention } from './services/retention.js';
 import { scheduleAutoCancel } from './services/autoCancel.js';
@@ -12,9 +12,9 @@ const pool = createPool(env.DATABASE_URL);
 const db = createDb(pool);
 const app = createApp({ env, db });
 
-// One-time move of the old PAYMENT_METHODS env wallets into the first shop.
-importLegacyWallets(db, env).catch((error: unknown) => {
-  console.error('Could not import PAYMENT_METHODS wallets:', error);
+// One-time conversion of old free-text wallets into the network catalog.
+convertLegacyWallets(db).catch((error: unknown) => {
+  console.error('Could not convert the old wallets:', error);
 });
 
 // Webhook (so the bot answers /start) and the chat's menu button.

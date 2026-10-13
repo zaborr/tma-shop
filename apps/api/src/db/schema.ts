@@ -17,8 +17,15 @@ import type {
   PriceTier,
   ProductOption,
   ShippingZone,
-  WalletInput,
+  PaymentSetup,
 } from '@tma-shop/shared';
+
+/** A wallet as the old free-text form stored it ("Base/Ethereum", "USDC/EURC"). */
+export interface LegacyWallet {
+  network: string;
+  token: string;
+  address: string;
+}
 
 export const userRoleEnum = pgEnum('user_role', ['customer', 'admin']);
 
@@ -44,7 +51,10 @@ export const shops = pgTable('shops', {
   /** Telegram ids of this shop's admins. */
   adminIds: jsonb('admin_ids').$type<number[]>().notNull().default([]),
   /** Wallets as entered by the admins (may join networks/tokens with "/"). */
-  wallets: jsonb('wallets').$type<WalletInput[]>().notNull().default([]),
+  /** Legacy free-text wallets; converted once into `paymentSetup`. */
+  wallets: jsonb('wallets').$type<LegacyWallet[]>().notNull().default([]),
+  /** Receiving addresses and accepted networks/tokens (null = none yet). */
+  paymentSetup: jsonb('payment_setup').$type<PaymentSetup>(),
   /** Set once wallets were saved or imported, so the legacy env import runs only once. */
   walletsInitialized: boolean('wallets_initialized').notNull().default(false),
   currency: text('currency').notNull().default('XTR'),

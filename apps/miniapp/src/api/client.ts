@@ -20,7 +20,7 @@ import type {
   ShopProfileInput,
   ShippingZone,
   ShopSummary,
-  WalletInput,
+  PaymentSetup,
 } from '@tma-shop/shared';
 import { lang } from '../i18n/index.js';
 
@@ -305,10 +305,11 @@ export class ApiClient {
     });
   }
 
-  adminUpdateWallets(wallets: WalletInput[]): Promise<ShopAdminView> {
-    return this.request<ShopAdminView>('/admin/shop/wallets', {
+  /** Receiving addresses and accepted networks/tokens of the shop. */
+  adminUpdatePayments(setup: PaymentSetup): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/payments', {
       method: 'PUT',
-      body: JSON.stringify({ wallets }),
+      body: JSON.stringify(setup),
     });
   }
 
