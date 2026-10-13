@@ -6,7 +6,7 @@ import { createApp } from '../app.js';
 import type { Env } from '../config/env.js';
 import { createDb, createPool, type Database } from '../db/client.js';
 import { eq } from 'drizzle-orm';
-import { categories, orders, products, shops, users } from '../db/schema.js';
+import { categories, orderItems, orders, products, shops, users } from '../db/schema.js';
 import { runRetention } from '../services/retention.js';
 import { cancelExpiredOrders } from '../services/autoCancel.js';
 
@@ -388,6 +388,63 @@ describeDb('API integration', () => {
     const [row] = await db.select().from(orders).where(eq(orders.id, orderId));
     expect(row?.status).toBe('cancelled');
     expect(row?.closedAt).not.toBeNull();
+  });
+
+  it('deletes a shop with its orders only after confirming its name', async () => {
+    const admin = await authToken(ADMIN_ID, 'Ivan');
+    const adminAuth = { Authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
+    await authToken(CUSTOMER_ID, 'Alice');
+
+    const [shop] = await db
+      .insert(shops)
+      .values({ slug: `to-delete-${Date.now()}`, name: 'Test Shop', description: '', currency: 'USDC' })
+      .returning();
+    const [product] = await db
+      .insert(products)
+      .values({
+        shopId: shop!.id,
+        slug: 'thing',
+        title: 'Thing',
+        description: '',
+        price: 100,
+        currency: 'USDC',
+        stock: null,
+        isActive: true,
+      })
+      .returning();
+    const [order] = await db
+      .insert(orders)
+      .values({ shopId: shop!.id, userId: CUSTOMER_ID, total: 100, currency: 'USDC' })
+      .returning();
+    await db.insert(orderItems).values({
+      orderId: order!.id,
+      productId: product!.id,
+      title: 'Thing',
+      unitPrice: 100,
+      quantity: 1,
+      subtotal: 100,
+    });
+
+    const contents = await app.request(`/api/platform/shops/${shop!.id}/contents`, {
+      headers: adminAuth,
+    });
+    expect(await contents.json()).toEqual({ orders: 1, products: 1, categories: 0, carts: 0 });
+
+    const wrong = await app.request(`/api/platform/shops/${shop!.id}/delete-all`, {
+      method: 'POST',
+      headers: adminAuth,
+      body: JSON.stringify({ confirmName: 'Test' }),
+    });
+    expect(wrong.status).toBe(400);
+
+    const ok = await app.request(`/api/platform/shops/${shop!.id}/delete-all`, {
+      method: 'POST',
+      headers: adminAuth,
+      body: JSON.stringify({ confirmName: 'Test Shop' }),
+    });
+    expect(ok.status).toBe(200);
+    expect(await db.select().from(shops).where(eq(shops.id, shop!.id))).toHaveLength(0);
+    expect(await db.select().from(orders).where(eq(orders.id, order!.id))).toHaveLength(0);
   });
 
   it('enforces admin-only routes', async () => {

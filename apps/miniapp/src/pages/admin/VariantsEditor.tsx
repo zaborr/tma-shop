@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Cell, Input, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, Section } from '@telegram-apps/telegram-ui';
+import { Input } from '../../components/Field.js';
 import type { Product, ProductOption, VariantInput } from '@tma-shop/shared';
 import { toMajor } from './common.js';
 

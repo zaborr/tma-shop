@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Cell, Input, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
+import { Input } from '../components/Field.js';
 import { payBefore, unitPriceFor, type Order, type PaymentMethod } from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';

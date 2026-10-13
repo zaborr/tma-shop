@@ -1,4 +1,4 @@
-import { and, asc, eq, or } from 'drizzle-orm';
+import { and, asc, eq, or, sql } from 'drizzle-orm';
 import { createHash, createPublicKey, randomUUID } from 'node:crypto';
 import type {
   PlatformShopInput,
@@ -11,7 +11,7 @@ import type {
 } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import type { Env } from '../config/env.js';
-import { orders, shops } from '../db/schema.js';
+import { carts, categories, orders, products, shops } from '../db/schema.js';
 import { toShopAdminDTO, toShopConfigDTO, toShopSummaryDTO } from '../db/mappers.js';
 import { expandWallets } from '../config/payment-methods.js';
 import { ApiError } from '../lib/errors.js';
@@ -263,6 +263,48 @@ export async function deleteShop(db: Database, shopId: string): Promise<void> {
   }
   const deleted = await db.delete(shops).where(eq(shops.id, shopId)).returning({ id: shops.id });
   if (deleted.length === 0) throw ApiError.notFound('Shop not found');
+}
+
+export interface ShopContents {
+  orders: number;
+  products: number;
+  categories: number;
+  carts: number;
+}
+
+/** What deleting a shop would take with it. */
+export async function shopContents(db: Database, shopId: string): Promise<ShopContents> {
+  const shop = await db.query.shops.findFirst({ where: eq(shops.id, shopId) });
+  if (!shop) throw ApiError.notFound('Shop not found');
+  const n = sql<number>`count(*)::int`;
+  const [o] = await db.select({ n }).from(orders).where(eq(orders.shopId, shopId));
+  const [p] = await db.select({ n }).from(products).where(eq(products.shopId, shopId));
+  const [k] = await db.select({ n }).from(categories).where(eq(categories.shopId, shopId));
+  const [c] = await db.select({ n }).from(carts).where(eq(carts.shopId, shopId));
+  return { orders: o?.n ?? 0, products: p?.n ?? 0, categories: k?.n ?? 0, carts: c?.n ?? 0 };
+}
+
+/**
+ * Deletes a shop and everything in it, orders included. The caller must type
+ * the shop's exact name; it is checked again here. All or nothing.
+ */
+export async function deleteShopWithEverything(
+  db: Database,
+  shopId: string,
+  confirmName: string,
+): Promise<ShopContents> {
+  const contents = await shopContents(db, shopId);
+  await db.transaction(async (tx) => {
+    const shop = await tx.query.shops.findFirst({ where: eq(shops.id, shopId) });
+    if (!shop) throw ApiError.notFound('Shop not found');
+    if (confirmName.trim() !== shop.name.trim()) {
+      throw ApiError.badRequest('name_mismatch', 'The name does not match the shop name');
+    }
+    // Orders first: their lines point at products. The rest cascades.
+    await tx.delete(orders).where(eq(orders.shopId, shopId));
+    await tx.delete(shops).where(eq(shops.id, shopId));
+  });
+  return contents;
 }
 
 /**

@@ -27,6 +27,13 @@ export interface ShopsResponse {
   isSuperAdmin: boolean;
 }
 
+export interface ShopContents {
+  orders: number;
+  products: number;
+  categories: number;
+  carts: number;
+}
+
 export interface ProductPage {
   items: Product[];
   page: number;
@@ -140,6 +147,19 @@ export class ApiClient {
 
   platformDeleteShop(shopId: string): Promise<void> {
     return this.request<void>(`/platform/shops/${shopId}`, { method: 'DELETE' });
+  }
+
+  /** How many orders, products, categories and carts a shop holds. */
+  platformShopContents(shopId: string): Promise<ShopContents> {
+    return this.request<ShopContents>(`/platform/shops/${shopId}/contents`);
+  }
+
+  /** Deletes a shop with everything in it; `confirmName` must be its exact name. */
+  platformDeleteShopWithEverything(shopId: string, confirmName: string): Promise<ShopContents> {
+    return this.request<ShopContents>(`/platform/shops/${shopId}/delete-all`, {
+      method: 'POST',
+      body: JSON.stringify({ confirmName }),
+    });
   }
 
   platformGetRetention(): Promise<RetentionStatus> {

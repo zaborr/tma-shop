@@ -1,4 +1,5 @@
-import { Input, Section, Textarea } from '@telegram-apps/telegram-ui';
+import { Section } from '@telegram-apps/telegram-ui';
+import { Input, Textarea } from './Field.js';
 import type { DeliveryAddress } from '@tma-shop/shared';
 
 export const EMPTY_ADDRESS: DeliveryAddress = {

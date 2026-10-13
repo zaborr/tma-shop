@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Cell, Input, List, Section, Textarea } from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
+import { Input, Textarea } from '../../components/Field.js';
 import type { ShopAdminView } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
