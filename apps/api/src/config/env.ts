@@ -33,11 +33,6 @@ const envSchema = z.object({
    */
   TELEGRAM_WEBHOOK_SECRET: optional(z.string().trim().min(1)),
   /**
-   * Public address of the Mini App (the Vercel URL). The bot answers /start
-   * with a button that opens it, and uses it for the chat's menu button.
-   */
-  MINIAPP_URL: optional(z.url()),
-  /**
    * Public address of this API, to register the Telegram webhook at startup.
    * Render sets RENDER_EXTERNAL_URL by itself, so it is rarely needed.
    */
