@@ -4,8 +4,7 @@ import { createDb, createPool } from './db/client.js';
 import { createApp } from './app.js';
 import { convertLegacyWallets } from './services/shop.js';
 import { configureBot } from './services/bot.js';
-import { scheduleRetention } from './services/retention.js';
-import { scheduleAutoCancel } from './services/autoCancel.js';
+import { scheduleMaintenance } from './services/maintenance.js';
 import { resumePaymentChecks } from './services/paymentCheck.js';
 
 const env = loadEnv();
@@ -21,11 +20,9 @@ convertLegacyWallets(db).catch((error: unknown) => {
 // Webhook (so the bot answers /start) and the chat's menu button.
 void configureBot(env);
 
-// Deletes personal data past its retention period, now and every 6 hours.
-scheduleRetention(db);
-
-// Cancels unpaid orders past each shop's deadline, now and every hour.
-scheduleAutoCancel(db, env);
+// Every 3 hours (and now): cancel unpaid orders past their deadline, then
+// delete personal data past its retention period. One run, one database wake-up.
+scheduleMaintenance(db, env);
 
 // Payment checks that were running before a restart.
 resumePaymentChecks(db, env).catch((error: unknown) => {

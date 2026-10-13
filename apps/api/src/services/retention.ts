@@ -103,17 +103,3 @@ export async function runRetention(db: Database, now = new Date()): Promise<Rete
     ranAt: now.toISOString(),
   };
 }
-
-/** Runs the cleanup now and every `everyHours` while the server is up. */
-export function scheduleRetention(db: Database, everyHours = 6): void {
-  const run = (): void => {
-    runRetention(db)
-      .then((report) => {
-        const total = report.ordersAnonymized + report.cartsDeleted + report.usersDeleted;
-        if (total > 0) console.log('Data retention:', report);
-      })
-      .catch((error: unknown) => console.error('Data retention failed:', error));
-  };
-  run();
-  setInterval(run, everyHours * 60 * 60 * 1000).unref();
-}
