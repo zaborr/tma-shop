@@ -101,11 +101,9 @@ export class TelegramApi {
     });
   }
 
-  /** Default menu button of every private chat with the bot: opens the Mini App. */
-  setChatMenuButton(text: string, url: string): Promise<true> {
-    return this.call<true>('setChatMenuButton', {
-      menu_button: { type: 'web_app', text, web_app: { url } },
-    });
+  /** The bot's default menu button, as set up in @BotFather. */
+  getChatMenuButton(): Promise<{ type: string; text?: string; web_app?: { url: string } }> {
+    return this.call('getChatMenuButton', {});
   }
 
   answerPreCheckoutQuery(
