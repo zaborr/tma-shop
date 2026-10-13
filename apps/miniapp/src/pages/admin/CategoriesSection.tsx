@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Cell, Input, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, Section } from '@telegram-apps/telegram-ui';
+import { Input } from '../../components/Field.js';
 import type { Category } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { toSlug } from '../../lib/slug.js';

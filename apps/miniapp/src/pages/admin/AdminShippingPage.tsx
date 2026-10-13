@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Cell, Input, List, Section } from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
+import { Input } from '../../components/Field.js';
 import type { ShippingZone } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useShop } from '../../providers/ShopProvider.js';

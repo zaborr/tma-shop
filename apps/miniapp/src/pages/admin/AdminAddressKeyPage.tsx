@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button, Cell, List, Section, Textarea } from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
+import { Textarea } from '../../components/Field.js';
 import { api } from '../../api/client.js';
 import { copyText } from '../../lib/clipboard.js';
 import {
