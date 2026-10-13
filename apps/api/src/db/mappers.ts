@@ -123,11 +123,8 @@ export function toSessionUserDTO(row: UserRow): SessionUser {
   return {
     telegramId: row.telegramId,
     firstName: row.firstName,
-    lastName: row.lastName,
     username: row.username,
     languageCode: row.languageCode,
-    isPremium: row.isPremium,
-    photoUrl: row.photoUrl,
     role: row.role,
   };
 }
@@ -181,6 +178,8 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
         }
       : null,
     paymentLog: row.paymentLog,
+    closedAt: row.closedAt?.toISOString() ?? null,
+    anonymizedAt: row.anonymizedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

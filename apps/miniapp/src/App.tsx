@@ -25,6 +25,7 @@ import { AdminExportPage } from './pages/admin/AdminExportPage.js';
 import { ShopsPage } from './pages/ShopsPage.js';
 import { PlatformPage } from './pages/platform/PlatformPage.js';
 import { PlatformShopPage } from './pages/platform/PlatformShopPage.js';
+import { PlatformRetentionPage } from './pages/platform/PlatformRetentionPage.js';
 
 function platform(): 'ios' | 'base' {
   try {
@@ -52,6 +53,7 @@ function Shell(): React.JSX.Element {
       <Route path="/" element={<ShopsPage />} />
       <Route path="/platform" element={<PlatformPage />} />
       <Route path="/platform/shops/:id" element={<PlatformShopPage />} />
+      <Route path="/platform/retention" element={<PlatformRetentionPage />} />
 
       <Route path="/s/:shopRef" element={<ShopLayout />}>
         <Route index element={<CatalogPage />} />

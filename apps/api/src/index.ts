@@ -4,6 +4,7 @@ import { createDb, createPool } from './db/client.js';
 import { createApp } from './app.js';
 import { importLegacyWallets } from './services/shop.js';
 import { configureBot } from './services/bot.js';
+import { scheduleRetention } from './services/retention.js';
 
 const env = loadEnv();
 const pool = createPool(env.DATABASE_URL);
@@ -17,6 +18,9 @@ importLegacyWallets(db, env).catch((error: unknown) => {
 
 // Webhook (so the bot answers /start) and the chat's menu button.
 void configureBot(env);
+
+// Deletes personal data past its retention period, now and every 6 hours.
+scheduleRetention(db);
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`tma-shop API listening on http://localhost:${info.port}`);

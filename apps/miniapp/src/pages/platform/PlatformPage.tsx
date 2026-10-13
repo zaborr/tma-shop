@@ -27,6 +27,7 @@ function Platform(): React.JSX.Element {
     <List>
       <Section>
         <Cell onClick={() => navigate('/platform/shops/new')}>➕ New shop</Cell>
+        <Cell onClick={() => navigate('/platform/retention')}>🧹 Data retention</Cell>
       </Section>
 
       {list.length === 0 ? (

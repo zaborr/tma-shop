@@ -11,6 +11,9 @@ import type {
   PlatformShopInput,
   Product,
   ProductInput,
+  RetentionReport,
+  RetentionSettings,
+  RetentionStatus,
   ShopAdminView,
   ShopConfig,
   ShopProfileInput,
@@ -137,6 +140,21 @@ export class ApiClient {
 
   platformDeleteShop(shopId: string): Promise<void> {
     return this.request<void>(`/platform/shops/${shopId}`, { method: 'DELETE' });
+  }
+
+  platformGetRetention(): Promise<RetentionStatus> {
+    return this.request<RetentionStatus>('/platform/retention');
+  }
+
+  platformUpdateRetention(settings: RetentionSettings): Promise<RetentionStatus> {
+    return this.request<RetentionStatus>('/platform/retention', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
+  }
+
+  platformRunRetention(): Promise<RetentionReport> {
+    return this.request<RetentionReport>('/platform/retention/run', { method: 'POST' });
   }
 
   // --- catalog ---

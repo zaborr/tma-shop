@@ -67,7 +67,8 @@ export type PaymentLogEntry = z.infer<typeof paymentLogEntry>;
 export const order = z.object({
   id,
   shopId: id,
-  userId: telegramUserId,
+  /** Customer; null once the order is anonymized (data retention). */
+  userId: telegramUserId.nullable(),
   status: orderStatus,
   items: z.array(orderItem).min(1),
   /** Total including `fee`. */
@@ -113,6 +114,10 @@ export const order = z.object({
   changeRequest: orderChangeRequest.nullable(),
   /** Confirmed payments and refunds, oldest first. */
   paymentLog: z.array(paymentLogEntry),
+  /** When it was delivered or cancelled. */
+  closedAt: isoDateTime.nullable(),
+  /** When the address and the link to the customer were removed. */
+  anonymizedAt: isoDateTime.nullable(),
   createdAt: isoDateTime,
   updatedAt: isoDateTime,
 });

@@ -67,7 +67,12 @@ function AdminOrder(): React.JSX.Element {
         >
           Customer
         </Cell>
-        <Cell after={String(o.userId)}>Telegram id</Cell>
+        <Cell after={o.userId === null ? '—' : String(o.userId)}>Telegram id</Cell>
+        {o.anonymizedAt && (
+          <Cell multiline subtitle={`Since ${formatDate(o.anonymizedAt)}`}>
+            Anonymized: address and link to the customer deleted (data retention)
+          </Cell>
+        )}
         {o.trackingNumber && (
           <Cell subtitle="Tracking" multiline>
             <TrackingText value={o.trackingNumber} />

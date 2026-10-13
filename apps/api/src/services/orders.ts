@@ -462,11 +462,14 @@ export async function changeOrderStatus(
     }
     const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, locked.id));
 
+    const now = new Date();
     const set: Partial<typeof orders.$inferInsert> = {
       status: change.status,
       statusNote: note,
-      updatedAt: new Date(),
+      updatedAt: now,
     };
+    // Retention counts from the moment the order is closed.
+    if (change.status === 'fulfilled' || change.status === 'cancelled') set.closedAt = now;
     if (change.status === 'pending') {
       // Payment rejected: the customer can send a (correct) transaction again.
       set.paymentTxHash = null;

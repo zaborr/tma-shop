@@ -87,6 +87,7 @@ function notes(order: Order): string {
   if (order.changeRequest) parts.push('Change requested');
   if (order.amountDue < 0) parts.push('Refund owed');
   if (order.amountDue > 0 && order.amountPaid > 0) parts.push('Difference due');
+  if (order.anonymizedAt) parts.push('Anonymized');
   return parts.join('; ');
 }
 
@@ -114,7 +115,7 @@ function ordersSheet(input: ReportInput, orders: readonly Order[]): Sheet {
     'Items',
   ];
   const rows = orders.map((o): CellValue[] => {
-    const customer = input.customers.get(o.userId);
+    const customer = o.userId === null ? undefined : input.customers.get(o.userId);
     const products = o.items.reduce((sum, i) => sum + i.subtotal, 0);
     const username = o.contactUsername ?? customer?.username ?? null;
     return [
@@ -123,7 +124,7 @@ function ordersSheet(input: ReportInput, orders: readonly Order[]): Sheet {
       STATUS_LABEL[o.status],
       customer?.name ?? '',
       username ? `@${username}` : '',
-      o.userId,
+      o.userId ?? '',
       o.shippingZoneName ?? '',
       o.currency,
       o.items.reduce((n, i) => n + i.quantity, 0),
