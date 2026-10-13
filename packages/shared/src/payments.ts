@@ -6,9 +6,9 @@ import { z } from 'zod';
  * an admin spells a network name.
  */
 export const CHAINS = {
-  base: { name: 'Base', family: 'evm', evmChainId: 8453, explorerTx: 'https://basescan.org/tx/' },
-  solana: { name: 'Solana', family: 'solana', evmChainId: null, explorerTx: 'https://solscan.io/tx/' },
-  ethereum: { name: 'Ethereum', family: 'evm', evmChainId: 1, explorerTx: 'https://etherscan.io/tx/' },
+  base: { name: 'Base', family: 'evm', explorerTx: 'https://basescan.org/tx/' },
+  solana: { name: 'Solana', family: 'solana', explorerTx: 'https://solscan.io/tx/' },
+  ethereum: { name: 'Ethereum', family: 'evm', explorerTx: 'https://etherscan.io/tx/' },
 } as const;
 
 export const chainId = z.enum(['base', 'solana', 'ethereum']);
@@ -97,35 +97,4 @@ export function paymentMethodsOf(setup: PaymentSetup | null | undefined): Paymen
     }
   }
   return methods;
-}
-
-/**
- * Payment request a wallet understands (QR or link), with address, token and
- * amount filled in: Solana Pay for Solana, EIP-681 for Base/Ethereum.
- * `cents` is the amount in minor units of the token.
- */
-export function paymentUri(
-  method: PaymentMethod,
-  cents: number,
-  label: string,
-  message: string,
-): string {
-  if (method.chain === 'solana') {
-    const params = new URLSearchParams({
-      amount: (cents / 100).toFixed(2),
-      'spl-token': method.contract,
-      label,
-      message,
-    });
-    return `solana:${method.address}?${params.toString()}`;
-  }
-  const raw = BigInt(cents) * 10n ** BigInt(TOKEN_DECIMALS - 2);
-  return `ethereum:${method.contract}@${CHAINS[method.chain].evmChainId}/transfer?address=${method.address}&uint256=${raw.toString()}`;
-}
-
-/** Link that opens the same EVM payment in the MetaMask app. */
-export function metamaskUrl(method: PaymentMethod, cents: number): string | null {
-  if (method.chain === 'solana') return null;
-  const uri = paymentUri(method, cents, '', '');
-  return `https://metamask.app.link/send/${uri.slice('ethereum:'.length)}`;
 }
