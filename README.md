@@ -154,7 +154,9 @@ tma-shop/
 | `JWT_TTL_SECONDS`          | Session lifetime                                  | `3600`  |
 | `INITDATA_MAX_AGE_SECONDS` | Max accepted `initData` age                       | `86400` |
 | `ADMIN_TELEGRAM_IDS`       | Comma-separated platform super-admin user ids     | —       |
-| `TELEGRAM_WEBHOOK_SECRET`  | Webhook secret, only for Telegram Stars; unset = webhook off | —       |
+| `TELEGRAM_WEBHOOK_SECRET`  | Webhook secret (long random value). Needed for the bot to answer /start and for Stars; unset = webhook off | —       |
+| `MINIAPP_URL`              | Public Mini App URL (e.g. the Vercel one): /start button and chat menu button | —       |
+| `PUBLIC_URL`               | Public API URL, to register the webhook at startup (Render: automatic via `RENDER_EXTERNAL_URL`) | —       |
 | `SHOP_ID`                  | Active shop id (optional; resolved automatically) | —       |
 | `CORS_ORIGIN`              | Allowed Mini App origin(s), e.g. `https://your-app.vercel.app` | `*`     |
 | `PAYMENT_METHODS`          | Legacy: JSON array of wallets imported once into the first shop; wallets are managed in each shop's admin afterwards | `[]` |

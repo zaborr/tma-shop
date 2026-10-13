@@ -18,6 +18,10 @@ export interface PreCheckoutQuery {
 export interface TelegramUpdate {
   update_id: number;
   message?: {
+    message_id?: number;
+    chat?: { id: number; type: string };
+    from?: { id: number; first_name?: string; language_code?: string };
+    text?: string;
     successful_payment?: SuccessfulPayment;
   };
   pre_checkout_query?: PreCheckoutQuery;
