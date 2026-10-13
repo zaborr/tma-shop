@@ -89,6 +89,17 @@ function AdminCatalog(): React.JSX.Element {
   );
 }
 
+/** "12 in stock", "unlimited stock" or, with variants, "6 variants · 40 in stock". */
+function stockSummary(product: Product): string {
+  if (product.options.length === 0) {
+    return product.stock === null ? 'unlimited stock' : `${product.stock} in stock`;
+  }
+  const active = product.variants.filter((v) => v.isActive);
+  const tracked = active.every((v) => v.stock !== null);
+  const total = active.reduce((sum, v) => sum + (v.stock ?? 0), 0);
+  return `${active.length} variants · ${tracked ? `${total} in stock` : 'unlimited stock'}`;
+}
+
 function ProductRow({
   product,
   actions,
@@ -104,7 +115,7 @@ function ProductRow({
       before={<ProductImage url={product.imageUrl} alt={product.title} size={48} />}
       subtitle={[
         formatPrice(product.price, product.currency),
-        product.stock === null ? 'unlimited stock' : `${product.stock} in stock`,
+        stockSummary(product),
         product.isActive ? null : '🙈 hidden',
       ]
         .filter(Boolean)

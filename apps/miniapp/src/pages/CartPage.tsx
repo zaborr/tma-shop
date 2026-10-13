@@ -7,6 +7,7 @@ import { useCart } from '../providers/CartProvider.js';
 import { useSession } from '../providers/SessionProvider.js';
 import { useMainButton } from '../hooks/useMainButton.js';
 import { formatPrice } from '../lib/format.js';
+import { lineName } from '../lib/variants.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { Loader } from '../components/Loader.js';
 import { useShopPath } from '../providers/ShopProvider.js';
@@ -93,15 +94,15 @@ export function CartPage(): React.JSX.Element {
       <Section header="Cart">
         {cart?.lines.map((line) => (
           <Cell
-            key={line.product.id}
-            subtitle={formatPrice(line.product.price, line.product.currency)}
+            key={line.id}
+            subtitle={formatPrice(line.unitPrice, cart.currency)}
             after={formatPrice(line.subtotal, cart.currency)}
             description={
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
                 <Button
                   size="s"
                   mode="bezeled"
-                  onClick={() => void setQuantity(line.product.id, line.quantity - 1)}
+                  onClick={() => void setQuantity(line.id, line.quantity - 1)}
                 >
                   −
                 </Button>
@@ -109,18 +110,18 @@ export function CartPage(): React.JSX.Element {
                 <Button
                   size="s"
                   mode="bezeled"
-                  onClick={() => void setQuantity(line.product.id, line.quantity + 1)}
+                  onClick={() => void setQuantity(line.id, line.quantity + 1)}
                 >
                   +
                 </Button>
-                <Button size="s" mode="plain" onClick={() => void remove(line.product.id)}>
+                <Button size="s" mode="plain" onClick={() => void remove(line.id)}>
                   Remove
                 </Button>
               </div>
             }
             multiline
           >
-            {line.product.title}
+            {lineName(line.product.title, line.variant?.label)}
           </Cell>
         ))}
       </Section>

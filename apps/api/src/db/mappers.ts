@@ -3,12 +3,21 @@ import type {
   Order,
   OrderItem,
   Product,
+  ProductVariant,
   SessionUser,
   ShopAdminView,
   ShopConfig,
   ShopSummary,
 } from '@tma-shop/shared';
-import type { categories, orderItems, orders, products, shops, users } from './schema.js';
+import type {
+  categories,
+  orderItems,
+  orders,
+  productVariants,
+  products,
+  shops,
+  users,
+} from './schema.js';
 import { expandWallets, explorerTxUrl } from '../config/payment-methods.js';
 
 type ProductRow = typeof products.$inferSelect;
@@ -18,7 +27,27 @@ type UserRow = typeof users.$inferSelect;
 type OrderRow = typeof orders.$inferSelect;
 type OrderItemRow = typeof orderItems.$inferSelect;
 
-export function toProductDTO(row: ProductRow): Product {
+type VariantRow = typeof productVariants.$inferSelect;
+
+/** "Red / M" */
+export function variantLabel(values: readonly string[]): string {
+  return values.join(' / ');
+}
+
+export function toVariantDTO(row: VariantRow, product: ProductRow): ProductVariant {
+  return {
+    id: row.id,
+    values: row.optionValues,
+    label: variantLabel(row.optionValues),
+    priceOverride: row.price,
+    price: row.price ?? product.price,
+    stock: row.stock,
+    isActive: row.isActive,
+  };
+}
+
+/** `variants` should already be filtered (active only for customers) and sorted. */
+export function toProductDTO(row: ProductRow, variants: readonly VariantRow[] = []): Product {
   return {
     id: row.id,
     shopId: row.shopId,
@@ -31,6 +60,8 @@ export function toProductDTO(row: ProductRow): Product {
     imageUrl: row.imageUrl,
     stock: row.stock,
     isActive: row.isActive,
+    options: row.options,
+    variants: row.options.length > 0 ? variants.map((v) => toVariantDTO(v, row)) : [],
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -100,6 +131,8 @@ export function toSessionUserDTO(row: UserRow): SessionUser {
 export function toOrderItemDTO(row: OrderItemRow): OrderItem {
   return {
     productId: row.productId,
+    variantId: row.variantId,
+    variantLabel: row.variantLabel,
     title: row.title,
     unitPrice: row.unitPrice,
     quantity: row.quantity,
@@ -125,7 +158,17 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
     amountPaid: row.amountPaid,
     amountDue: row.total - row.amountPaid,
     amountSubmitted: row.amountSubmitted,
-    changeRequest: row.changeRequest ?? null,
+    // Requests saved before variants existed lack the variant fields.
+    changeRequest: row.changeRequest
+      ? {
+          ...row.changeRequest,
+          items: row.changeRequest.items.map((item) => ({
+            ...item,
+            variantId: item.variantId ?? null,
+            variantLabel: item.variantLabel ?? null,
+          })),
+        }
+      : null,
     paymentLog: row.paymentLog,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

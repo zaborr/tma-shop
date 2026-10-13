@@ -5,6 +5,14 @@ import { api, ApiClientError } from '../../api/client.js';
 import { toSlug } from '../../lib/slug.js';
 import { ProductImage } from '../../components/ProductImage.js';
 import { TOKENS, toMajor, type Token } from './common.js';
+import {
+  buildVariants,
+  initialDrafts,
+  initialOptions,
+  VariantsEditor,
+  type OptionDraft,
+  type VariantDraft,
+} from './VariantsEditor.js';
 
 /** Create a product, or edit `product` when given. */
 export function ProductForm({
@@ -30,6 +38,10 @@ export function ProductForm({
   const [imageUrl, setImageUrl] = useState(product?.imageUrl ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
   const [categoryId, setCategoryId] = useState<string | null>(product?.categoryId ?? null);
+  const [optionDrafts, setOptionDrafts] = useState<OptionDraft[]>(() => initialOptions(product));
+  const [variantDrafts, setVariantDrafts] = useState<Record<string, VariantDraft>>(() =>
+    initialDrafts(product),
+  );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -37,8 +49,15 @@ export function ProductForm({
   const imageInvalid = image !== '' && !/^https:\/\/\S+$/i.test(image);
   const stockValue = stock.trim();
   const stockInvalid = stockValue !== '' && !/^\d+$/.test(stockValue);
+  const built = buildVariants(optionDrafts, variantDrafts);
+  const variantError = 'error' in built ? built.error : null;
+  const withVariants = !('error' in built) && built.options.length > 0;
 
   const submit = async (): Promise<void> => {
+    if ('error' in built) {
+      setMessage(built.error);
+      return;
+    }
     setBusy(true);
     setMessage(null);
     const input: ProductInput = {
@@ -52,8 +71,11 @@ export function ProductForm({
       price: Math.round((Number(price.replace(',', '.')) || 0) * 100),
       currency: token,
       imageUrl: image === '' ? null : image,
-      stock: stockValue === '' ? null : Number(stockValue),
+      // With variants, stock is set per variant.
+      stock: withVariants || stockValue === '' ? null : Number(stockValue),
       isActive: product?.isActive ?? true,
+      options: built.options,
+      variants: built.variants,
     };
     try {
       const saved = product
@@ -68,6 +90,8 @@ export function ProductForm({
         setImageUrl('');
         setDescription('');
         setCategoryId(null);
+        setOptionDrafts([]);
+        setVariantDrafts({});
       }
       onSaved();
     } catch (err) {
@@ -78,6 +102,7 @@ export function ProductForm({
   };
 
   return (
+    <>
     <Section header={product ? `Edit product: ${product.title}` : 'Add product'}>
       <Input header="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
       <Input
@@ -133,20 +158,26 @@ export function ProductForm({
         {token}
       </Cell>
       <Input
-        header={`Price (${token}, e.g. 12.90)`}
+        header={
+          withVariants
+            ? `Base price (${token}) — used by variants without their own`
+            : `Price (${token}, e.g. 12.90)`
+        }
         type="text"
         inputMode="decimal"
         value={price}
         onChange={(e) => setPrice(e.target.value)}
       />
-      <Input
-        header={stockInvalid ? 'Stock — whole number, or empty' : 'Stock (empty = unlimited)'}
-        type="text"
-        inputMode="numeric"
-        status={stockInvalid ? 'error' : 'default'}
-        value={stock}
-        onChange={(e) => setStock(e.target.value)}
-      />
+      {!withVariants && (
+        <Input
+          header={stockInvalid ? 'Stock — whole number, or empty' : 'Stock (empty = unlimited)'}
+          type="text"
+          inputMode="numeric"
+          status={stockInvalid ? 'error' : 'default'}
+          value={stock}
+          onChange={(e) => setStock(e.target.value)}
+        />
+      )}
       <Input
         header={imageInvalid ? 'Image URL — must start with https://' : 'Image URL (optional)'}
         type="url"
@@ -165,11 +196,23 @@ export function ProductForm({
         value={description}
         onChange={(e) => setDescription(e.target.value)}
       />
+    </Section>
+
+    <VariantsEditor
+      options={optionDrafts}
+      setOptions={setOptionDrafts}
+      drafts={variantDrafts}
+      setDrafts={setVariantDrafts}
+      basePrice={price}
+      currency={token}
+    />
+
+    <Section footer={variantError ?? undefined}>
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <Button
           stretched
           loading={busy}
-          disabled={!title.trim() || imageInvalid || stockInvalid}
+          disabled={!title.trim() || imageInvalid || (!withVariants && stockInvalid) || variantError !== null}
           onClick={() => void submit()}
         >
           {product ? 'Save changes' : 'Create product'}
@@ -182,5 +225,6 @@ export function ProductForm({
         {message && <Cell multiline>{message}</Cell>}
       </div>
     </Section>
+    </>
   );
 }

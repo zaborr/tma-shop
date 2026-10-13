@@ -69,6 +69,7 @@ export const requestOrderChangeRequest = z.object({
     .array(
       z.object({
         productId: id,
+        variantId: id.nullable().optional(),
         quantity: z.number().int().positive().max(999),
       }),
     )

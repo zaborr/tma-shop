@@ -1,14 +1,22 @@
 import { and, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import type { Order, OrderChangeRequest, PaymentLogEntry } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
-import { cartItems, orderItems, orders, products, shops } from '../db/schema.js';
-import { toOrderDTO } from '../db/mappers.js';
+import { cartItems, orderItems, orders, productVariants, products, shops } from '../db/schema.js';
+import { toOrderDTO, variantLabel } from '../db/mappers.js';
+import { basePrice, lineStock, loadVariants } from './variants.js';
 import { ApiError } from '../lib/errors.js';
 
 type OrderItemRow = typeof orderItems.$inferSelect;
 
+/** Key of an order or cart line: product plus variant. */
+export function lineKey(productId: string, variantId: string | null | undefined): string {
+  return `${productId}:${variantId ?? ''}`;
+}
+
 export interface DraftLine {
   productId: string;
+  variantId?: string | null;
+  variantLabel?: string | null;
   title: string;
   unitPrice: number;
   quantity: number;
@@ -19,6 +27,8 @@ export interface DraftLine {
 export interface OrderDraft {
   items: Array<{
     productId: string;
+    variantId: string | null;
+    variantLabel: string | null;
     title: string;
     unitPrice: number;
     quantity: number;
@@ -40,11 +50,14 @@ export function buildOrderDraft(lines: DraftLine[]): OrderDraft {
     if (line.quantity <= 0) {
       throw ApiError.badRequest('invalid_quantity', `Invalid quantity for "${line.title}"`);
     }
+    const name = line.variantLabel ? `${line.title} (${line.variantLabel})` : line.title;
     if (line.stock !== null && line.quantity > line.stock) {
-      throw ApiError.conflict('out_of_stock', `Only ${line.stock} of "${line.title}" in stock`);
+      throw ApiError.conflict('out_of_stock', `Only ${line.stock} of "${name}" in stock`);
     }
     return {
       productId: line.productId,
+      variantId: line.variantId ?? null,
+      variantLabel: line.variantLabel ?? null,
       title: line.title,
       unitPrice: line.unitPrice,
       quantity: line.quantity,
@@ -86,16 +99,29 @@ export async function createOrderFromCart(
     }
     const currency = activeLines[0]?.product.currency ?? shop.currency;
 
-    const draft = buildOrderDraft(
-      activeLines
-        .map((l) => ({
-          productId: l.product.id,
-          title: l.product.title,
-          unitPrice: l.product.price,
-          quantity: l.item.quantity,
-          stock: l.product.stock,
-        })),
+    const variants = await loadVariants(
+      tx,
+      activeLines.map((l) => l.product.id),
     );
+    const draftLines: DraftLine[] = [];
+    for (const { item, product } of activeLines) {
+      const variant = item.variantId
+        ? (variants.get(product.id)?.find((v) => v.id === item.variantId) ?? null)
+        : null;
+      // Same rule as the cart: lines that no longer match the product are dropped.
+      if (product.options.length > 0 && (!variant || !variant.isActive)) continue;
+      if (product.options.length === 0 && item.variantId) continue;
+      draftLines.push({
+        productId: product.id,
+        variantId: variant?.id ?? null,
+        variantLabel: variant ? variantLabel(variant.optionValues) : null,
+        title: product.title,
+        unitPrice: basePrice(product, variant),
+        quantity: item.quantity,
+        stock: lineStock(product, variant),
+      });
+    }
+    const draft = buildOrderDraft(draftLines);
 
     const [order] = await tx
       .insert(orders)
@@ -218,10 +244,22 @@ export async function markOrderPaid(
 
     if (!order.stockApplied) {
       for (const item of items) {
-        await tx
-          .update(products)
-          .set({ stock: sql`GREATEST(${products.stock} - ${item.quantity}, 0)` })
-          .where(and(eq(products.id, item.productId), sql`${products.stock} IS NOT NULL`));
+        if (item.variantId) {
+          await tx
+            .update(productVariants)
+            .set({ stock: sql`GREATEST(${productVariants.stock} - ${item.quantity}, 0)` })
+            .where(
+              and(
+                eq(productVariants.id, item.variantId),
+                sql`${productVariants.stock} IS NOT NULL`,
+              ),
+            );
+        } else {
+          await tx
+            .update(products)
+            .set({ stock: sql`GREATEST(${products.stock} - ${item.quantity}, 0)` })
+            .where(and(eq(products.id, item.productId), sql`${products.stock} IS NOT NULL`));
+        }
       }
     }
 
@@ -324,7 +362,7 @@ export async function requestOrderChange(
   shopId: string,
   orderId: string,
   userId: number,
-  lines: Array<{ productId: string; quantity: number }>,
+  lines: Array<{ productId: string; variantId?: string | null | undefined; quantity: number }>,
 ): Promise<Order> {
   const order = await db.query.orders.findFirst({
     where: and(eq(orders.shopId, shopId), eq(orders.id, orderId), eq(orders.userId, userId)),
@@ -338,27 +376,47 @@ export async function requestOrderChange(
   }
 
   const current = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
-  const currentQty = new Map(current.map((item) => [item.productId, item.quantity]));
-  const currentPrice = new Map(current.map((item) => [item.productId, item.unitPrice]));
+  const currentQty = new Map(current.map((i) => [lineKey(i.productId, i.variantId), i.quantity]));
+  const currentPrice = new Map(
+    current.map((i) => [lineKey(i.productId, i.variantId), i.unitPrice]),
+  );
 
   // Merge duplicate lines.
-  const wanted = new Map<string, number>();
+  const wanted = new Map<string, { productId: string; variantId: string | null; quantity: number }>();
   for (const line of lines) {
-    wanted.set(line.productId, (wanted.get(line.productId) ?? 0) + line.quantity);
+    const variantId = line.variantId ?? null;
+    const key = lineKey(line.productId, variantId);
+    const prev = wanted.get(key);
+    wanted.set(key, {
+      productId: line.productId,
+      variantId,
+      quantity: (prev?.quantity ?? 0) + line.quantity,
+    });
   }
 
+  const productIds = [...new Set([...wanted.values()].map((w) => w.productId))];
   const rows = await db
     .select()
     .from(products)
-    .where(and(eq(products.shopId, shopId), inArray(products.id, [...wanted.keys()])));
+    .where(and(eq(products.shopId, shopId), inArray(products.id, productIds)));
   const byId = new Map(rows.map((row) => [row.id, row]));
+  const variants = await loadVariants(db, productIds);
 
   const items: OrderChangeRequest['items'] = [];
-  for (const [productId, quantity] of wanted) {
+  for (const [key, { productId, variantId, quantity }] of wanted) {
     const product = byId.get(productId);
-    const inOrder = currentQty.has(productId);
+    const inOrder = currentQty.has(key);
     if (!product || (!inOrder && !product.isActive)) {
       throw ApiError.badRequest('unknown_product', 'A product in the change is no longer available');
+    }
+    const variant = variantId
+      ? (variants.get(productId)?.find((v) => v.id === variantId) ?? null)
+      : null;
+    if (product.options.length > 0 && (!variant || (!inOrder && !variant.isActive))) {
+      throw ApiError.badRequest('variant_required', `Choose an available option for "${product.title}"`);
+    }
+    if (product.options.length === 0 && variantId) {
+      throw ApiError.badRequest('no_variants', `"${product.title}" has no options`);
     }
     if (product.currency !== order.currency) {
       throw ApiError.badRequest(
@@ -366,16 +424,20 @@ export async function requestOrderChange(
         `"${product.title}" is priced in ${product.currency}; this order is in ${order.currency}`,
       );
     }
-    const held = order.stockApplied ? (currentQty.get(productId) ?? 0) : 0;
-    if (product.stock !== null && quantity > product.stock + held) {
+    const label = variant ? variantLabel(variant.optionValues) : null;
+    const stock = lineStock(product, variant);
+    const held = order.stockApplied ? (currentQty.get(key) ?? 0) : 0;
+    if (stock !== null && quantity > stock + held) {
       throw ApiError.conflict(
         'out_of_stock',
-        `Only ${product.stock + held} of "${product.title}" available`,
+        `Only ${stock + held} of "${label ? `${product.title} (${label})` : product.title}" available`,
       );
     }
-    const unitPrice = currentPrice.get(productId) ?? product.price;
+    const unitPrice = currentPrice.get(key) ?? basePrice(product, variant);
     items.push({
       productId,
+      variantId: variant?.id ?? null,
+      variantLabel: label,
       title: product.title,
       unitPrice,
       quantity,
@@ -385,7 +447,7 @@ export async function requestOrderChange(
 
   const unchanged =
     items.length === current.length &&
-    items.every((item) => currentQty.get(item.productId) === item.quantity);
+    items.every((item) => currentQty.get(lineKey(item.productId, item.variantId)) === item.quantity);
   if (unchanged) throw ApiError.badRequest('no_changes', 'The order is unchanged');
 
   const changeRequest: OrderChangeRequest = {
@@ -447,32 +509,60 @@ export async function approveOrderChange(
     const current = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
 
     if (order.stockApplied) {
-      const delta = new Map<string, number>();
-      for (const item of current) delta.set(item.productId, -item.quantity);
-      for (const item of change.items) {
-        delta.set(item.productId, (delta.get(item.productId) ?? 0) + item.quantity);
-      }
-      for (const [productId, diff] of delta) {
+      const delta = new Map<string, { productId: string; variantId: string | null; diff: number }>();
+      const bump = (productId: string, variantId: string | null, by: number): void => {
+        const key = lineKey(productId, variantId);
+        const prev = delta.get(key);
+        delta.set(key, { productId, variantId, diff: (prev?.diff ?? 0) + by });
+      };
+      for (const item of current) bump(item.productId, item.variantId, -item.quantity);
+      for (const item of change.items) bump(item.productId, item.variantId ?? null, item.quantity);
+
+      for (const { productId, variantId, diff } of delta.values()) {
         if (diff === 0) continue;
-        const product = await tx.query.products.findFirst({ where: eq(products.id, productId) });
-        if (!product || product.stock === null) continue;
-        if (diff > product.stock) {
-          throw ApiError.conflict(
-            'out_of_stock',
-            `Not enough stock of "${product.title}" (${product.stock} left) to approve`,
-          );
+        if (variantId) {
+          const variant = await tx.query.productVariants.findFirst({
+            where: eq(productVariants.id, variantId),
+          });
+          if (!variant || variant.stock === null) continue;
+          if (diff > variant.stock) {
+            throw ApiError.conflict(
+              'out_of_stock',
+              `Not enough stock of "${variantLabel(variant.optionValues)}" (${variant.stock} left) to approve`,
+            );
+          }
+          await tx
+            .update(productVariants)
+            .set({ stock: variant.stock - diff })
+            .where(eq(productVariants.id, variantId));
+        } else {
+          const product = await tx.query.products.findFirst({ where: eq(products.id, productId) });
+          if (!product || product.stock === null) continue;
+          if (diff > product.stock) {
+            throw ApiError.conflict(
+              'out_of_stock',
+              `Not enough stock of "${product.title}" (${product.stock} left) to approve`,
+            );
+          }
+          await tx
+            .update(products)
+            .set({ stock: product.stock - diff })
+            .where(eq(products.id, productId));
         }
-        await tx
-          .update(products)
-          .set({ stock: product.stock - diff })
-          .where(eq(products.id, productId));
       }
     }
 
     await tx.delete(orderItems).where(eq(orderItems.orderId, order.id));
     const inserted = await tx
       .insert(orderItems)
-      .values(change.items.map((item) => ({ orderId: order.id, ...item })))
+      .values(
+        change.items.map((item) => ({
+          orderId: order.id,
+          ...item,
+          variantId: item.variantId ?? null,
+          variantLabel: item.variantLabel ?? null,
+        })),
+      )
       .returning();
 
     const status =

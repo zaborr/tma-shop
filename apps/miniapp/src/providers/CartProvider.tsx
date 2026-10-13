@@ -16,9 +16,10 @@ interface CartValue {
   loading: boolean;
   itemCount: number;
   refresh: () => Promise<void>;
-  add: (productId: string, quantity: number) => Promise<void>;
-  setQuantity: (productId: string, quantity: number) => Promise<void>;
-  remove: (productId: string) => Promise<void>;
+  add: (productId: string, variantId: string | null, quantity: number) => Promise<void>;
+  /** By cart line id. */
+  setQuantity: (lineId: string, quantity: number) => Promise<void>;
+  remove: (lineId: string) => Promise<void>;
 }
 
 const CartContext = createContext<CartValue | null>(null);
@@ -41,16 +42,16 @@ export function CartProvider({ children }: { children: ReactNode }): React.JSX.E
     if (status === 'ready') void refresh();
   }, [status, refresh]);
 
-  const add = useCallback(async (productId: string, quantity: number) => {
-    setCart(await api.addToCart(productId, quantity));
+  const add = useCallback(async (productId: string, variantId: string | null, quantity: number) => {
+    setCart(await api.addToCart(productId, variantId, quantity));
   }, []);
 
-  const setQuantity = useCallback(async (productId: string, quantity: number) => {
-    setCart(await api.setCartItem(productId, quantity));
+  const setQuantity = useCallback(async (lineId: string, quantity: number) => {
+    setCart(await api.setCartItem(lineId, quantity));
   }, []);
 
-  const remove = useCallback(async (productId: string) => {
-    setCart(await api.removeCartItem(productId));
+  const remove = useCallback(async (lineId: string) => {
+    setCart(await api.removeCartItem(lineId));
   }, []);
 
   const value = useMemo<CartValue>(

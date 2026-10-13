@@ -3,6 +3,7 @@ import type { CatalogQuery, Category, Product } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { categories, products } from '../db/schema.js';
 import { toCategoryDTO, toProductDTO } from '../db/mappers.js';
+import { loadVariants } from './variants.js';
 
 export async function listCategories(db: Database, shopId: string): Promise<Category[]> {
   const rows = await db
@@ -46,8 +47,13 @@ export async function listProducts(
       .where(where),
   ]);
 
+  const variants = await loadVariants(
+    db,
+    rows.map((row) => row.id),
+    { activeOnly: true },
+  );
   return {
-    items: rows.map(toProductDTO),
+    items: rows.map((row) => toProductDTO(row, variants.get(row.id))),
     page: query.page,
     limit: query.limit,
     total: counted?.count ?? 0,
@@ -62,5 +68,7 @@ export async function getProductById(
   const row = await db.query.products.findFirst({
     where: and(eq(products.shopId, shopId), eq(products.id, productId)),
   });
-  return row ? toProductDTO(row) : undefined;
+  if (!row) return undefined;
+  const variants = await loadVariants(db, [row.id], { activeOnly: true });
+  return toProductDTO(row, variants.get(row.id));
 }

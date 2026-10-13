@@ -5,6 +5,7 @@ import type { Order } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { formatPrice } from '../../lib/format.js';
+import { itemName } from '../../lib/variants.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { AdminOnly, formatDate, itemsSummary, needsAttention, statusLabel } from './common.js';
@@ -54,7 +55,7 @@ function AdminOrders(): React.JSX.Element {
       (query === '' ||
         order.id.toLowerCase().startsWith(query) ||
         (order.contactUsername ?? '').toLowerCase().includes(query) ||
-        order.items.some((item) => item.title.toLowerCase().includes(query))),
+        order.items.some((item) => itemName(item).toLowerCase().includes(query))),
   );
 
   return (

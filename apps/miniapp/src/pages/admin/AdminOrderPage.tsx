@@ -5,6 +5,7 @@ import type { Order } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { formatPrice } from '../../lib/format.js';
+import { itemKey, itemName } from '../../lib/variants.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import {
@@ -70,12 +71,12 @@ function AdminOrder(): React.JSX.Element {
       <Section header={`Items · ${o.items.reduce((n, i) => n + i.quantity, 0)}`}>
         {o.items.map((item) => (
           <Cell
-            key={item.productId}
+            key={itemKey(item)}
             subtitle={`${item.quantity} × ${money(item.unitPrice)}`}
             after={money(item.subtotal)}
             multiline
           >
-            {item.title}
+            {itemName(item)}
           </Cell>
         ))}
         {o.fee > 0 && (
@@ -153,10 +154,10 @@ function ChangeRequestSection({
       }
     >
       {change.items.map((item) => {
-        const before = order.items.find((i) => i.productId === item.productId)?.quantity ?? 0;
+        const before = order.items.find((i) => itemKey(i) === itemKey(item))?.quantity ?? 0;
         return (
           <Cell
-            key={item.productId}
+            key={itemKey(item)}
             subtitle={
               before === item.quantity
                 ? `${item.quantity} × ${money(item.unitPrice)}`
@@ -165,15 +166,15 @@ function ChangeRequestSection({
             after={money(item.subtotal)}
             multiline
           >
-            {before === 0 ? `🆕 ${item.title}` : item.title}
+            {before === 0 ? `🆕 ${itemName(item)}` : itemName(item)}
           </Cell>
         );
       })}
       {order.items
-        .filter((item) => !change.items.some((c) => c.productId === item.productId))
+        .filter((item) => !change.items.some((c) => itemKey(c) === itemKey(item)))
         .map((item) => (
-          <Cell key={item.productId} subtitle={`${item.quantity} → 0`} multiline>
-            ❌ {item.title}
+          <Cell key={itemKey(item)} subtitle={`${item.quantity} → 0`} multiline>
+            ❌ {itemName(item)}
           </Cell>
         ))}
       <Cell after={`${money(order.total)} → ${money(change.total)}`}>Total</Cell>

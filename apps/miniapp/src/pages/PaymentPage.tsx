@@ -7,6 +7,7 @@ import { useAsync } from '../hooks/useAsync.js';
 import { useMainButton } from '../hooks/useMainButton.js';
 import { copyText } from '../lib/clipboard.js';
 import { formatPrice, formatTokenAmount } from '../lib/format.js';
+import { activeVariants, hasVariants, itemKey, itemName } from '../lib/variants.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { useShopPath } from '../providers/ShopProvider.js';
@@ -67,11 +68,11 @@ export function PaymentPage(): React.JSX.Element {
       <Section header={`Order #${current.id.slice(0, 8)}`}>
         {current.items.map((item) => (
           <Cell
-            key={item.productId}
+            key={itemKey(item)}
             after={formatPrice(item.subtotal, current.currency)}
             subtitle={`${item.quantity} × ${formatPrice(item.unitPrice, current.currency)}`}
           >
-            {item.title}
+            {itemName(item)}
           </Cell>
         ))}
         {current.fee > 0 && (
@@ -390,11 +391,11 @@ function PendingChange({
     >
       {change.items.map((item) => (
         <Cell
-          key={item.productId}
+          key={itemKey(item)}
           after={formatPrice(item.subtotal, order.currency)}
           subtitle={`${item.quantity} × ${formatPrice(item.unitPrice, order.currency)}`}
         >
-          {item.title}
+          {itemName(item)}
         </Cell>
       ))}
       {order.fee > 0 && <Cell after={formatPrice(order.fee, order.currency)}>{feeLabel}</Cell>}
@@ -415,6 +416,8 @@ function PendingChange({
 
 interface DraftLine {
   productId: string;
+  variantId: string | null;
+  variantLabel: string | null;
   title: string;
   unitPrice: number;
   quantity: number;
@@ -435,6 +438,8 @@ function ChangeEditor({
   const [lines, setLines] = useState<DraftLine[]>(() =>
     order.items.map((item) => ({
       productId: item.productId,
+      variantId: item.variantId,
+      variantLabel: item.variantLabel,
       title: item.title,
       unitPrice: item.unitPrice,
       quantity: item.quantity,
@@ -444,22 +449,45 @@ function ChangeEditor({
   const [error, setError] = useState<string | null>(null);
   const catalog = useAsync(() => api.getProducts({ limit: 100 }), []);
 
-  const setQty = (productId: string, quantity: number): void =>
+  const setQty = (key: string, quantity: number): void =>
     setLines((prev) =>
       quantity <= 0
-        ? prev.filter((l) => l.productId !== productId)
-        : prev.map((l) => (l.productId === productId ? { ...l, quantity } : l)),
+        ? prev.filter((l) => itemKey(l) !== key)
+        : prev.map((l) => (itemKey(l) === key ? { ...l, quantity } : l)),
     );
 
   // The order's fee is charged once, whatever the items.
   const total = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0) + order.fee;
   const diff = total - coveredAmount(order);
-  const addable = (catalog.data?.items ?? []).filter(
-    (p) =>
-      p.currency === order.currency &&
-      (p.stock === null || p.stock > 0) &&
-      !lines.some((l) => l.productId === p.id),
-  );
+  // One addable entry per product, or per variant for products with options.
+  const addable: DraftLine[] = (catalog.data?.items ?? [])
+    .filter((p) => p.currency === order.currency)
+    .flatMap((p): DraftLine[] =>
+      hasVariants(p)
+        ? activeVariants(p)
+            .filter((v) => v.stock === null || v.stock > 0)
+            .map((v) => ({
+              productId: p.id,
+              variantId: v.id,
+              variantLabel: v.label,
+              title: p.title,
+              unitPrice: v.price,
+              quantity: 1,
+            }))
+        : p.stock === null || p.stock > 0
+          ? [
+              {
+                productId: p.id,
+                variantId: null,
+                variantLabel: null,
+                title: p.title,
+                unitPrice: p.price,
+                quantity: 1,
+              },
+            ]
+          : [],
+    )
+    .filter((candidate) => !lines.some((l) => itemKey(l) === itemKey(candidate)));
 
   const submit = async (): Promise<void> => {
     setBusy(true);
@@ -467,7 +495,11 @@ function ChangeEditor({
     try {
       await api.requestOrderChange(
         order.id,
-        lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+        lines.map((l) => ({
+          productId: l.productId,
+          variantId: l.variantId,
+          quantity: l.quantity,
+        })),
       );
       onRequested();
     } catch (err) {
@@ -483,7 +515,7 @@ function ChangeEditor({
         {lines.length === 0 && <Cell multiline>Keep at least one product.</Cell>}
         {lines.map((line) => (
           <Cell
-            key={line.productId}
+            key={itemKey(line)}
             subtitle={formatPrice(line.unitPrice, order.currency)}
             after={formatPrice(line.unitPrice * line.quantity, order.currency)}
             multiline
@@ -492,7 +524,7 @@ function ChangeEditor({
                 <Button
                   size="s"
                   mode="bezeled"
-                  onClick={() => setQty(line.productId, line.quantity - 1)}
+                  onClick={() => setQty(itemKey(line), line.quantity - 1)}
                 >
                   −
                 </Button>
@@ -500,17 +532,17 @@ function ChangeEditor({
                 <Button
                   size="s"
                   mode="bezeled"
-                  onClick={() => setQty(line.productId, line.quantity + 1)}
+                  onClick={() => setQty(itemKey(line), line.quantity + 1)}
                 >
                   +
                 </Button>
-                <Button size="s" mode="plain" onClick={() => setQty(line.productId, 0)}>
+                <Button size="s" mode="plain" onClick={() => setQty(itemKey(line), 0)}>
                   Remove
                 </Button>
               </div>
             }
           >
-            {line.title}
+            {itemName(line)}
           </Cell>
         ))}
         {order.fee > 0 && (
@@ -521,31 +553,22 @@ function ChangeEditor({
 
       {addable.length > 0 && (
         <Section header="Add products">
-          {addable.map((product) => (
+          {addable.map((candidate) => (
             <Cell
-              key={product.id}
-              subtitle={formatPrice(product.price, product.currency)}
+              key={itemKey(candidate)}
+              subtitle={formatPrice(candidate.unitPrice, order.currency)}
               after={
                 <Button
                   size="s"
                   mode="bezeled"
-                  onClick={() =>
-                    setLines((prev) => [
-                      ...prev,
-                      {
-                        productId: product.id,
-                        title: product.title,
-                        unitPrice: product.price,
-                        quantity: 1,
-                      },
-                    ])
-                  }
+                  onClick={() => setLines((prev) => [...prev, candidate])}
                 >
                   Add
                 </Button>
               }
+              multiline
             >
-              {product.title}
+              {itemName(candidate)}
             </Cell>
           ))}
         </Section>

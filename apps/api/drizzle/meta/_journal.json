@@ -57,6 +57,13 @@
       "when": 1791900000000,
       "tag": "0007_multi_store",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791910000000,
+      "tag": "0008_variants",
+      "breakpoints": true
     }
   ]
 }

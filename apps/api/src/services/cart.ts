@@ -1,9 +1,10 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import type { Cart, CartLine } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
-import { cartItems, carts, products, shops } from '../db/schema.js';
-import { toProductDTO } from '../db/mappers.js';
+import { cartItems, carts, productVariants, products, shops } from '../db/schema.js';
+import { toProductDTO, toVariantDTO, variantLabel } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
+import { basePrice, lineStock, loadVariants, type VariantRow } from './variants.js';
 
 type CartRow = typeof carts.$inferSelect;
 type ProductRow = typeof products.$inferSelect;
@@ -43,9 +44,42 @@ async function loadProductForShop(
   return product;
 }
 
-function assertStock(product: ProductRow, requestedQty: number): void {
-  if (product.stock !== null && requestedQty > product.stock) {
-    throw ApiError.conflict('out_of_stock', `Only ${product.stock} of "${product.title}" in stock`);
+/**
+ * The variant a line refers to. Products with options require an active
+ * variant of their own; products without options take none.
+ */
+async function resolveVariant(
+  db: Database,
+  product: ProductRow,
+  variantId: string | null | undefined,
+): Promise<VariantRow | null> {
+  if (product.options.length === 0) {
+    if (variantId) throw ApiError.badRequest('no_variants', 'This product has no variants');
+    return null;
+  }
+  if (!variantId) {
+    throw ApiError.badRequest('variant_required', `Choose an option for "${product.title}"`);
+  }
+  const variant = await db.query.productVariants.findFirst({
+    where: and(eq(productVariants.id, variantId), eq(productVariants.productId, product.id)),
+  });
+  if (!variant || !variant.isActive) {
+    throw ApiError.notFound('That option is no longer available');
+  }
+  return variant;
+}
+
+function lineTitle(product: ProductRow, variant: VariantRow | null): string {
+  return variant ? `${product.title} (${variantLabel(variant.optionValues)})` : product.title;
+}
+
+function assertStock(product: ProductRow, variant: VariantRow | null, requestedQty: number): void {
+  const stock = lineStock(product, variant);
+  if (stock !== null && requestedQty > stock) {
+    throw ApiError.conflict(
+      'out_of_stock',
+      `Only ${stock} of "${lineTitle(product, variant)}" in stock`,
+    );
   }
 }
 
@@ -60,13 +94,32 @@ export async function getCart(db: Database, shopId: string, userId: number): Pro
       .where(eq(cartItems.cartId, cart.id)),
   ]);
 
-  const lines: CartLine[] = rows
-    .filter((r) => r.product.isActive)
-    .map((r) => ({
-      product: toProductDTO(r.product),
-      quantity: r.item.quantity,
-      subtotal: r.product.price * r.item.quantity,
-    }));
+  const active = rows.filter((r) => r.product.isActive);
+  const variants = await loadVariants(
+    db,
+    active.map((r) => r.product.id),
+  );
+
+  const lines: CartLine[] = [];
+  for (const { item, product } of active) {
+    const own = variants.get(product.id) ?? [];
+    const variant = item.variantId ? (own.find((v) => v.id === item.variantId) ?? null) : null;
+    // Skip lines that no longer match the product (variant disabled, options added).
+    if (product.options.length > 0 && (!variant || !variant.isActive)) continue;
+    if (product.options.length === 0 && item.variantId) continue;
+    const unitPrice = basePrice(product, variant);
+    lines.push({
+      id: item.id,
+      product: toProductDTO(
+        product,
+        own.filter((v) => v.isActive),
+      ),
+      variant: variant ? toVariantDTO(variant, product) : null,
+      unitPrice,
+      quantity: item.quantity,
+      subtotal: unitPrice * item.quantity,
+    });
+  }
 
   // The per-order fee is added once, only when there is something to buy.
   const fee = lines.length > 0 ? (shop?.orderFee ?? 0) : 0;
@@ -86,16 +139,22 @@ export async function addItem(
   shopId: string,
   userId: number,
   productId: string,
+  variantId: string | null | undefined,
   quantity: number,
 ): Promise<Cart> {
   const cart = await getOrCreateCart(db, shopId, userId);
   const product = await loadProductForShop(db, shopId, productId);
+  const variant = await resolveVariant(db, product, variantId);
 
   const existing = await db.query.cartItems.findFirst({
-    where: and(eq(cartItems.cartId, cart.id), eq(cartItems.productId, productId)),
+    where: and(
+      eq(cartItems.cartId, cart.id),
+      eq(cartItems.productId, productId),
+      variant ? eq(cartItems.variantId, variant.id) : isNull(cartItems.variantId),
+    ),
   });
   const newQty = (existing?.quantity ?? 0) + quantity;
-  assertStock(product, newQty);
+  assertStock(product, variant, newQty);
 
   // One order is paid with one token, so a cart cannot mix currencies.
   const other = await db
@@ -112,42 +171,52 @@ export async function addItem(
     );
   }
 
-  await db
-    .insert(cartItems)
-    .values({ cartId: cart.id, productId, quantity: newQty })
-    .onConflictDoUpdate({
-      target: [cartItems.cartId, cartItems.productId],
-      set: { quantity: newQty },
-    });
+  if (existing) {
+    await db.update(cartItems).set({ quantity: newQty }).where(eq(cartItems.id, existing.id));
+  } else {
+    await db
+      .insert(cartItems)
+      .values({ cartId: cart.id, productId, variantId: variant?.id ?? null, quantity: newQty });
+  }
   await touchCart(db, cart.id);
 
   return getCart(db, shopId, userId);
 }
 
+/**
+ * Sets a line's quantity (0 removes it). `lineId` is the cart line id; older
+ * clients send a product id instead, which matches its line without a variant.
+ */
 export async function setItemQuantity(
   db: Database,
   shopId: string,
   userId: number,
-  productId: string,
+  lineId: string,
   quantity: number,
 ): Promise<Cart> {
   const cart = await getOrCreateCart(db, shopId, userId);
+  const line = await db.query.cartItems.findFirst({
+    where: and(
+      eq(cartItems.cartId, cart.id),
+      or(
+        eq(cartItems.id, lineId),
+        and(eq(cartItems.productId, lineId), isNull(cartItems.variantId)),
+      ),
+    ),
+  });
+  if (!line) throw ApiError.notFound('Item is not in the cart');
 
   if (quantity === 0) {
-    await db
-      .delete(cartItems)
-      .where(and(eq(cartItems.cartId, cart.id), eq(cartItems.productId, productId)));
+    await db.delete(cartItems).where(eq(cartItems.id, line.id));
   } else {
-    const product = await loadProductForShop(db, shopId, productId);
-    assertStock(product, quantity);
-    const updated = await db
-      .update(cartItems)
-      .set({ quantity })
-      .where(and(eq(cartItems.cartId, cart.id), eq(cartItems.productId, productId)))
-      .returning();
-    if (updated.length === 0) {
-      throw ApiError.notFound('Item is not in the cart');
-    }
+    const product = await loadProductForShop(db, shopId, line.productId);
+    const variant = line.variantId
+      ? ((await db.query.productVariants.findFirst({
+          where: eq(productVariants.id, line.variantId),
+        })) ?? null)
+      : null;
+    assertStock(product, variant, quantity);
+    await db.update(cartItems).set({ quantity }).where(eq(cartItems.id, line.id));
   }
   await touchCart(db, cart.id);
   return getCart(db, shopId, userId);
