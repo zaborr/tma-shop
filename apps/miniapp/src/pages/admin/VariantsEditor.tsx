@@ -3,6 +3,7 @@ import { Button, Cell, Section } from '@telegram-apps/telegram-ui';
 import { Input } from '../../components/Field.js';
 import type { Product, ProductOption, VariantInput } from '@tma-shop/shared';
 import { toMajor } from './common.js';
+import { t } from '../../i18n/index.js';
 
 /** An option as typed in the form: values are comma-separated text. */
 export interface OptionDraft {
@@ -72,15 +73,15 @@ export function buildVariants(
   const options = optionDrafts
     .map((o) => ({ name: o.name.trim(), values: parseValues(o.values) }))
     .filter((o) => o.name !== '' || o.values.length > 0);
-  if (options.some((o) => o.name === '')) return { error: 'Every option needs a name' };
-  if (options.some((o) => o.values.length === 0)) return { error: 'Every option needs values' };
+  if (options.some((o) => o.name === '')) return { error: t('variants.needName') };
+  if (options.some((o) => o.values.length === 0)) return { error: t('variants.needValues') };
   const names = new Set(options.map((o) => o.name.toLowerCase()));
-  if (names.size !== options.length) return { error: 'Option names must be different' };
+  if (names.size !== options.length) return { error: t('variants.uniqueNames') };
   if (options.length === 0) return { options: [], variants: [] };
 
   const combos = combinations(options);
   if (combos.length > MAX_VARIANTS) {
-    return { error: `Too many combinations (${combos.length}); the limit is ${MAX_VARIANTS}` };
+    return { error: t('variants.tooMany', { count: combos.length, max: MAX_VARIANTS }) };
   }
   const variants: VariantInput[] = [];
   for (const values of combos) {
@@ -88,10 +89,10 @@ export function buildVariants(
     const price = draft.price.trim();
     const stock = draft.stock.trim();
     if (price !== '' && !PRICE_RE.test(price)) {
-      return { error: `Invalid price for ${values.join(' / ')}` };
+      return { error: t('variants.badPrice', { name: values.join(' / ') }) };
     }
     if (stock !== '' && !STOCK_RE.test(stock)) {
-      return { error: `Invalid stock for ${values.join(' / ')}` };
+      return { error: t('variants.badStock', { name: values.join(' / ') }) };
     }
     variants.push({
       values,
@@ -100,7 +101,7 @@ export function buildVariants(
       isActive: draft.active,
     });
   }
-  if (!variants.some((v) => v.isActive)) return { error: 'Turn on at least one variant' };
+  if (!variants.some((v) => v.isActive)) return { error: t('variants.needOne') };
   return { options, variants };
 }
 
@@ -137,20 +138,20 @@ export function VariantsEditor({
   return (
     <>
       <Section
-        header="Options"
-        footer="E.g. Color: Red, Blue · Size: S, M, L. Each combination becomes a variant with its own stock and, optionally, its own price."
+        header={t('variants.options')}
+        footer={t('variants.optionsFooter')}
       >
         {options.map((option, index) => (
           <div key={index}>
             <Input
-              header={`Option ${index + 1} name`}
-              placeholder={index === 0 ? 'Color' : 'Size'}
+              header={t('variants.optionName', { n: index + 1 })}
+              placeholder={index === 0 ? t('variants.colorExample') : t('variants.sizeExample')}
               value={option.name}
               onChange={(e) => updateOption(index, { name: e.target.value })}
             />
             <Input
-              header="Values (comma-separated)"
-              placeholder={index === 0 ? 'Red, Blue, Green' : 'S, M, L, XL'}
+              header={t('variants.values')}
+              placeholder={index === 0 ? t('variants.colorValuesExample') : 'S, M, L, XL'}
               value={option.values}
               onChange={(e) => updateOption(index, { values: e.target.value })}
             />
@@ -160,7 +161,7 @@ export function VariantsEditor({
                 mode="plain"
                 onClick={() => setOptions(options.filter((_, i) => i !== index))}
               >
-                Remove option
+                {t('variants.removeOption')}
               </Button>
             </div>
           </div>
@@ -172,7 +173,7 @@ export function VariantsEditor({
               mode="bezeled"
               onClick={() => setOptions([...options, { name: '', values: '' }])}
             >
-              ➕ Add option
+              {t('variants.addOption')}
             </Button>
           </div>
         )}
@@ -180,20 +181,20 @@ export function VariantsEditor({
 
       {combos.length > 0 && (
         <Section
-          header={`Variants · ${combos.length}`}
+          header={t('variants.title', { count: combos.length })}
           footer={
             tooMany
-              ? `Too many combinations: the limit is ${MAX_VARIANTS}.`
-              : `Empty price = product price (${basePrice || '0'} ${currency}). Empty stock = unlimited.`
+              ? t('variants.limit', { max: MAX_VARIANTS })
+              : t('variants.footer', { price: basePrice || '0', currency })
           }
         >
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', padding: '8px 16px' }}>
             <div style={{ flex: 1 }}>
               <Input
-                header="Same stock for all"
+                header={t('variants.bulkStock')}
                 type="text"
                 inputMode="numeric"
-                placeholder="e.g. 10"
+                placeholder={t('variants.bulkStockPlaceholder')}
                 value={bulkStock}
                 onChange={(e) => setBulkStock(e.target.value)}
               />
@@ -210,7 +211,7 @@ export function VariantsEditor({
                 setDrafts(next);
               }}
             >
-              Apply
+              {t('variants.apply')}
             </Button>
           </div>
           {!tooMany &&
@@ -230,7 +231,7 @@ export function VariantsEditor({
                         mode={draft.active ? 'bezeled' : 'plain'}
                         onClick={() => updateDraft(values, { active: !draft.active })}
                       >
-                        {draft.active ? 'On' : 'Off'}
+                        {draft.active ? t('variants.on') : t('variants.off')}
                       </Button>
                     }
                   >
@@ -239,7 +240,7 @@ export function VariantsEditor({
                   <div style={{ display: 'flex', gap: 8, padding: '0 8px' }}>
                     <div style={{ flex: 1 }}>
                       <Input
-                        header={`Price (${currency})`}
+                        header={t('variants.price', { currency })}
                         type="text"
                         inputMode="decimal"
                         placeholder={basePrice || '—'}
@@ -250,7 +251,7 @@ export function VariantsEditor({
                     </div>
                     <div style={{ flex: 1 }}>
                       <Input
-                        header="Stock"
+                        header={t('variants.stock')}
                         type="text"
                         inputMode="numeric"
                         placeholder="∞"

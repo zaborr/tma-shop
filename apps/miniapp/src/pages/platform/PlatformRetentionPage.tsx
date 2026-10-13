@@ -8,11 +8,12 @@ import { useSession } from '../../providers/SessionProvider.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { ErrorBanner, formatDate, useAdminActions } from '../admin/common.js';
+import { t } from '../../i18n/index.js';
 
 /** Platform super-admin: how long personal data is kept, and a manual cleanup. */
 export function PlatformRetentionPage(): React.JSX.Element {
   const { isSuperAdmin } = useSession();
-  if (!isSuperAdmin) return <ErrorView message="Platform admins only" />;
+  if (!isSuperAdmin) return <ErrorView message={t('platform.only')} />;
   return <Retention />;
 }
 
@@ -81,25 +82,25 @@ function RetentionForm({
       <ErrorBanner message={actions.error} />
 
       <Section
-        header="How long personal data is kept"
-        footer="Applies to every shop. The cleanup runs every few hours; numbers are days (1–3650)."
+        header={t('retention.title')}
+        footer={t('retention.footer')}
       >
         <Input
-          header="Orders: delete the address and unlink the customer, days after delivered or cancelled"
+          header={t('retention.orders')}
           inputMode="numeric"
           status={values.addressRetentionDays === null ? 'error' : 'default'}
           value={address}
           onChange={(e) => setAddress(e.target.value)}
         />
         <Input
-          header="Carts: delete when untouched for (days)"
+          header={t('retention.carts')}
           inputMode="numeric"
           status={values.cartRetentionDays === null ? 'error' : 'default'}
           value={carts}
           onChange={(e) => setCarts(e.target.value)}
         />
         <Input
-          header="Users with no orders: delete after not opening the app for (days)"
+          header={t('retention.users')}
           inputMode="numeric"
           status={values.inactiveUserDays === null ? 'error' : 'default'}
           value={usersDays}
@@ -107,29 +108,35 @@ function RetentionForm({
         />
         <div style={{ padding: 16 }}>
           <Button stretched disabled={!valid} onClick={save}>
-            {saved ? 'Saved ✓' : 'Save'}
+            {saved ? t('common.saved') : t('common.save')}
           </Button>
         </div>
       </Section>
 
       <Section
-        header="What is kept"
-        footer="An anonymized order keeps its products, amounts, payments and the contact @username, so sales and accounts still add up. Orders that still owe a refund are not anonymized until it is recorded."
+        header={t('retention.kept')}
+        footer={t('retention.keptFooter')}
       >
         <Cell multiline>
-          Users only store their Telegram id, first name, @username and language.
+          {t('retention.usersStore')}
         </Cell>
       </Section>
 
       <Section
-        header="Run the cleanup now"
+        header={t('retention.runNow')}
         footer={
-          status.lastRunAt ? `Last run: ${formatDate(status.lastRunAt)}` : 'It has not run yet.'
+          status.lastRunAt
+            ? t('retention.lastRun', { date: formatDate(status.lastRunAt) })
+            : t('retention.neverRun')
         }
       >
         {report && (
           <Cell multiline>
-            {`${report.ordersAnonymized} orders anonymized · ${report.cartsDeleted} carts deleted · ${report.usersDeleted} users deleted`}
+            {t('retention.report', {
+              orders: report.ordersAnonymized,
+              carts: report.cartsDeleted,
+              users: report.usersDeleted,
+            })}
           </Cell>
         )}
         <div style={{ padding: 16 }}>
@@ -142,7 +149,7 @@ function RetentionForm({
               })
             }
           >
-            {actions.tapLabel('run', 'Run now', 'Tap again: this deletes data')}
+            {actions.tapLabel('run', t('retention.run'), t('retention.runConfirm'))}
           </Button>
         </div>
       </Section>

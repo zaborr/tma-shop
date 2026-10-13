@@ -10,6 +10,7 @@ import { ErrorView } from '../components/ErrorView.js';
 import { ProductCard } from '../components/ProductCard.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { useShop, useShopPath } from '../providers/ShopProvider.js';
+import { t } from '../i18n/index.js';
 
 export function CatalogPage(): React.JSX.Element {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export function CatalogPage(): React.JSX.Element {
         <Cell
           before={<ProductImage url={shop.imageUrl} alt={shop.name} size={48} />}
           subtitle={shop.description || undefined}
-          description={shop.isVisible ? undefined : '🙈 Hidden — only admins can see this shop'}
+          description={shop.isVisible ? undefined : t('catalog.hiddenShop')}
           multiline
         >
           <strong>{shop.name}</strong>
@@ -42,15 +43,15 @@ export function CatalogPage(): React.JSX.Element {
           onClick={() => navigate(to('/cart'))}
           after={itemCount > 0 ? <Badge type="number">{itemCount}</Badge> : undefined}
         >
-          🛒 Cart
+          {t('catalog.cart')}
         </Cell>
-        <Cell onClick={() => navigate(to('/orders'))}>📦 My orders</Cell>
-        {canManage && <Cell onClick={() => navigate(to('/admin'))}>🛠️ Admin</Cell>}
+        <Cell onClick={() => navigate(to('/orders'))}>{t('catalog.myOrders')}</Cell>
+        {canManage && <Cell onClick={() => navigate(to('/admin'))}>{t('catalog.admin')}</Cell>}
       </Section>
 
-      <Section header="Catalog">
+      <Section header={t('catalog.title')}>
         <Input
-          placeholder="Search products"
+          placeholder={t('catalog.search')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -60,7 +61,7 @@ export function CatalogPage(): React.JSX.Element {
             mode={categoryId === undefined ? 'filled' : 'bezeled'}
             onClick={() => setCategoryId(undefined)}
           >
-            All
+            {t('catalog.all')}
           </Button>
           {categories.data?.map((category) => (
             <Button
@@ -80,7 +81,7 @@ export function CatalogPage(): React.JSX.Element {
       {products.data && (
         <Section>
           {products.data.items.length === 0 ? (
-            <Cell>No products found</Cell>
+            <Cell>{t('catalog.noProducts')}</Cell>
           ) : (
             products.data.items.map((product) => <ProductCard key={product.id} product={product} />)
           )}

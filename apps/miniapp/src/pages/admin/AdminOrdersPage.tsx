@@ -11,17 +11,18 @@ import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { AdminOnly, formatDate, itemsSummary, needsAttention, statusLabel } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
+import { t, tn, type MessageKey } from '../../i18n/index.js';
 
 type FilterKey = 'all' | 'attention' | 'unpaid' | 'paid' | 'shipped' | 'fulfilled' | 'cancelled';
 
-const FILTERS: Record<FilterKey, { label: string; match: (order: Order) => boolean }> = {
-  all: { label: 'All', match: () => true },
-  attention: { label: '🔔 To review', match: needsAttention },
-  unpaid: { label: 'Not paid', match: (o) => o.status === 'pending' },
-  paid: { label: 'To ship', match: (o) => o.status === 'paid' },
-  shipped: { label: 'Shipped', match: (o) => o.status === 'shipped' },
-  fulfilled: { label: 'Delivered', match: (o) => o.status === 'fulfilled' },
-  cancelled: { label: 'Cancelled', match: (o) => o.status === 'cancelled' },
+const FILTERS: Record<FilterKey, { label: MessageKey; match: (order: Order) => boolean }> = {
+  all: { label: 'catalog.all', match: () => true },
+  attention: { label: 'adminHome.toReview', match: needsAttention },
+  unpaid: { label: 'filter.unpaid', match: (o) => o.status === 'pending' },
+  paid: { label: 'filter.toShip', match: (o) => o.status === 'paid' },
+  shipped: { label: 'orderStatus.shipped', match: (o) => o.status === 'shipped' },
+  fulfilled: { label: 'orderStatus.fulfilled', match: (o) => o.status === 'fulfilled' },
+  cancelled: { label: 'orderStatus.cancelled', match: (o) => o.status === 'cancelled' },
 };
 
 function isFilterKey(value: string | null): value is FilterKey {
@@ -73,21 +74,21 @@ function AdminOrders(): React.JSX.Element {
                 mode={key === filter ? 'filled' : 'bezeled'}
                 onClick={() => setParams(key === 'all' ? {} : { filter: key }, { replace: true })}
               >
-                {`${FILTERS[key].label} · ${count}`}
+                {`${t(FILTERS[key].label)} · ${count}`}
               </Button>
             );
           })}
         </div>
         <Input
-          header="Search"
-          placeholder="Order #, @username or product"
+          header={t('adminOrders.search')}
+          placeholder={t('adminOrders.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </Section>
 
-      <Section header={`${visible.length} orders`}>
-        {visible.length === 0 && <Cell>No orders here</Cell>}
+      <Section header={tn(visible.length, 'count.orders.one', 'count.orders.other')}>
+        {visible.length === 0 && <Cell>{t('adminOrders.empty')}</Cell>}
         {visible.map((order) => (
           <Cell
             key={order.id}

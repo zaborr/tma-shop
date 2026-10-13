@@ -5,26 +5,31 @@ import { ApiClientError } from '../../api/client.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { itemName } from '../../lib/variants.js';
+import { locale, t, type MessageKey } from '../../i18n/index.js';
 
 /** Tokens a product can be priced in. Prices are stored in cents (1290 = 12.90). */
 export const TOKENS = ['USDC', 'EURC'] as const;
 export type Token = (typeof TOKENS)[number];
 
-export const STATUS_LABEL: Record<OrderStatus, string> = {
-  pending: 'Not paid yet',
-  awaiting_payment: '🔎 Verify payment',
-  paid: 'Paid · to ship',
-  cancelled: 'Cancelled',
-  shipped: 'Shipped',
-  fulfilled: 'Delivered',
-};
+/** Order status as the admin sees it. */
+export function adminStatusText(status: OrderStatus): string {
+  const keys: Record<OrderStatus, MessageKey> = {
+    pending: 'adminStatus.pending',
+    awaiting_payment: 'adminStatus.awaiting_payment',
+    paid: 'adminStatus.paid',
+    cancelled: 'adminStatus.cancelled',
+    shipped: 'adminStatus.shipped',
+    fulfilled: 'adminStatus.fulfilled',
+  };
+  return t(keys[status]);
+}
 
 /** Status shown to the admin, including change requests and pending refunds. */
 export function statusLabel(order: Order): string {
-  if (order.changeRequest) return '✏️ Change requested';
-  if (order.status === 'pending' && order.amountPaid > 0) return 'Difference not paid yet';
-  if (order.amountDue < 0) return '↩️ Refund owed';
-  return STATUS_LABEL[order.status];
+  if (order.changeRequest) return t('adminStatus.changeRequested');
+  if (order.status === 'pending' && order.amountPaid > 0) return t('adminStatus.differenceUnpaid');
+  if (order.amountDue < 0) return t('adminStatus.refundOwed');
+  return adminStatusText(order.status);
 }
 
 /** Orders counted as sales: payment confirmed (shipped and delivered included). */
@@ -77,7 +82,7 @@ export function formatDate(iso: string): string {
   const date = new Date(iso);
   return Number.isNaN(date.getTime())
     ? iso
-    : date.toLocaleString(undefined, {
+    : date.toLocaleString(locale(), {
         day: '2-digit',
         month: 'short',
         hour: '2-digit',
@@ -113,7 +118,7 @@ export function useAdminActions(onDone: () => void): AdminActions {
       await action();
       onDone();
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Something went wrong');
+      setError(err instanceof ApiClientError ? err.message : t('error.title'));
       setErrorCode(err instanceof ApiClientError ? err.code : null);
     }
   };
@@ -127,8 +132,8 @@ export function useAdminActions(onDone: () => void): AdminActions {
     await run(action);
   };
 
-  const tapLabel = (key: string, text: string, confirmText = 'Tap again to confirm'): string =>
-    armed === key ? confirmText : text;
+  const tapLabel = (key: string, text: string, confirmText?: string): string =>
+    armed === key ? (confirmText ?? t('common.tapAgainToConfirm')) : text;
 
   return { run, twoTap, tapLabel, error, errorCode };
 }
@@ -147,6 +152,6 @@ export function ErrorBanner({ message }: { message: string | null }): React.JSX.
 /** Renders its children only for this shop's admins (and platform super-admins). */
 export function AdminOnly({ children }: { children: React.ReactNode }): React.JSX.Element {
   const { canManage } = useShop();
-  if (!canManage) return <ErrorView message="Admins only" />;
+  if (!canManage) return <ErrorView message={t('admin.only')} />;
   return <>{children}</>;
 }

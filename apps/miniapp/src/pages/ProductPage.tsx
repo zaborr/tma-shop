@@ -19,13 +19,14 @@ import {
 } from '../lib/variants.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { useShopPath } from '../providers/ShopProvider.js';
+import { t, tn } from '../i18n/index.js';
 
 export function ProductPage(): React.JSX.Element {
   const { id = '' } = useParams();
   const { data: product, loading, error } = useAsync(() => api.getProduct(id), [id]);
 
   if (loading) return <Loader />;
-  if (error || !product) return <ErrorView message={error ?? 'Product not found'} />;
+  if (error || !product) return <ErrorView message={error ?? t('product.notFound')} />;
   return <ProductView key={product.id} product={product} />;
 }
 
@@ -57,7 +58,7 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
 
   const onAdd = useCallback(async () => {
     if (withVariants && !variant) {
-      setAddError('Choose an option first');
+      setAddError(t('product.chooseFirst'));
       return;
     }
     setAdding(true);
@@ -66,14 +67,14 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
       await add(product.id, variant?.id ?? null, 1);
       navigate(to('/cart'));
     } catch (err) {
-      setAddError(err instanceof ApiClientError ? err.message : 'Could not add to cart');
+      setAddError(err instanceof ApiClientError ? err.message : t('product.addFailed'));
     } finally {
       setAdding(false);
     }
   }, [product.id, withVariants, variant, add, navigate, to]);
 
   useMainButton({
-    text: outOfStock ? 'Out of stock' : missing ? 'Choose an option' : 'Add to cart',
+    text: outOfStock ? t('product.outOfStock') : missing ? t('product.chooseOption') : t('product.addToCart'),
     visible: true,
     enabled: !outOfStock && !missing,
     loading: adding,
@@ -123,20 +124,16 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
 
       {tiers.length > 0 && (
         <Section
-          header="Volume pricing"
-          footer={
-            withVariants
-              ? 'Price per unit. All options of this product count together.'
-              : 'Price per unit, depending on how many you buy.'
-          }
+          header={t('product.volumePricing')}
+          footer={withVariants ? t('product.volumeFooterVariants') : t('product.volumeFooter')}
         >
           {tiers.map((tier) => (
             <Cell key={tier.from} after={formatPrice(tier.price, product.currency)}>
               {tier.to === null
-                ? `${tier.from}+ units`
+                ? t('product.unitsFrom', { from: tier.from })
                 : tier.from === tier.to
-                  ? `${tier.from} unit${tier.from === 1 ? '' : 's'}`
-                  : `${tier.from}–${tier.to} units`}
+                  ? tn(tier.from, 'units.one', 'units.other')
+                  : t('product.unitsRange', { from: tier.from, to: tier.to })}
             </Cell>
           ))}
         </Section>
@@ -153,15 +150,15 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
         <Cell
           after={
             missing
-              ? 'Choose an option'
+              ? t('product.chooseOption')
               : stock === null
-                ? 'In stock'
+                ? t('product.inStock')
                 : stock > 0
-                  ? `${stock} left`
-                  : 'Out of stock'
+                  ? t('product.left', { count: stock })
+                  : t('product.outOfStock')
           }
         >
-          Availability
+          {t('product.availability')}
         </Cell>
       </Section>
     </List>

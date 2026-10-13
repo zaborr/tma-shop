@@ -11,14 +11,15 @@ import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { AdminOnly, formatDate, itemsSummary, statusLabel } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
+import { t, tn, type MessageKey } from '../../i18n/index.js';
 
 type Scope = 'all' | 'toFulfil' | 'shipped' | 'fulfilled';
 
-const SCOPES: Record<Scope, { label: string; match: (order: Order) => boolean }> = {
-  all: { label: 'All paid', match: (o) => isSaleStatus(o.status) },
-  toFulfil: { label: 'To ship', match: (o) => o.status === 'paid' },
-  shipped: { label: 'Shipped', match: (o) => o.status === 'shipped' },
-  fulfilled: { label: 'Delivered', match: (o) => o.status === 'fulfilled' },
+const SCOPES: Record<Scope, { label: MessageKey; match: (order: Order) => boolean }> = {
+  all: { label: 'summary.allPaid', match: (o) => isSaleStatus(o.status) },
+  toFulfil: { label: 'filter.toShip', match: (o) => o.status === 'paid' },
+  shipped: { label: 'orderStatus.shipped', match: (o) => o.status === 'shipped' },
+  fulfilled: { label: 'orderStatus.fulfilled', match: (o) => o.status === 'fulfilled' },
 };
 
 interface ProductTotal {
@@ -92,19 +93,22 @@ function summaryText(
   currencies: CurrencyTotal[],
   orders: Order[],
 ): string {
-  const lines = [`Sales summary — ${label}`, ''];
+  const lines = [t('summary.textTitle', { label }), ''];
   for (const c of currencies) {
     lines.push(
-      `${c.currency}: ${c.orders} orders, ${c.items} items, ${formatPrice(c.revenue, c.currency)}` +
-        (c.fees > 0 ? ` (fees ${formatPrice(c.fees, c.currency)})` : '') +
-        (c.shipping > 0 ? ` (shipping ${formatPrice(c.shipping, c.currency)})` : ''),
+      `${c.currency}: ${tn(c.orders, 'count.orders.one', 'count.orders.other')}, ` +
+        `${tn(c.items, 'items.one', 'items.other')}, ${formatPrice(c.revenue, c.currency)}` +
+        (c.fees > 0 ? ` (${t('summary.fees', { amount: formatPrice(c.fees, c.currency) })})` : '') +
+        (c.shipping > 0
+          ? ` (${t('summary.shipping', { amount: formatPrice(c.shipping, c.currency) })})`
+          : ''),
     );
   }
-  lines.push('', 'Products:');
+  lines.push('', t('summary.productsColon'));
   for (const p of products) {
     lines.push(`• ${p.quantity}× ${p.title} — ${formatPrice(p.revenue, p.currency)}`);
   }
-  lines.push('', 'Orders:');
+  lines.push('', t('summary.ordersColon'));
   for (const o of orders) {
     lines.push(
       `• #${o.id.slice(0, 8)}${o.contactUsername ? ` @${o.contactUsername}` : ''} — ` +
@@ -138,7 +142,7 @@ function AdminSummary(): React.JSX.Element {
 
   const copy = async (): Promise<void> => {
     setCopied(
-      await copyText(summaryText(SCOPES[scope].label, products, currencies, selected)),
+      await copyText(summaryText(t(SCOPES[scope].label), products, currencies, selected)),
     );
   };
 
@@ -156,22 +160,27 @@ function AdminSummary(): React.JSX.Element {
                 setCopied(false);
               }}
             >
-              {SCOPES[key].label}
+              {t(SCOPES[key].label)}
             </Button>
           ))}
         </div>
       </Section>
 
-      <Section header="Totals">
-        {currencies.length === 0 && <Cell>No paid orders yet</Cell>}
+      <Section header={t('summary.totals')}>
+        {currencies.length === 0 && <Cell>{t('summary.empty')}</Cell>}
         {currencies.map((c) => (
           <Cell
             key={c.currency}
-            subtitle={`${c.orders} orders · ${c.items} items${
-              c.fees > 0 ? ` · fees ${formatPrice(c.fees, c.currency)}` : ''
-            }${
-              c.shipping > 0 ? ` · shipping ${formatPrice(c.shipping, c.currency)}` : ''
-            }`}
+            subtitle={[
+              tn(c.orders, 'count.orders.one', 'count.orders.other'),
+              tn(c.items, 'items.one', 'items.other'),
+              c.fees > 0 ? t('summary.fees', { amount: formatPrice(c.fees, c.currency) }) : null,
+              c.shipping > 0
+                ? t('summary.shipping', { amount: formatPrice(c.shipping, c.currency) })
+                : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
             after={<strong>{formatPrice(c.revenue, c.currency)}</strong>}
             multiline
           >
@@ -181,11 +190,11 @@ function AdminSummary(): React.JSX.Element {
       </Section>
 
       {products.length > 0 && (
-        <Section header="Products sold">
+        <Section header={t('summary.productsSold')}>
           {products.map((p) => (
             <Cell
               key={p.key}
-              subtitle={`in ${p.orders} ${p.orders === 1 ? 'order' : 'orders'}`}
+              subtitle={t('summary.inOrders', { orders: tn(p.orders, 'count.orders.one', 'count.orders.other') })}
               after={formatPrice(p.revenue, p.currency)}
               multiline
             >
@@ -196,7 +205,7 @@ function AdminSummary(): React.JSX.Element {
       )}
 
       {selected.length > 0 && (
-        <Section header={`Orders · ${selected.length}`}>
+        <Section header={t('summary.orders', { count: selected.length })}>
           {selected.map((order) => (
             <Cell
               key={order.id}
@@ -213,10 +222,10 @@ function AdminSummary(): React.JSX.Element {
       )}
 
       {selected.length > 0 && (
-        <Section footer="Copies the totals, products and orders as text, to paste in a chat or a note.">
+        <Section footer={t('summary.copyFooter')}>
           <div style={{ padding: 16 }}>
             <Button stretched mode="bezeled" onClick={() => void copy()}>
-              {copied ? 'Copied ✓' : 'Copy summary as text'}
+              {copied ? t('key.copied') : t('summary.copy')}
             </Button>
           </div>
         </Section>

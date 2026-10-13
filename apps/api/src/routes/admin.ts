@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { inArray } from 'drizzle-orm';
 import {
   exportRequest,
+  langFrom,
   productInput,
   shopProfileInput,
   slug,
@@ -37,7 +38,7 @@ import {
 import {
   buildChangeDecisionMessage,
   buildStatusMessage,
-  notifyChats,
+  notifyUsers,
 } from '../services/notifications.js';
 import {
   getShopAdminView,
@@ -52,6 +53,7 @@ import { ApiError } from '../lib/errors.js';
 import { users } from '../db/schema.js';
 import { buildReport } from '../export/report.js';
 import { TelegramApi } from '../telegram/api.js';
+import { tr } from '../i18n/messages.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -161,10 +163,8 @@ export function adminRoutes(): Hono<AppBindings> {
       );
       // The customer hears about it from the bot (best effort).
       if (order.status !== previous) {
-        await notifyChats(
-          c.get('env').BOT_TOKEN,
-          customerChat(order),
-          buildStatusMessage(shop.name, order, previous),
+        await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, customerChat(order), (lang) =>
+          buildStatusMessage(lang, shop.name, order, previous),
         );
       }
       return c.json(order);
@@ -189,6 +189,8 @@ export function adminRoutes(): Hono<AppBindings> {
       ]),
     );
 
+    // Same language as the app the admin is using.
+    const lang = langFrom(c.req.header('X-Lang'));
     const file = buildReport({
       shopName: shop.name,
       shopSlug: shop.slug,
@@ -196,6 +198,7 @@ export function adminRoutes(): Hono<AppBindings> {
       orders,
       customers,
       request,
+      lang,
     });
     if (file.orderCount === 0) {
       throw ApiError.badRequest('nothing_to_export', 'No orders match these filters');
@@ -206,7 +209,10 @@ export function adminRoutes(): Hono<AppBindings> {
         file.fileName,
         file.data,
         file.contentType,
-        `📊 ${shop.name} — ${file.orderCount} order${file.orderCount === 1 ? '' : 's'}`,
+        tr(lang, file.orderCount === 1 ? 'export.captionOne' : 'export.captionOther', {
+          shop: shop.name,
+          count: file.orderCount,
+        }),
       );
     } catch (error) {
       console.error('Export could not be sent:', error);
@@ -221,12 +227,16 @@ export function adminRoutes(): Hono<AppBindings> {
   // Customer change requests: approve (apply + tell them what to pay) or reject.
   app.post('/orders/:id/change/approve', zValidator('param', idParam), async (c) => {
     const order = await approveOrderChange(c.get('db'), c.get('shopId'), c.req.valid('param').id);
-    await notifyChats(c.get('env').BOT_TOKEN, customerChat(order), buildChangeDecisionMessage(order, true));
+    await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, customerChat(order), (lang) =>
+      buildChangeDecisionMessage(lang, order, true),
+    );
     return c.json(order);
   });
   app.post('/orders/:id/change/reject', zValidator('param', idParam), async (c) => {
     const order = await clearOrderChange(c.get('db'), c.get('shopId'), c.req.valid('param').id);
-    await notifyChats(c.get('env').BOT_TOKEN, customerChat(order), buildChangeDecisionMessage(order, false));
+    await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, customerChat(order), (lang) =>
+      buildChangeDecisionMessage(lang, order, false),
+    );
     return c.json(order);
   });
 

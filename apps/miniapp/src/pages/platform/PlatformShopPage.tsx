@@ -11,11 +11,12 @@ import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { ProductImage } from '../../components/ProductImage.js';
 import { ErrorBanner, useAdminActions } from '../admin/common.js';
+import { t } from '../../i18n/index.js';
 
 /** `/platform/shops/new` creates a shop; `/platform/shops/:id` edits one. */
 export function PlatformShopPage(): React.JSX.Element {
   const { isSuperAdmin } = useSession();
-  if (!isSuperAdmin) return <ErrorView message="Platform admins only" />;
+  if (!isSuperAdmin) return <ErrorView message={t('platform.only')} />;
   return <PlatformShop />;
 }
 
@@ -40,7 +41,7 @@ function PlatformShop(): React.JSX.Element {
   if (shops.loading) return <Loader />;
   if (shops.error) return <ErrorView message={shops.error} />;
   const shop = isNew ? null : (shops.data?.find((s) => s.id === id) ?? null);
-  if (!isNew && !shop) return <ErrorView message="Shop not found" />;
+  if (!isNew && !shop) return <ErrorView message={t('platformShop.notFound')} />;
 
   return <ShopForm key={shop?.id ?? 'new'} shop={shop} />;
 }
@@ -99,21 +100,21 @@ function ShopForm({ shop }: { shop: ShopAdminView | null }): React.JSX.Element {
     <List>
       <ErrorBanner message={actions.error} />
 
-      <Section header={shop ? `Edit shop: ${shop.name}` : 'New shop'}>
-        <Input header="Name" value={name} onChange={(e) => setName(e.target.value)} />
+      <Section header={shop ? t('platformShop.edit', { name: shop.name }) : t('platformShop.new')}>
+        <Input header={t('settings.name')} value={name} onChange={(e) => setName(e.target.value)} />
         <Input
-          header="Slug (link name, optional)"
+          header={t('platformShop.slug')}
           placeholder={name ? toSlug(name) : 'tea-shop'}
           value={slug}
           onChange={(e) => setSlug(e.target.value)}
         />
         <Textarea
-          header="Description"
+          header={t('productForm.description')}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
         <Input
-          header={imageInvalid ? 'Image URL — must start with https://' : 'Image URL (optional)'}
+          header={imageInvalid ? t('common.imageInvalid') : t('settings.image')}
           type="url"
           placeholder="https://…/logo.png"
           status={imageInvalid ? 'error' : 'default'}
@@ -122,14 +123,14 @@ function ShopForm({ shop }: { shop: ShopAdminView | null }): React.JSX.Element {
         />
         {image !== '' && !imageInvalid && (
           <div style={{ padding: '8px 16px' }}>
-            <ProductImage url={image} alt="Preview" size={96} />
+            <ProductImage url={image} alt={t('common.preview')} size={96} />
           </div>
         )}
       </Section>
 
       <Section
-        header="Visibility"
-        footer="Hidden shops only appear to their admins and to platform admins — handy while you set them up."
+        header={t('settings.visibility')}
+        footer={t('platformShop.visibilityFooter')}
       >
         <Cell
           after={
@@ -139,22 +140,22 @@ function ShopForm({ shop }: { shop: ShopAdminView | null }): React.JSX.Element {
                 mode={isVisible ? 'filled' : 'bezeled'}
                 onClick={() => setIsVisible(true)}
               >
-                Visible
+                {t('settings.visible')}
               </Button>
               <Button
                 size="s"
                 mode={isVisible ? 'bezeled' : 'filled'}
                 onClick={() => setIsVisible(false)}
               >
-                Hidden
+                {t('platformShop.hidden')}
               </Button>
             </div>
           }
         >
-          {isVisible ? 'Customers see it' : '🙈 Only admins see it'}
+          {isVisible ? t('platformShop.customersSee') : t('platformShop.onlyAdmins')}
         </Cell>
         <Input
-          header="Order in the shop list (1 = first)"
+          header={t('platformShop.order')}
           type="text"
           inputMode="numeric"
           status={orderInvalid ? 'error' : 'default'}
@@ -164,11 +165,11 @@ function ShopForm({ shop }: { shop: ShopAdminView | null }): React.JSX.Element {
       </Section>
 
       <Section
-        header="Shop admins"
-        footer="Telegram user ids, separated by commas. Each admin must have started the bot to receive order messages. Anyone can get their id from @userinfobot."
+        header={t('platformShop.admins')}
+        footer={t('platformShop.adminsFooter')}
       >
         <Input
-          header={adminIds === null ? 'Only numbers, separated by commas' : 'Admin Telegram ids'}
+          header={adminIds === null ? t('platformShop.adminsInvalid') : t('platformShop.adminsField')}
           placeholder="123456789, 987654321"
           status={adminIds === null ? 'error' : 'default'}
           value={admins}
@@ -179,7 +180,7 @@ function ShopForm({ shop }: { shop: ShopAdminView | null }): React.JSX.Element {
       <Section>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
           <Button stretched loading={busy} disabled={invalid} onClick={() => void save()}>
-            {shop ? 'Save shop' : 'Create shop'}
+            {shop ? t('platformShop.save') : t('platformShop.create')}
           </Button>
           {saved && <Cell>Saved ✓</Cell>}
         </div>
@@ -218,14 +219,14 @@ function DeleteShopSection({
   };
   const cancelButton = (
     <Button stretched mode="bezeled" onClick={cancel}>
-      Keep the shop
+      {t('deleteShop.keep')}
     </Button>
   );
 
   return (
     <>
     <ErrorBanner message={actions.error} />
-    <Section header="Danger zone">
+    <Section header={t('deleteShop.zone')}>
       {step === 'idle' && (
         <div style={{ padding: 16 }}>
           <Button
@@ -238,7 +239,7 @@ function DeleteShopSection({
               })
             }
           >
-            <span style={danger}>Delete shop…</span>
+            <span style={danger}>{t('deleteShop.start')}</span>
           </Button>
         </div>
       )}
@@ -246,19 +247,16 @@ function DeleteShopSection({
       {step === 'review' && contents && (
         <>
           <Cell multiline style={danger}>
-            {`Step 1 of 3 · Deleting "${shop.name}" also deletes, for good:`}
+            {t('deleteShop.step1', { name: shop.name })}
           </Cell>
-          <Cell after={String(contents.orders)}>Orders (with their payment records)</Cell>
-          <Cell after={String(contents.products)}>Products and their variants</Cell>
-          <Cell after={String(contents.categories)}>Categories</Cell>
-          <Cell after={String(contents.carts)}>Customer carts</Cell>
-          <Cell multiline>
-            This cannot be undone. If you only want customers to stop seeing it, set it to Hidden
-            instead.
-          </Cell>
+          <Cell after={String(contents.orders)}>{t('deleteShop.orders')}</Cell>
+          <Cell after={String(contents.products)}>{t('deleteShop.products')}</Cell>
+          <Cell after={String(contents.categories)}>{t('categories.title')}</Cell>
+          <Cell after={String(contents.carts)}>{t('deleteShop.carts')}</Cell>
+          <Cell multiline>{t('deleteShop.cannotUndo')}</Cell>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
             <Button stretched mode="plain" onClick={() => setStep('type')}>
-              <span style={danger}>I understand, continue</span>
+              <span style={danger}>{t('deleteShop.understand')}</span>
             </Button>
             {cancelButton}
           </div>
@@ -268,10 +266,10 @@ function DeleteShopSection({
       {step === 'type' && (
         <>
           <Cell multiline style={danger}>
-            Step 2 of 3 · Type the shop name exactly to confirm.
+            {t('deleteShop.step2')}
           </Cell>
           <Input
-            header={`Shop name: ${shop.name}`}
+            header={t('deleteShop.nameField', { name: shop.name })}
             placeholder={shop.name}
             status={typed && !nameMatches ? 'error' : 'default'}
             value={typed}
@@ -284,7 +282,7 @@ function DeleteShopSection({
               disabled={!nameMatches}
               onClick={() => setStep('final')}
             >
-              <span style={nameMatches ? danger : undefined}>Continue</span>
+              <span style={nameMatches ? danger : undefined}>{t('deleteShop.continue')}</span>
             </Button>
             {cancelButton}
           </div>
@@ -294,7 +292,7 @@ function DeleteShopSection({
       {step === 'final' && (
         <>
           <Cell multiline style={danger}>
-            Step 3 of 3 · Last chance. Tap the red button twice to delete everything.
+            {t('deleteShop.step3')}
           </Cell>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
             <Button
@@ -310,8 +308,8 @@ function DeleteShopSection({
             >
               {actions.tapLabel(
                 'delete-forever',
-                'Delete forever',
-                'Tap again: delete everything now',
+                t('deleteShop.forever'),
+                t('deleteShop.foreverConfirm'),
               )}
             </Button>
             {cancelButton}

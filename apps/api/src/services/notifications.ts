@@ -1,4 +1,8 @@
-import type { Order, OrderStatus } from '@tma-shop/shared';
+import { inArray } from 'drizzle-orm';
+import { langFrom, type Lang, type Order, type OrderStatus } from '@tma-shop/shared';
+import type { Database } from '../db/client.js';
+import { users } from '../db/schema.js';
+import { tr } from '../i18n/messages.js';
 import { TelegramApi } from '../telegram/api.js';
 
 function money(amount: number, currency: string): string {
@@ -6,72 +10,80 @@ function money(amount: number, currency: string): string {
   return `${(amount / 100).toFixed(2)} ${currency}`;
 }
 
-function contactLine(order: Order): string {
-  return `Contact: ${order.contactUsername ? `@${order.contactUsername}` : '—'}`;
+function shortId(order: Order): string {
+  return order.id.slice(0, 8);
+}
+
+function contactLine(lang: Lang, order: Order): string {
+  return tr(lang, 'line.contact', {
+    contact: order.contactUsername ? `@${order.contactUsername}` : '—',
+  });
 }
 
 /** Plain-text summary of an order waiting for manual payment verification. */
-export function buildPaymentReviewMessage(order: Order, customer: string): string {
+export function buildPaymentReviewMessage(lang: Lang, order: Order, customer: string): string {
   const amount = order.amountSubmitted > 0 ? order.amountSubmitted : order.amountDue;
   const lines = [
-    order.amountPaid > 0 ? '💰 Difference payment to verify' : '💰 Payment to verify',
+    tr(lang, order.amountPaid > 0 ? 'admin.differenceToVerify' : 'admin.paymentToVerify'),
     '',
-    `Order #${order.id.slice(0, 8)}`,
-    `Customer: ${customer}`,
-    contactLine(order),
-    `Amount: ${money(amount, order.currency)}`,
-    ...(order.shippingZoneName ? [`Shipping: ${order.shippingZoneName}`] : []),
-    `Method: ${order.paymentNetwork ?? '—'}`,
-    `Tx: ${order.paymentTxHash ?? '—'}`,
+    tr(lang, 'order.number', { id: shortId(order) }),
+    tr(lang, 'line.customer', { customer }),
+    contactLine(lang, order),
+    tr(lang, 'line.amount', { amount: money(amount, order.currency) }),
+    ...(order.shippingZoneName ? [tr(lang, 'line.shipping', { zone: order.shippingZoneName })] : []),
+    tr(lang, 'line.method', { method: order.paymentNetwork ?? '—' }),
+    tr(lang, 'line.tx', { tx: order.paymentTxHash ?? '—' }),
   ];
   if (order.paymentTxUrl) lines.push('', order.paymentTxUrl);
-  lines.push('', 'Open the shop → Admin to confirm or cancel it.');
+  lines.push('', tr(lang, 'admin.openToConfirm'));
   return lines.join('\n');
 }
 
 /** Tells admins a customer wants to modify a paid order. */
-export function buildChangeRequestMessage(order: Order, customer: string): string {
+export function buildChangeRequestMessage(lang: Lang, order: Order, customer: string): string {
   const change = order.changeRequest;
   if (!change) return '';
   const diff = change.total - order.amountPaid;
   const lines = [
-    '✏️ Order change requested',
+    tr(lang, 'admin.changeRequested'),
     '',
-    `Order #${order.id.slice(0, 8)}`,
-    `Customer: ${customer}`,
-    contactLine(order),
+    tr(lang, 'order.number', { id: shortId(order) }),
+    tr(lang, 'line.customer', { customer }),
+    contactLine(lang, order),
     '',
-    'New items:',
+    tr(lang, 'admin.newItems'),
     ...change.items.map(
       (item) =>
         `• ${item.quantity}× ${item.title}${item.variantLabel ? ` (${item.variantLabel})` : ''}`,
     ),
     '',
-    `Total: ${money(order.total, order.currency)} → ${money(change.total, order.currency)}`,
+    tr(lang, 'admin.total', {
+      from: money(order.total, order.currency),
+      to: money(change.total, order.currency),
+    }),
     diff > 0
-      ? `Customer would pay: ${money(diff, order.currency)}`
+      ? tr(lang, 'admin.customerWouldPay', { amount: money(diff, order.currency) })
       : diff < 0
-        ? `You would refund: ${money(-diff, order.currency)}`
-        : 'Same amount, nothing to pay or refund',
+        ? tr(lang, 'admin.youWouldRefund', { amount: money(-diff, order.currency) })
+        : tr(lang, 'admin.sameAmount'),
     '',
-    'Open the shop → Admin to approve or reject it.',
+    tr(lang, 'admin.openToApprove'),
   ];
   return lines.join('\n');
 }
 
 /** Tells the customer what happened to their change request. */
-export function buildChangeDecisionMessage(order: Order, approved: boolean): string {
-  const ref = `order #${order.id.slice(0, 8)}`;
-  if (!approved) {
-    return `Your change request for ${ref} was not approved. The order stays as it was.`;
-  }
-  const lines = [`✅ Your change to ${ref} was approved.`, `New total: ${money(order.total, order.currency)}`];
+export function buildChangeDecisionMessage(lang: Lang, order: Order, approved: boolean): string {
+  const ref = tr(lang, 'order.number', { id: shortId(order) });
+  if (!approved) return tr(lang, 'change.rejected', { ref });
+  const lines = [
+    tr(lang, 'change.approved', { ref }),
+    tr(lang, 'change.newTotal', { amount: money(order.total, order.currency) }),
+  ];
   if (order.amountDue > 0) {
-    lines.push(
-      `Please pay the difference of ${money(order.amountDue, order.currency)}: open the shop → My orders.`,
-    );
+    lines.push(tr(lang, 'change.payDifference', { amount: money(order.amountDue, order.currency) }));
   } else if (order.amountDue < 0) {
-    lines.push(`The shop will refund you ${money(-order.amountDue, order.currency)}.`);
+    lines.push(tr(lang, 'refund.willRefund', { amount: money(-order.amountDue, order.currency) }));
   }
   return lines.join('\n');
 }
@@ -81,53 +93,78 @@ export function buildChangeDecisionMessage(order: Order, approved: boolean): str
  * note if the admin wrote one. Empty when there is nothing to say.
  */
 export function buildStatusMessage(
+  lang: Lang,
   shopName: string,
   order: Order,
   previous: OrderStatus,
 ): string {
-  const ref = `${shopName} · order #${order.id.slice(0, 8)}`;
+  const ref = tr(lang, 'order.ref', { shop: shopName, id: shortId(order) });
   const lines: string[] = [];
   switch (order.status) {
     case 'paid':
-      lines.push(`Payment confirmed for ${ref}. The shop is preparing your order.`);
+      lines.push(tr(lang, 'status.paid', { ref }));
       if (order.amountDue < 0) {
-        lines.push(`The shop will refund you ${money(-order.amountDue, order.currency)}.`);
+        lines.push(tr(lang, 'refund.willRefund', { amount: money(-order.amountDue, order.currency) }));
       }
       break;
     case 'pending':
       // A rejected payment clears the transaction; a partial one keeps it.
       if (previous === 'awaiting_payment' && order.paymentTxHash === null) {
-        lines.push(
-          `We could not verify your payment for ${ref}.`,
-          'Check the transaction and send it again from My orders in the shop.',
-        );
+        lines.push(tr(lang, 'status.rejected', { ref }), tr(lang, 'status.rejectedHint'));
       } else {
-        // Partial payment confirmed: part of the total is still due.
         lines.push(
-          `We received your payment for ${ref}.`,
-          `Still to pay: ${money(order.amountDue, order.currency)}. Open My orders in the shop to pay it.`,
+          tr(lang, 'status.partial', { ref }),
+          tr(lang, 'status.partialHint', { amount: money(order.amountDue, order.currency) }),
         );
       }
       break;
     case 'shipped':
-      lines.push(`Your order ${ref} has been shipped.`);
-      if (order.trackingNumber) lines.push(`Tracking: ${order.trackingNumber}`);
+      lines.push(tr(lang, 'status.shipped', { ref }));
+      if (order.trackingNumber) lines.push(tr(lang, 'status.tracking', { tracking: order.trackingNumber }));
       break;
     case 'fulfilled':
-      lines.push(`Your order ${ref} has been delivered. Thank you!`);
+      lines.push(tr(lang, 'status.delivered', { ref }));
       break;
     case 'cancelled':
-      lines.push(`Your order ${ref} was cancelled.`);
+      lines.push(tr(lang, 'status.cancelled', { ref }));
       if (order.amountDue < 0) {
-        lines.push(`The shop will refund you ${money(-order.amountDue, order.currency)}.`);
+        lines.push(tr(lang, 'refund.willRefund', { amount: money(-order.amountDue, order.currency) }));
       }
       break;
     case 'awaiting_payment':
       break;
   }
   if (lines.length === 0) return '';
-  if (order.statusNote) lines.push('', `Message from the shop: ${order.statusNote}`);
+  if (order.statusNote) lines.push('', tr(lang, 'status.shopMessage', { note: order.statusNote }));
   return lines.join('\n');
+}
+
+/** Each user's language, from their Telegram settings (English when unknown). */
+export async function languagesOf(db: Database, telegramIds: number[]): Promise<Map<number, Lang>> {
+  const result = new Map<number, Lang>();
+  if (telegramIds.length === 0) return result;
+  const rows = await db
+    .select({ id: users.telegramId, languageCode: users.languageCode })
+    .from(users)
+    .where(inArray(users.telegramId, telegramIds));
+  for (const row of rows) result.set(row.id, langFrom(row.languageCode));
+  return result;
+}
+
+/** Sends each user the message built in their own language (best effort). */
+export async function notifyUsers(
+  db: Database,
+  botToken: string,
+  telegramIds: number[],
+  build: (lang: Lang) => string,
+  telegram = new TelegramApi(botToken),
+): Promise<void> {
+  const langs = await languagesOf(db, telegramIds);
+  await Promise.all(
+    telegramIds.map((id) =>
+      notifyChats(botToken, [id], build(langs.get(id) ?? 'en'), telegram),
+    ),
+  );
 }
 
 /**
@@ -150,14 +187,4 @@ export async function notifyChats(
       }
     }),
   );
-}
-
-/** Tells every admin that an order needs payment verification. */
-export async function notifyAdminsOfPayment(
-  botToken: string,
-  adminIds: number[],
-  order: Order,
-  customer: string,
-): Promise<void> {
-  await notifyChats(botToken, adminIds, buildPaymentReviewMessage(order, customer));
 }

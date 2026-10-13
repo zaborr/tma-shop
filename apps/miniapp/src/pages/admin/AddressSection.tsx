@@ -5,6 +5,7 @@ import type { DeliveryAddress, Order } from '@tma-shop/shared';
 import { copyText } from '../../lib/clipboard.js';
 import { decryptAddress, loadPrivateKey } from '../../lib/addressCrypto.js';
 import { useShop } from '../../providers/ShopProvider.js';
+import { t } from '../../i18n/index.js';
 
 type State =
   | { kind: 'loading' }
@@ -59,11 +60,13 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
 
   if (!order.encryptedAddress) return null;
 
-  const header = `Delivery address${order.shippingZoneName ? ` · ${order.shippingZoneName}` : ''}`;
+  const header = order.shippingZoneName
+    ? t('addressSection.headerZone', { zone: order.shippingZoneName })
+    : t('address.title');
   const keyButton = (
     <div style={{ padding: '0 16px 16px' }}>
       <Button size="s" mode="bezeled" onClick={() => navigate(to('/admin/address-key'))}>
-        🔑 Address key
+        {t('adminHome.addressKey')}
       </Button>
     </div>
   );
@@ -72,14 +75,14 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
     case 'loading':
       return (
         <Section header={header}>
-          <Cell>Decrypting…</Cell>
+          <Cell>{t('addressSection.decrypting')}</Cell>
         </Section>
       );
     case 'no-key':
       return (
         <Section header={header}>
           <Cell multiline>
-            🔒 Encrypted. Paste your private key in Admin → Address key to read it on this device.
+            {t('addressSection.noKey')}
           </Cell>
           {keyButton}
         </Section>
@@ -88,7 +91,7 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
       return (
         <Section header={header}>
           <Cell multiline>
-            {`🔒 Encrypted with an older key (${order.addressKeyFingerprint ?? '?'}). Paste that key's private part in Admin → Address key to read it.`}
+            {t('addressSection.olderKey', { id: order.addressKeyFingerprint ?? '?' })}
           </Cell>
           {keyButton}
         </Section>
@@ -97,8 +100,7 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
       return (
         <Section header={header}>
           <Cell multiline>
-            ⚠️ The private key on this device can’t open this address. Check you pasted the right
-            key.
+            {t('addressSection.wrongKey')}
           </Cell>
           {keyButton}
         </Section>
@@ -106,7 +108,7 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
     case 'ok': {
       const lines = addressLines(state.address);
       return (
-        <Section header={header} footer={state.address.notes ? `Notes: ${state.address.notes}` : undefined}>
+        <Section header={header} footer={state.address.notes ? t('addressSection.notes', { notes: state.address.notes }) : undefined}>
           {lines.map((line, i) => (
             <Cell key={i} multiline>
               {line}
@@ -118,13 +120,13 @@ export function AddressSection({ order }: { order: Order }): React.JSX.Element |
               mode="bezeled"
               onClick={() =>
                 void copyText(
-                  [...lines, state.address.notes ? `Notes: ${state.address.notes}` : '']
+                  [...lines, state.address.notes ? t('addressSection.notes', { notes: state.address.notes }) : '']
                     .filter(Boolean)
                     .join('\n'),
                 ).then(setCopied)
               }
             >
-              {copied ? 'Copied ✓' : 'Copy address'}
+              {copied ? t('addressSection.copied') : t('addressSection.copy')}
             </Button>
           </div>
         </Section>

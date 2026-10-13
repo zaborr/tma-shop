@@ -3,7 +3,8 @@ import type { Env } from '../config/env.js';
 import type { Database } from '../db/client.js';
 import { orders, shops } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
-import { buildStatusMessage, notifyChats } from './notifications.js';
+import { buildStatusMessage, languagesOf, notifyChats } from './notifications.js';
+import { tr } from '../i18n/messages.js';
 import { changeOrderStatus } from './orders.js';
 
 /**
@@ -13,7 +14,13 @@ import { changeOrderStatus } from './orders.js';
  */
 export async function cancelExpiredOrders(db: Database, env: Env): Promise<number> {
   const expired = await db
-    .select({ id: orders.id, shopId: orders.shopId, shopName: shops.name, hours: shops.autoCancelHours })
+    .select({
+      id: orders.id,
+      shopId: orders.shopId,
+      userId: orders.userId,
+      shopName: shops.name,
+      hours: shops.autoCancelHours,
+    })
     .from(orders)
     .innerJoin(shops, eq(orders.shopId, shops.id))
     .where(
@@ -26,16 +33,26 @@ export async function cancelExpiredOrders(db: Database, env: Env): Promise<numbe
       ),
     );
 
+  const langs = await languagesOf(
+    db,
+    expired.flatMap((row) => (row.userId === null ? [] : [row.userId])),
+  );
   let cancelled = 0;
   for (const row of expired) {
+    // The note is kept on the order, so it is written in the customer's language.
+    const lang = (row.userId !== null ? langs.get(row.userId) : undefined) ?? 'en';
     try {
       const { order } = await changeOrderStatus(db, row.shopId, row.id, {
         status: 'cancelled',
-        note: `It was not paid within ${row.hours} hours. You can place a new order any time.`,
+        note: tr(lang, 'autoCancel.note', { hours: row.hours }),
       });
       cancelled += 1;
       if (order.userId !== null) {
-        await notifyChats(env.BOT_TOKEN, [order.userId], buildStatusMessage(row.shopName, order, 'pending'));
+        await notifyChats(
+          env.BOT_TOKEN,
+          [order.userId],
+          buildStatusMessage(lang, row.shopName, order, 'pending'),
+        );
       }
     } catch (error) {
       // Changed meanwhile (e.g. the customer just paid): leave it alone.

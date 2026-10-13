@@ -26,6 +26,7 @@ import {
   saveAddress,
 } from '../lib/addressCrypto.js';
 import { askWriteAccess } from '../lib/writeAccess.js';
+import { t } from '../i18n/index.js';
 
 export function CartPage(): React.JSX.Element {
   const navigate = useNavigate();
@@ -70,22 +71,22 @@ export function CartPage(): React.JSX.Element {
     setError(null);
     try {
       if (!contactValid) {
-        setError('Enter your Telegram username so the shop can contact you.');
+        setError(t('cart.needUsername'));
         return;
       }
       let shippingDetails: { shippingZoneId: string; encryptedAddress: string } | null = null;
       if (needsShipping) {
         const config = shop.data;
         if (!zone) {
-          setError('Choose a shipping zone.');
+          setError(t('cart.needZone'));
           return;
         }
         if (!addressComplete(address)) {
-          setError('Fill in your delivery address (fields marked with *).');
+          setError(t('cart.needAddress'));
           return;
         }
         if (!config?.addressPublicKey || !config.addressKeyFingerprint || !cryptoAvailable()) {
-          setError('This shop cannot take orders with delivery yet. Please try again later.');
+          setError(t('cart.noDeliveryYet'));
           return;
         }
         const clean = trimAddress(address);
@@ -119,7 +120,7 @@ export function CartPage(): React.JSX.Element {
         navigate(to('/orders'));
       }
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Checkout failed');
+      setError(err instanceof ApiClientError ? err.message : t('cart.checkoutFailed'));
     } finally {
       setBusy(false);
     }
@@ -140,7 +141,9 @@ export function CartPage(): React.JSX.Element {
   const hasItems = (cart?.lines.length ?? 0) > 0;
 
   useMainButton({
-    text: cart ? `Checkout · ${formatPrice(grandTotal, cart.currency)}` : 'Checkout',
+    text: cart
+      ? t('cart.checkoutTotal', { total: formatPrice(grandTotal, cart.currency) })
+      : t('cart.checkout'),
     visible: hasItems,
     // Wait for the shop config so checkout never picks the wrong payment flow.
     enabled: shop.data !== null && contactValid && shippingReady,
@@ -152,7 +155,7 @@ export function CartPage(): React.JSX.Element {
 
   if (!hasItems) {
     return (
-      <Placeholder header="Your cart is empty" description="Add products from the catalog">
+      <Placeholder header={t('cart.empty')} description={t('cart.emptyHint')}>
         <span style={{ fontSize: 48 }}>🛒</span>
       </Placeholder>
     );
@@ -165,7 +168,7 @@ export function CartPage(): React.JSX.Element {
           <Cell style={{ color: 'var(--tgui--destructive_text_color)' }}>{error}</Cell>
         </Section>
       )}
-      <Section header="Cart">
+      <Section header={t('cart.title')}>
         {cart?.lines.map((line) => (
           <Cell
             key={line.id}
@@ -189,7 +192,7 @@ export function CartPage(): React.JSX.Element {
                   +
                 </Button>
                 <Button size="s" mode="plain" onClick={() => void remove(line.id)}>
-                  Remove
+                  {t('cart.remove')}
                 </Button>
               </div>
             }
@@ -202,18 +205,18 @@ export function CartPage(): React.JSX.Element {
       <Section>
         {cart && cart.fee > 0 && (
           <Cell after={formatPrice(cart.fee, cart.currency)}>
-            {shop.data?.orderFeeLabel ?? 'Service fee'}
+            {shop.data?.orderFeeLabel ?? t('cart.serviceFee')}
           </Cell>
         )}
         {needsShipping && (
           <Cell after={zone && cart ? formatPrice(shipping, cart.currency) : '—'}>
-            {zone ? `Shipping · ${zone.name}` : 'Shipping'}
+            {zone ? t('cart.shippingZoneLine', { zone: zone.name }) : t('cart.shipping')}
           </Cell>
         )}
-        <Cell after={cart ? formatPrice(grandTotal, cart.currency) : ''}>Total</Cell>
+        <Cell after={cart ? formatPrice(grandTotal, cart.currency) : ''}>{t('cart.total')}</Cell>
       </Section>
       {needsShipping && cart && (
-        <Section header="Shipping zone">
+        <Section header={t('cart.shippingZone')}>
           {zones.map((z) => {
             const cost = shippingCost(z, itemsTotal);
             return (
@@ -222,12 +225,12 @@ export function CartPage(): React.JSX.Element {
                 onClick={() => setZoneId(z.id)}
                 subtitle={
                   z.freeFrom !== null
-                    ? `Free from ${formatPrice(z.freeFrom, cart.currency)}`
+                    ? t('cart.freeFrom', { amount: formatPrice(z.freeFrom, cart.currency) })
                     : undefined
                 }
                 after={
                   <span>
-                    {cost === 0 ? 'Free' : formatPrice(cost, cart.currency)}
+                    {cost === 0 ? t('cart.free') : formatPrice(cost, cart.currency)}
                     {zone?.id === z.id ? ' ✓' : ''}
                   </span>
                 }
@@ -247,22 +250,18 @@ export function CartPage(): React.JSX.Element {
               after={remember ? '✓' : ''}
               multiline
             >
-              Remember this address on this phone
+              {t('cart.rememberAddress')}
             </Cell>
           </Section>
         </>
       )}
       <Section
-        header="Your Telegram username"
-        footer={
-          contactValid
-            ? 'The shop will contact you here about your order.'
-            : 'Required: 5–32 letters, digits or _ (you can find it in Telegram → Settings).'
-        }
+        header={t('cart.usernameSection')}
+        footer={contactValid ? t('cart.usernameOk') : t('cart.usernameRule')}
       >
         <Input
-          header="Telegram username"
-          placeholder="@username"
+          header={t('cart.usernameField')}
+          placeholder={t('cart.usernamePlaceholder')}
           status={contact.trim() === '' || contactValid ? 'default' : 'error'}
           value={contact}
           onChange={(e) => setContact(e.target.value)}

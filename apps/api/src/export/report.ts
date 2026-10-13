@@ -1,4 +1,10 @@
-import { isSaleStatus, type ExportRequest, type ExportScope, type Order } from '@tma-shop/shared';
+import {
+  isSaleStatus,
+  type ExportRequest,
+  type ExportScope,
+  type Lang,
+  type Order,
+} from '@tma-shop/shared';
 import { buildCsv, buildXlsx, type CellValue, type Sheet } from './xlsx.js';
 
 export interface CustomerInfo {
@@ -14,6 +20,8 @@ export interface ReportInput {
   customers: Map<number, CustomerInfo>;
   request: ExportRequest;
   now?: Date;
+  /** Language of the sheet names, headers and labels (the admin's). */
+  lang?: Lang;
 }
 
 export interface ReportFile {
@@ -23,24 +31,132 @@ export interface ReportFile {
   orderCount: number;
 }
 
-const SCOPE_LABEL: Record<ExportScope, string> = {
-  paid: 'Paid (incl. shipped and delivered)',
-  toFulfil: 'Paid, not shipped yet',
-  shipped: 'Shipped',
-  fulfilled: 'Delivered',
-  unpaid: 'Not paid / verifying',
-  cancelled: 'Cancelled',
-  all: 'All orders',
-};
+const TEXT = {
+  en: {
+    'scope.paid': 'Paid (incl. shipped and delivered)',
+    'scope.toFulfil': 'Paid, not shipped yet',
+    'scope.shipped': 'Shipped',
+    'scope.fulfilled': 'Delivered',
+    'scope.unpaid': 'Not paid / verifying',
+    'scope.cancelled': 'Cancelled',
+    'scope.all': 'All orders',
+    'status.pending': 'Not paid',
+    'status.awaiting_payment': 'Verifying payment',
+    'status.paid': 'Paid',
+    'status.shipped': 'Shipped',
+    'status.fulfilled': 'Delivered',
+    'status.cancelled': 'Cancelled',
+    'note.change': 'Change requested',
+    'note.refund': 'Refund owed',
+    'note.difference': 'Difference due',
+    'note.anonymized': 'Anonymized',
+    'sheet.summary': 'Summary',
+    'sheet.orders': 'Orders',
+    'sheet.lines': 'Lines',
+    'sheet.products': 'Products',
+    'col.order': 'Order',
+    'col.date': 'Date',
+    'col.status': 'Status',
+    'col.customer': 'Customer',
+    'col.username': 'Username',
+    'col.telegramId': 'Telegram ID',
+    'col.zone': 'Shipping zone',
+    'col.currency': 'Currency',
+    'col.units': 'Units',
+    'col.products': 'Products',
+    'col.shipping': 'Shipping',
+    'col.total': 'Total',
+    'col.paid': 'Paid',
+    'col.balance': 'Balance (+due / −refund)',
+    'col.method': 'Payment method',
+    'col.tx': 'Transaction',
+    'col.tracking': 'Tracking',
+    'col.notes': 'Notes',
+    'col.items': 'Items',
+    'col.product': 'Product',
+    'col.variant': 'Variant',
+    'col.quantity': 'Quantity',
+    'col.unitPrice': 'Unit price',
+    'col.subtotal': 'Subtotal',
+    'col.revenue': 'Revenue',
+    'col.orders': 'Orders',
+    'sum.shop': 'Shop',
+    'sum.included': 'Orders included',
+    'sum.from': 'From',
+    'sum.to': 'To',
+    'sum.beginning': 'Beginning',
+    'sum.now': 'Now',
+    'sum.generated': 'Generated',
+  },
+  es: {
+    'scope.paid': 'Pagados (incluye enviados y entregados)',
+    'scope.toFulfil': 'Pagados, sin enviar',
+    'scope.shipped': 'Enviados',
+    'scope.fulfilled': 'Entregados',
+    'scope.unpaid': 'Sin pagar / en revisión',
+    'scope.cancelled': 'Cancelados',
+    'scope.all': 'Todos los pedidos',
+    'status.pending': 'Sin pagar',
+    'status.awaiting_payment': 'Comprobando el pago',
+    'status.paid': 'Pagado',
+    'status.shipped': 'Enviado',
+    'status.fulfilled': 'Entregado',
+    'status.cancelled': 'Cancelado',
+    'note.change': 'Cambio solicitado',
+    'note.refund': 'Devolución pendiente',
+    'note.difference': 'Diferencia pendiente',
+    'note.anonymized': 'Anonimizado',
+    'sheet.summary': 'Resumen',
+    'sheet.orders': 'Pedidos',
+    'sheet.lines': 'Líneas',
+    'sheet.products': 'Productos',
+    'col.order': 'Pedido',
+    'col.date': 'Fecha',
+    'col.status': 'Estado',
+    'col.customer': 'Cliente',
+    'col.username': 'Usuario',
+    'col.telegramId': 'ID de Telegram',
+    'col.zone': 'Zona de envío',
+    'col.currency': 'Moneda',
+    'col.units': 'Unidades',
+    'col.products': 'Productos',
+    'col.shipping': 'Envío',
+    'col.total': 'Total',
+    'col.paid': 'Pagado',
+    'col.balance': 'Saldo (+pendiente / −devolver)',
+    'col.method': 'Forma de pago',
+    'col.tx': 'Transacción',
+    'col.tracking': 'Seguimiento',
+    'col.notes': 'Notas',
+    'col.items': 'Artículos',
+    'col.product': 'Producto',
+    'col.variant': 'Variante',
+    'col.quantity': 'Cantidad',
+    'col.unitPrice': 'Precio unitario',
+    'col.subtotal': 'Subtotal',
+    'col.revenue': 'Ingresos',
+    'col.orders': 'Pedidos',
+    'sum.shop': 'Tienda',
+    'sum.included': 'Pedidos incluidos',
+    'sum.from': 'Desde',
+    'sum.to': 'Hasta',
+    'sum.beginning': 'El principio',
+    'sum.now': 'Ahora',
+    'sum.generated': 'Generado',
+  },
+} as const;
 
-const STATUS_LABEL: Record<Order['status'], string> = {
-  pending: 'Not paid',
-  awaiting_payment: 'Verifying payment',
-  paid: 'Paid',
-  shipped: 'Shipped',
-  fulfilled: 'Delivered',
-  cancelled: 'Cancelled',
-};
+type TextKey = keyof (typeof TEXT)['en'];
+
+/** Labels in the report's language. */
+function labels(input: ReportInput): (key: TextKey) => string {
+  const table: Record<TextKey, string> = TEXT[input.lang ?? 'en'];
+  return (key) => table[key];
+}
+
+function statusText(L: (key: TextKey) => string, status: Order['status']): string {
+  return L(`status.${status}`);
+}
 
 export function matchesScope(order: Order, scope: ExportScope): boolean {
   switch (scope) {
@@ -82,37 +198,38 @@ function itemName(item: Order['items'][number]): string {
   return item.variantLabel ? `${item.title} (${item.variantLabel})` : item.title;
 }
 
-function notes(order: Order): string {
+function notes(L: (key: TextKey) => string, order: Order): string {
   const parts: string[] = [];
-  if (order.changeRequest) parts.push('Change requested');
-  if (order.amountDue < 0) parts.push('Refund owed');
-  if (order.amountDue > 0 && order.amountPaid > 0) parts.push('Difference due');
-  if (order.anonymizedAt) parts.push('Anonymized');
+  if (order.changeRequest) parts.push(L('note.change'));
+  if (order.amountDue < 0) parts.push(L('note.refund'));
+  if (order.amountDue > 0 && order.amountPaid > 0) parts.push(L('note.difference'));
+  if (order.anonymizedAt) parts.push(L('note.anonymized'));
   return parts.join('; ');
 }
 
 function ordersSheet(input: ReportInput, orders: readonly Order[]): Sheet {
+  const L = labels(input);
   const header: CellValue[] = [
-    'Order',
-    'Date',
-    'Status',
-    'Customer',
-    'Username',
-    'Telegram ID',
-    'Shipping zone',
-    'Currency',
-    'Units',
-    'Products',
+    L('col.order'),
+    L('col.date'),
+    L('col.status'),
+    L('col.customer'),
+    L('col.username'),
+    L('col.telegramId'),
+    L('col.zone'),
+    L('col.currency'),
+    L('col.units'),
+    L('col.products'),
     input.feeLabel,
-    'Shipping',
-    'Total',
-    'Paid',
-    'Balance (+due / −refund)',
-    'Payment method',
-    'Transaction',
-    'Tracking',
-    'Notes',
-    'Items',
+    L('col.shipping'),
+    L('col.total'),
+    L('col.paid'),
+    L('col.balance'),
+    L('col.method'),
+    L('col.tx'),
+    L('col.tracking'),
+    L('col.notes'),
+    L('col.items'),
   ];
   const rows = orders.map((o): CellValue[] => {
     const customer = o.userId === null ? undefined : input.customers.get(o.userId);
@@ -121,7 +238,7 @@ function ordersSheet(input: ReportInput, orders: readonly Order[]): Sheet {
     return [
       `#${o.id.slice(0, 8)}`,
       { date: new Date(o.createdAt) },
-      STATUS_LABEL[o.status],
+      statusText(L, o.status),
       customer?.name ?? '',
       username ? `@${username}` : '',
       o.userId ?? '',
@@ -141,35 +258,36 @@ function ordersSheet(input: ReportInput, orders: readonly Order[]): Sheet {
           : o.paymentTxHash
         : '',
       o.trackingNumber ?? '',
-      notes(o),
+      notes(L, o),
       o.items.map((i) => `${i.quantity}× ${itemName(i)}`).join(', '),
     ];
   });
   return {
-    name: 'Orders',
+    name: L('sheet.orders'),
     rows: [header, ...rows],
     widths: [11, 17, 17, 20, 18, 13, 16, 9, 7, 11, 11, 10, 11, 11, 14, 16, 30, 18, 18, 50],
   };
 }
 
-function linesSheet(orders: readonly Order[]): Sheet {
+function linesSheet(input: ReportInput, orders: readonly Order[]): Sheet {
+  const L = labels(input);
   const header: CellValue[] = [
-    'Order',
-    'Date',
-    'Status',
-    'Username',
-    'Product',
-    'Variant',
-    'Quantity',
-    'Unit price',
-    'Subtotal',
-    'Currency',
+    L('col.order'),
+    L('col.date'),
+    L('col.status'),
+    L('col.username'),
+    L('col.product'),
+    L('col.variant'),
+    L('col.quantity'),
+    L('col.unitPrice'),
+    L('col.subtotal'),
+    L('col.currency'),
   ];
   const rows = orders.flatMap((o) =>
     o.items.map((i): CellValue[] => [
       `#${o.id.slice(0, 8)}`,
       { date: new Date(o.createdAt) },
-      STATUS_LABEL[o.status],
+      statusText(L, o.status),
       o.contactUsername ? `@${o.contactUsername}` : '',
       i.title,
       i.variantLabel ?? '',
@@ -180,13 +298,14 @@ function linesSheet(orders: readonly Order[]): Sheet {
     ]),
   );
   return {
-    name: 'Lines',
+    name: L('sheet.lines'),
     rows: [header, ...rows],
     widths: [11, 17, 17, 18, 28, 18, 9, 11, 11, 9],
   };
 }
 
-function productsSheet(orders: readonly Order[]): Sheet {
+function productsSheet(input: ReportInput, orders: readonly Order[]): Sheet {
+  const L = labels(input);
   const totals = new Map<
     string,
     { title: string; variant: string; currency: string; units: number; revenue: number; orders: Set<string> }
@@ -219,13 +338,24 @@ function productsSheet(orders: readonly Order[]): Sheet {
       r.orders.size,
     ]);
   return {
-    name: 'Products',
-    rows: [['Product', 'Variant', 'Currency', 'Units', 'Revenue', 'Orders'], ...rows],
+    name: L('sheet.products'),
+    rows: [
+      [
+        L('col.product'),
+        L('col.variant'),
+        L('col.currency'),
+        L('col.units'),
+        L('col.revenue'),
+        L('col.orders'),
+      ],
+      ...rows,
+    ],
     widths: [30, 20, 9, 8, 12, 8],
   };
 }
 
 function summarySheet(input: ReportInput, orders: readonly Order[], now: Date): Sheet {
+  const L = labels(input);
   const byCurrency = new Map<
     string,
     { orders: number; units: number; products: number; fees: number; shipping: number; total: number; paid: number }
@@ -251,7 +381,16 @@ function summarySheet(input: ReportInput, orders: readonly Order[], now: Date): 
   }
   const { request } = input;
   const rows: CellValue[][] = [
-    ['Currency', 'Orders', 'Units', 'Products', input.feeLabel, 'Shipping', 'Total', 'Paid'],
+    [
+      L('col.currency'),
+      L('col.orders'),
+      L('col.units'),
+      L('col.products'),
+      input.feeLabel,
+      L('col.shipping'),
+      L('col.total'),
+      L('col.paid'),
+    ],
     ...[...byCurrency.entries()].map(([currency, r]): CellValue[] => [
       currency,
       r.orders,
@@ -263,13 +402,13 @@ function summarySheet(input: ReportInput, orders: readonly Order[], now: Date): 
       money(r.paid, currency),
     ]),
     [],
-    ['Shop', input.shopName],
-    ['Orders included', SCOPE_LABEL[request.scope]],
-    ['From', request.from ? { date: new Date(request.from) } : 'Beginning'],
-    ['To', request.to ? { date: new Date(request.to) } : 'Now'],
-    ['Generated', { date: now }],
+    [L('sum.shop'), input.shopName],
+    [L('sum.included'), L(`scope.${request.scope}`)],
+    [L('sum.from'), request.from ? { date: new Date(request.from) } : L('sum.beginning')],
+    [L('sum.to'), request.to ? { date: new Date(request.to) } : L('sum.now')],
+    [L('sum.generated'), { date: now }],
   ];
-  return { name: 'Summary', rows, widths: [18, 24, 9, 12, 12, 11, 12, 12], filter: false };
+  return { name: L('sheet.summary'), rows, widths: [18, 24, 9, 12, 12, 11, 12, 12], filter: false };
 }
 
 function dateStamp(now: Date, timeZone: string): string {
@@ -296,8 +435,8 @@ export function buildReport(input: ReportInput): ReportFile {
           [
             summarySheet(input, orders, now),
             ordersSheet(input, orders),
-            linesSheet(orders),
-            productsSheet(orders),
+            linesSheet(input, orders),
+            productsSheet(input, orders),
           ],
           { timeZone },
         ),
@@ -314,7 +453,7 @@ export function buildReport(input: ReportInput): ReportFile {
       return {
         fileName: `${base}-lines.csv`,
         contentType: 'text/csv',
-        data: buildCsv(linesSheet(orders).rows, { timeZone }),
+        data: buildCsv(linesSheet(input, orders).rows, { timeZone }),
         orderCount: orders.length,
       };
   }

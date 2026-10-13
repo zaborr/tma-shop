@@ -144,6 +144,12 @@ tma-shop/
 
 ---
 
+## 🌍 Languages
+
+The Mini App, the bot's messages and the exported reports speak **Spanish** to users whose Telegram is in Spanish and **English** to everyone else. App texts live in `apps/miniapp/src/i18n/` (`en.ts`, `es.ts`); bot and report texts in `apps/api/src/i18n/`. API error messages are translated from the `X-Lang` header the app sends.
+
+---
+
 ## ⚙️ Configuration (API)
 
 | Variable                   | Description                                       | Default |

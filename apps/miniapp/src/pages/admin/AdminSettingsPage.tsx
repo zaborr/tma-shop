@@ -9,6 +9,7 @@ import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { ProductImage } from '../../components/ProductImage.js';
 import { AdminOnly, ErrorBanner, useAdminActions } from './common.js';
+import { t } from '../../i18n/index.js';
 
 /** Shop name, description and image, editable by the shop's own admins. */
 export function AdminSettingsPage(): React.JSX.Element {
@@ -82,15 +83,15 @@ function ProfileForm({
   return (
     <>
       <ErrorBanner message={actions.error} />
-      <Section header="Store profile" footer="Shown in the shop list and at the top of the catalog.">
-        <Input header="Name" value={name} onChange={(e) => setName(e.target.value)} />
+      <Section header={t('settings.profile')} footer={t('settings.profileFooter')}>
+        <Input header={t('settings.name')} value={name} onChange={(e) => setName(e.target.value)} />
         <Textarea
-          header="Description"
+          header={t('productForm.description')}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
         <Input
-          header={imageInvalid ? 'Image URL — must start with https://' : 'Image URL (optional)'}
+          header={imageInvalid ? t('common.imageInvalid') : t('settings.image')}
           type="url"
           placeholder="https://…/logo.png"
           status={imageInvalid ? 'error' : 'default'}
@@ -99,7 +100,7 @@ function ProfileForm({
         />
         {image !== '' && !imageInvalid && (
           <div style={{ padding: '8px 16px' }}>
-            <ProductImage url={image} alt="Preview" size={96} />
+            <ProductImage url={image} alt={t('common.preview')} size={96} />
           </div>
         )}
         <div style={{ padding: 16 }}>
@@ -109,19 +110,21 @@ function ProfileForm({
             disabled={!name.trim() || imageInvalid || unchanged}
             onClick={() => void save()}
           >
-            Save profile
+            {t('settings.saveProfile')}
           </Button>
         </div>
       </Section>
 
       <Section
-        header="Access"
-        footer="Visibility, link name and the list of admins are managed by the platform admin."
+        header={t('settings.access')}
+        footer={t('settings.accessFooter')}
       >
-        <Cell after={`/${view.slug}`}>Link name</Cell>
-        <Cell after={view.isVisible ? 'Visible' : '🙈 Hidden'}>Visibility</Cell>
+        <Cell after={`/${view.slug}`}>{t('settings.linkName')}</Cell>
+        <Cell after={view.isVisible ? t('settings.visible') : t('shops.hidden')}>
+          {t('settings.visibility')}
+        </Cell>
         <Cell after={view.adminIds.join(', ') || '—'} multiline>
-          Admins
+          {t('settings.admins')}
         </Cell>
       </Section>
     </>
@@ -145,11 +148,11 @@ function AutoCancelForm({
     <>
       <ErrorBanner message={actions.error} />
       <Section
-        header="Unpaid orders"
-        footer="Orders with no payment sent are cancelled after this many hours without activity, and the customer gets a message. Orders with a payment under review are never cancelled. 0 = never."
+        header={t('settings.unpaid')}
+        footer={t('settings.unpaidFooter')}
       >
         <Input
-          header="Cancel unpaid orders after (hours, 0 = never)"
+          header={t('settings.unpaidHours')}
           inputMode="numeric"
           status={invalid ? 'error' : 'default'}
           value={hours}
@@ -161,7 +164,7 @@ function AutoCancelForm({
             disabled={invalid || value === view.autoCancelHours}
             onClick={() => void actions.run(() => api.adminUpdateAutoCancel(value))}
           >
-            Save
+            {t('common.save')}
           </Button>
         </div>
       </Section>

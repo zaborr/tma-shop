@@ -22,8 +22,8 @@ import {
 import { createStarsInvoice } from '../services/payments.js';
 import {
   buildChangeRequestMessage,
-  notifyAdminsOfPayment,
-  notifyChats,
+  buildPaymentReviewMessage,
+  notifyUsers,
 } from '../services/notifications.js';
 import { describeCustomer } from '../services/customers.js';
 import { expandWallets, paymentMethodLabel } from '../config/payment-methods.js';
@@ -103,11 +103,8 @@ export function orderRoutes(): Hono<AppBindings> {
       );
 
       const customer = await describeCustomer(db, sub);
-      await notifyAdminsOfPayment(
-        env.BOT_TOKEN,
-        shopNotificationChatIds(env, c.get('shop')),
-        order,
-        customer,
+      await notifyUsers(db, env.BOT_TOKEN, shopNotificationChatIds(env, c.get('shop')), (lang) =>
+        buildPaymentReviewMessage(lang, order, customer),
       );
 
       return c.json(order);
@@ -131,10 +128,8 @@ export function orderRoutes(): Hono<AppBindings> {
         c.req.valid('json').items,
       );
       const customer = await describeCustomer(db, sub);
-      await notifyChats(
-        env.BOT_TOKEN,
-        shopNotificationChatIds(env, c.get('shop')),
-        buildChangeRequestMessage(order, customer),
+      await notifyUsers(db, env.BOT_TOKEN, shopNotificationChatIds(env, c.get('shop')), (lang) =>
+        buildChangeRequestMessage(lang, order, customer),
       );
       return c.json(order);
     },

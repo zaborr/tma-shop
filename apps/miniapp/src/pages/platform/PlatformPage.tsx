@@ -7,11 +7,12 @@ import { shopPath } from '../../providers/ShopProvider.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { ProductImage } from '../../components/ProductImage.js';
+import { t, tn } from '../../i18n/index.js';
 
 /** Platform super-admin: every shop, hidden ones included. */
 export function PlatformPage(): React.JSX.Element {
   const { isSuperAdmin } = useSession();
-  if (!isSuperAdmin) return <ErrorView message="Platform admins only" />;
+  if (!isSuperAdmin) return <ErrorView message={t('platform.only')} />;
   return <Platform />;
 }
 
@@ -26,18 +27,18 @@ function Platform(): React.JSX.Element {
   return (
     <List>
       <Section>
-        <Cell onClick={() => navigate('/platform/shops/new')}>➕ New shop</Cell>
-        <Cell onClick={() => navigate('/platform/retention')}>🧹 Data retention</Cell>
+        <Cell onClick={() => navigate('/platform/shops/new')}>{t('platform.newShop')}</Cell>
+        <Cell onClick={() => navigate('/platform/retention')}>{t('platform.retention')}</Cell>
       </Section>
 
       {list.length === 0 ? (
-        <Placeholder header="No shops yet" description="Create the first one.">
+        <Placeholder header={t('shops.empty')} description={t('platform.createFirst')}>
           <span style={{ fontSize: 48 }}>🏪</span>
         </Placeholder>
       ) : (
         <Section
-          header={`All shops · ${list.length}`}
-          footer="Tap a shop to edit its name, visibility and admins. Open it to manage its catalog, wallets and orders."
+          header={t('platform.allShops', { count: list.length })}
+          footer={t('platform.footer')}
         >
           {list.map((shop) => (
             <Cell
@@ -46,9 +47,9 @@ function Platform(): React.JSX.Element {
               before={<ProductImage url={shop.imageUrl} alt={shop.name} size={48} />}
               subtitle={[
                 `/${shop.slug}`,
-                shop.isVisible ? 'visible' : '🙈 hidden',
-                `${shop.adminIds.length} ${shop.adminIds.length === 1 ? 'admin' : 'admins'}`,
-                `${shop.paymentMethods.length} payment methods`,
+                shop.isVisible ? t('platform.visible') : t('platform.hidden'),
+                tn(shop.adminIds.length, 'count.admins.one', 'count.admins.other'),
+                tn(shop.paymentMethods.length, 'count.paymentOptions.one', 'count.paymentOptions.other'),
               ].join(' · ')}
               after={
                 <span
@@ -59,7 +60,7 @@ function Platform(): React.JSX.Element {
                     navigate(shopPath(shop.slug));
                   }}
                 >
-                  Open
+                  {t('platform.open')}
                 </span>
               }
               multiline

@@ -21,6 +21,7 @@ import type {
   ShopSummary,
   WalletInput,
 } from '@tma-shop/shared';
+import { lang } from '../i18n/index.js';
 
 export interface ShopsResponse {
   shops: ShopSummary[];
@@ -99,6 +100,8 @@ export class ApiClient {
     if (init.body) headers.set('Content-Type', 'application/json');
     if (this.token) headers.set('Authorization', `Bearer ${this.token}`);
     if (this.shop) headers.set('X-Shop', this.shop);
+    // Error messages come back in the user's language.
+    headers.set('X-Lang', lang());
 
     const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
     if (res.status === 401 && !retried && path !== '/auth' && (await this.refreshToken())) {

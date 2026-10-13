@@ -33,13 +33,13 @@ const base: Order = {
 
 describe('buildStatusMessage', () => {
   it('confirms a payment', () => {
-    const text = buildStatusMessage('Demo', base, 'awaiting_payment');
+    const text = buildStatusMessage('en', 'Demo', base, 'awaiting_payment');
     expect(text).toContain('Payment confirmed for Demo · order #abcd1234');
   });
 
   it('tells the customer a rejected payment must be sent again', () => {
     const order: Order = { ...base, status: 'pending', paymentTxHash: null, amountPaid: 0, amountDue: 5490 };
-    const text = buildStatusMessage('Demo', order, 'awaiting_payment');
+    const text = buildStatusMessage('en', 'Demo', order, 'awaiting_payment');
     expect(text).toContain('could not verify your payment');
   });
 
@@ -50,7 +50,7 @@ describe('buildStatusMessage', () => {
       trackingNumber: 'RR123456789ES',
       statusNote: 'Arrives on Friday',
     };
-    const text = buildStatusMessage('Demo', order, 'paid');
+    const text = buildStatusMessage('en', 'Demo', order, 'paid');
     expect(text).toContain('has been shipped');
     expect(text).toContain('Tracking: RR123456789ES');
     expect(text).toContain('Message from the shop: Arrives on Friday');
@@ -58,7 +58,16 @@ describe('buildStatusMessage', () => {
 
   it('mentions the refund when a paid order is cancelled', () => {
     const order: Order = { ...base, status: 'cancelled', amountDue: -5490 };
-    expect(buildStatusMessage('Demo', order, 'paid')).toContain('will refund you 54.90 USDC');
+    expect(buildStatusMessage('en', 'Demo', order, 'paid')).toContain('will refund you 54.90 USDC');
+  });
+});
+
+describe('buildStatusMessage in Spanish', () => {
+  it('speaks the customer\'s language', () => {
+    const order: Order = { ...base, status: 'shipped', trackingNumber: 'RR1' };
+    const text = buildStatusMessage('es', 'Demo', order, 'paid');
+    expect(text).toContain('Tu pedido Demo · pedido #abcd1234 ya está enviado.');
+    expect(text).toContain('Seguimiento: RR1');
   });
 });
 

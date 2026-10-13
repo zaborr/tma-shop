@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ApiClientError } from '../api/client.js';
+import { t } from '../i18n/index.js';
 
 export interface AsyncState<T> {
   data: T | null;
@@ -21,7 +22,7 @@ export function useAsync<T>(loader: () => Promise<T>, deps: readonly unknown[]):
       .catch((err: unknown) => {
         if (cancelled) return;
         const message =
-          err instanceof ApiClientError ? err.message : 'Something went wrong. Please try again.';
+          err instanceof ApiClientError ? err.message : t('error.tryAgain');
         setState({ data: null, loading: false, error: message });
       });
     return () => {

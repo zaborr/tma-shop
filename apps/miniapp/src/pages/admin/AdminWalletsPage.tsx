@@ -8,6 +8,7 @@ import { useShop } from '../../providers/ShopProvider.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { AdminOnly, ErrorBanner, TOKENS, useAdminActions } from './common.js';
+import { t, tn } from '../../i18n/index.js';
 
 interface Row {
   key: number;
@@ -22,7 +23,7 @@ function toRow(wallet: WalletInput, key: number): Row {
     network: wallet.network,
     tokens: wallet.token
       .split(/[/,|]/)
-      .map((t) => t.trim().toUpperCase())
+      .map((part) => part.trim().toUpperCase())
       .filter(Boolean),
     address: wallet.address,
   };
@@ -75,7 +76,7 @@ function WalletsForm({
   const toggleToken = (row: Row, token: string): void =>
     update(row.key, {
       tokens: row.tokens.includes(token)
-        ? row.tokens.filter((t) => t !== token)
+        ? row.tokens.filter((other) => other !== token)
         : [...row.tokens, token],
     });
 
@@ -108,21 +109,21 @@ function WalletsForm({
       {rows.length === 0 && (
         <Section>
           <Cell multiline>
-            No wallets yet. Customers can’t pay until you add at least one.
+            {t('wallets.empty')}
           </Cell>
         </Section>
       )}
 
       {rows.map((row, index) => (
-        <Section key={row.key} header={`Wallet ${index + 1}`}>
+        <Section key={row.key} header={t('wallets.wallet', { n: index + 1 })}>
           <Input
-            header="Networks (join several with /)"
+            header={t('wallets.networks')}
             placeholder="Base/Ethereum"
             value={row.network}
             onChange={(e) => update(row.key, { network: e.target.value })}
           />
           <Cell
-            subtitle="Tokens"
+            subtitle={t('wallets.tokens')}
             after={
               <div style={{ display: 'flex', gap: 8 }}>
                 {[...new Set([...TOKENS, ...row.tokens])].map((token) => (
@@ -138,11 +139,11 @@ function WalletsForm({
               </div>
             }
           >
-            {row.tokens.join(' / ') || 'None'}
+            {row.tokens.join(' / ') || t('productForm.none')}
           </Cell>
           <Input
-            header="Address"
-            placeholder="0x… / Solana address"
+            header={t('wallets.address')}
+            placeholder={t('wallets.addressPlaceholder')}
             value={row.address}
             onChange={(e) => update(row.key, { address: e.target.value })}
           />
@@ -152,14 +153,16 @@ function WalletsForm({
               mode="plain"
               onClick={() => setRows((prev) => prev.filter((r) => r.key !== row.key))}
             >
-              Remove wallet
+              {t('wallets.remove')}
             </Button>
           </div>
         </Section>
       ))}
 
       <Section
-        footer={`Customers will see ${methodCount} payment option${methodCount === 1 ? '' : 's'} (one per network and token). Double-check every address: payments sent to a wrong address are lost.`}
+        footer={t('wallets.footer', {
+          options: tn(methodCount, 'count.paymentOptions.one', 'count.paymentOptions.other'),
+        })}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
           <Button
@@ -173,10 +176,10 @@ function WalletsForm({
               setNextKey((k) => k + 1);
             }}
           >
-            ➕ Add wallet
+            {t('wallets.add')}
           </Button>
           <Button stretched loading={busy} disabled={invalid} onClick={() => void save()}>
-            Save wallets
+            {t('wallets.save')}
           </Button>
         </div>
       </Section>

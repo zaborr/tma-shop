@@ -1,6 +1,7 @@
 import { Section } from '@telegram-apps/telegram-ui';
 import { Input, Textarea } from './Field.js';
 import type { DeliveryAddress } from '@tma-shop/shared';
+import { t } from '../i18n/index.js';
 
 export const EMPTY_ADDRESS: DeliveryAddress = {
   name: '',
@@ -48,22 +49,22 @@ export function AddressForm({
 
   return (
     <Section
-      header="Delivery address"
-      footer="🔒 Encrypted on your phone before it is sent. Only the shop can read it."
+      header={t('address.title')}
+      footer={t('address.footer')}
     >
-      <Input header="Full name *" value={value.name} onChange={set('name')} />
-      <Input header="Address *" placeholder="Street, number" value={value.line1} onChange={set('line1')} />
+      <Input header={t('address.name')} value={value.name} onChange={set('name')} />
+      <Input header={t('address.line1')} placeholder={t('address.line1Placeholder')} value={value.line1} onChange={set('line1')} />
       <Input
-        header="Apartment, floor (optional)"
+        header={t('address.line2')}
         value={value.line2}
         onChange={set('line2')}
       />
-      <Input header="Postal code *" value={value.postalCode} onChange={set('postalCode')} />
-      <Input header="City *" value={value.city} onChange={set('city')} />
-      <Input header="Region / province" value={value.region} onChange={set('region')} />
-      <Input header="Country *" value={value.country} onChange={set('country')} />
-      <Input header="Phone" type="tel" value={value.phone} onChange={set('phone')} />
-      <Textarea header="Notes for delivery" value={value.notes} onChange={set('notes')} />
+      <Input header={t('address.postalCode')} value={value.postalCode} onChange={set('postalCode')} />
+      <Input header={t('address.city')} value={value.city} onChange={set('city')} />
+      <Input header={t('address.region')} value={value.region} onChange={set('region')} />
+      <Input header={t('address.country')} value={value.country} onChange={set('country')} />
+      <Input header={t('address.phone')} type="tel" value={value.phone} onChange={set('phone')} />
+      <Textarea header={t('address.notes')} value={value.notes} onChange={set('notes')} />
     </Section>
   );
 }

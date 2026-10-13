@@ -26,6 +26,7 @@ import { ShopsPage } from './pages/ShopsPage.js';
 import { PlatformPage } from './pages/platform/PlatformPage.js';
 import { PlatformShopPage } from './pages/platform/PlatformShopPage.js';
 import { PlatformRetentionPage } from './pages/platform/PlatformRetentionPage.js';
+import { t } from './i18n/index.js';
 
 function platform(): 'ios' | 'base' {
   try {
@@ -42,7 +43,7 @@ function Shell(): React.JSX.Element {
   if (status === 'loading') return <Loader />;
   if (status === 'error') {
     return (
-      <Placeholder header="Couldn’t sign you in" description={error ?? 'Please reopen the app'}>
+      <Placeholder header={t('app.signInFailed')} description={error ?? t('app.reopen')}>
         <span style={{ fontSize: 48 }}>🔒</span>
       </Placeholder>
     );

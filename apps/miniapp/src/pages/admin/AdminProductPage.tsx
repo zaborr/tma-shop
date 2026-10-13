@@ -8,6 +8,7 @@ import { ErrorView } from '../../components/ErrorView.js';
 import { ProductForm } from './ProductForm.js';
 import { AdminOnly, TOKENS } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
+import { t } from '../../i18n/index.js';
 
 /** `/admin/products/new` creates a product; `/admin/products/:id` edits one. */
 export function AdminProductPage(): React.JSX.Element {
@@ -37,9 +38,9 @@ function AdminProduct(): React.JSX.Element {
   if (error) return <ErrorView message={error} />;
 
   const product = isNew ? null : (products.data?.find((p) => p.id === id) ?? null);
-  if (!isNew && !product) return <ErrorView message="Product not found" />;
+  if (!isNew && !product) return <ErrorView message={t('product.notFound')} />;
 
-  const defaultToken = TOKENS.find((t) => t === shop.data?.currency) ?? 'USDC';
+  const defaultToken = TOKENS.find((token) => token === shop.data?.currency) ?? 'USDC';
   // After editing go back to the catalog; after creating stay, to add another.
   const onSaved = (): void => {
     if (!isNew) navigate(to('/admin/catalog'));
