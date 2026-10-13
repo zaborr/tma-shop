@@ -37,6 +37,13 @@ const envSchema = z.object({
    */
   PUBLIC_URL: optional(z.url()),
   RENDER_EXTERNAL_URL: optional(z.url()),
+  /**
+   * Blockchain nodes used to check payments. Public nodes by default; set your
+   * own (Alchemy, Helius, QuickNode…) if a network is slow or rate-limited.
+   */
+  RPC_BASE_URL: z.url().default('https://mainnet.base.org'),
+  RPC_ETHEREUM_URL: z.url().default('https://ethereum-rpc.publicnode.com'),
+  RPC_SOLANA_URL: z.url().default('https://api.mainnet-beta.solana.com'),
   SHOP_ID: z.uuid().optional(),
   CORS_ORIGIN: z.string().default('*'),
 });

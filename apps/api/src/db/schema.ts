@@ -17,6 +17,7 @@ import type {
   PriceTier,
   ProductOption,
   ShippingZone,
+  PaymentCheck,
   PaymentSetup,
 } from '@tma-shop/shared';
 
@@ -205,6 +206,10 @@ export const orders = pgTable('orders', {
   paymentNetwork: text('payment_network'),
   /** Crypto transaction hash submitted by the customer for manual review. */
   paymentTxHash: text('payment_tx_hash'),
+  /** Payment method id of that transaction, e.g. `usdc-base`. */
+  paymentMethodId: text('payment_method_id'),
+  /** Result of the automatic on-chain check of that transaction. */
+  paymentCheck: jsonb('payment_check').$type<PaymentCheck>(),
   /** Customer's Telegram username (without @) given at checkout. */
   contactUsername: text('contact_username'),
   /** Shipment tracking number or link, set when the order is shipped. */

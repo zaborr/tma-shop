@@ -294,6 +294,8 @@ export async function markOrderPaid(
     checkStock?: boolean;
     /** Message from the shop to the customer. */
     note?: string | null;
+    /** Amount actually received (from the on-chain check), in minor units. */
+    received?: number;
   } = {},
 ): Promise<Order> {
   return db.transaction(async (tx) => {
@@ -315,7 +317,8 @@ export async function markOrderPaid(
     }
 
     const received =
-      order.amountSubmitted > 0 ? order.amountSubmitted : Math.max(order.total - order.amountPaid, 0);
+      options.received ??
+      (order.amountSubmitted > 0 ? order.amountSubmitted : Math.max(order.total - order.amountPaid, 0));
     const amountPaid = order.amountPaid + received;
     const entry: PaymentLogEntry = {
       type: 'payment',
@@ -474,6 +477,8 @@ export async function changeOrderStatus(
       // Payment rejected: the customer can send a (correct) transaction again.
       set.paymentTxHash = null;
       set.paymentNetwork = null;
+      set.paymentMethodId = null;
+      set.paymentCheck = null;
       set.amountSubmitted = 0;
       // Give back the stock reserved by that payment (not stock already paid for).
       if (locked.stockApplied && locked.amountPaid === 0) {
@@ -513,6 +518,7 @@ export async function submitCryptoPayment(
   userId: number,
   paymentNetwork: string,
   txHash: string,
+  paymentMethodId: string | null = null,
 ): Promise<Order> {
   return db.transaction(async (tx) => {
     const order = await lockOrder(
@@ -553,6 +559,11 @@ export async function submitCryptoPayment(
         status: 'awaiting_payment',
         paymentNetwork,
         paymentTxHash: txHash,
+        paymentMethodId,
+        // The on-chain check starts right after.
+        paymentCheck: paymentMethodId
+          ? { status: 'checking', reason: null, vars: null, at: new Date().toISOString() }
+          : null,
         amountSubmitted: due,
         stockApplied,
         updatedAt: new Date(),

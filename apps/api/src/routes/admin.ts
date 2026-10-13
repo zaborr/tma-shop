@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import {
   exportRequest,
   langFrom,
@@ -51,7 +51,8 @@ import {
   shopNotificationChatIds,
 } from '../services/shop.js';
 import { ApiError } from '../lib/errors.js';
-import { users } from '../db/schema.js';
+import { orders, users } from '../db/schema.js';
+import { startPaymentCheck } from '../services/paymentCheck.js';
 import { buildReport } from '../export/report.js';
 import { TelegramApi } from '../telegram/api.js';
 import { tr } from '../i18n/messages.js';
@@ -207,8 +208,8 @@ export function adminRoutes(): Hono<AppBindings> {
     const { sub } = c.get('claims');
     const request = c.req.valid('json');
 
-    const orders = await listAllOrders(db, shop.id);
-    const ids = [...new Set(orders.flatMap((o) => (o.userId === null ? [] : [o.userId])))];
+    const allOrders = await listAllOrders(db, shop.id);
+    const ids = [...new Set(allOrders.flatMap((o) => (o.userId === null ? [] : [o.userId])))];
     const people =
       ids.length > 0 ? await db.select().from(users).where(inArray(users.telegramId, ids)) : [];
     const customers = new Map(
@@ -224,7 +225,7 @@ export function adminRoutes(): Hono<AppBindings> {
       shopName: shop.name,
       shopSlug: shop.slug,
       feeLabel: shop.orderFeeLabel,
-      orders,
+      orders: allOrders,
       customers,
       request,
       lang,
@@ -266,6 +267,31 @@ export function adminRoutes(): Hono<AppBindings> {
     await notifyUsers(c.get('db'), c.get('env').BOT_TOKEN, customerChat(order), (lang) =>
       buildChangeDecisionMessage(lang, order, false),
     );
+    return c.json(order);
+  });
+
+  // Check the submitted transaction on the blockchain again.
+  app.post('/orders/:id/recheck', zValidator('param', idParam), async (c) => {
+    const db = c.get('db');
+    const [row] = await db
+      .update(orders)
+      .set({
+        paymentCheck: { status: 'checking', reason: null, vars: null, at: new Date().toISOString() },
+      })
+      .where(
+        and(
+          eq(orders.shopId, c.get('shopId')),
+          eq(orders.id, c.req.valid('param').id),
+          eq(orders.status, 'awaiting_payment'),
+          isNotNull(orders.paymentMethodId),
+        ),
+      )
+      .returning({ id: orders.id });
+    if (!row) {
+      throw ApiError.conflict('not_checkable', 'Only orders with a payment under review can be checked');
+    }
+    startPaymentCheck(db, c.get('env'), row.id);
+    const order = await getOrder(db, c.get('shopId'), row.id);
     return c.json(order);
   });
 

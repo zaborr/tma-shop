@@ -64,6 +64,20 @@ export const paymentLogEntry = z.object({
 });
 export type PaymentLogEntry = z.infer<typeof paymentLogEntry>;
 
+/**
+ * Automatic check of a crypto payment on the blockchain: running, passed (the
+ * order was confirmed) or failed with a reason (an admin decides).
+ */
+export const paymentCheck = z.object({
+  status: z.enum(['checking', 'verified', 'failed']),
+  /** Why it failed, e.g. `short`, `ambiguous`, `not_found`. */
+  reason: z.string().nullable(),
+  /** Values for the reason text (amounts, counts…). */
+  vars: z.record(z.string(), z.union([z.string(), z.number()])).nullable(),
+  at: z.string(),
+});
+export type PaymentCheck = z.infer<typeof paymentCheck>;
+
 export const order = z.object({
   id,
   shopId: id,
@@ -95,6 +109,8 @@ export const order = z.object({
   paymentTxHash: z.string().nullable(),
   /** Block-explorer link for `paymentTxHash`, when the network is known. */
   paymentTxUrl: z.string().nullable(),
+  /** Automatic on-chain check of the last transaction, if any. */
+  paymentCheck: paymentCheck.nullable(),
   /** Customer's Telegram username (without @), given at checkout for contact. */
   contactUsername: z.string().nullable(),
   /** Shipment tracking number or link, set when the order is shipped. */
