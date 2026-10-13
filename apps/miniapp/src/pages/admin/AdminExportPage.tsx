@@ -7,6 +7,7 @@ import { decryptAddress, loadPrivateKey } from '../../lib/addressCrypto.js';
 import { shareOrDownload, toCsv } from '../../lib/download.js';
 import { itemName } from '../../lib/variants.js';
 import { useShop } from '../../providers/ShopProvider.js';
+import { askWriteAccess } from '../../lib/writeAccess.js';
 import { AdminOnly, ErrorBanner } from './common.js';
 
 const SCOPES: Array<{ key: ExportScope; label: string }> = [
@@ -77,6 +78,8 @@ function AdminExport(): React.JSX.Element {
     setMessage(null);
     setError(null);
     try {
+      // The bot can only send the file if it may message this admin.
+      await askWriteAccess();
       const result = await api.adminExport({
         format,
         scope,

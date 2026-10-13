@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { AppBindings } from '../context.js';
 import type { TelegramUpdate } from '../telegram/types.js';
 import { handlePaymentUpdate } from '../services/payments.js';
+import { handleBotMessage } from '../services/bot.js';
 import { ApiError } from '../lib/errors.js';
 
 function safeEqual(a: string, b: string): boolean {
@@ -31,6 +32,7 @@ export function webhookRoutes(): Hono<AppBindings> {
     const update = (await c.req.json()) as TelegramUpdate;
     try {
       await handlePaymentUpdate(c.get('db'), env.BOT_TOKEN, update);
+      await handleBotMessage(env, update);
     } catch (error) {
       // Log and still acknowledge: a 5xx makes Telegram retry the same update.
       console.error('Webhook handling error:', error);

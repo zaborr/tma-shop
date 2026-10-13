@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { walletsEnvSchema } from './payment-methods.js';
 
+/** Optional variable: an empty value counts as not set. */
+const optional = <T extends z.ZodType>(schema: T) =>
+  z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    schema.optional(),
+  );
+
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().min(1),
@@ -21,13 +28,21 @@ const envSchema = z.object({
     )
     .pipe(z.array(z.number().int().positive())),
   /**
-   * Secret Telegram sends with each webhook call (only needed for Telegram
-   * Stars payments). Without it the webhook endpoint is switched off.
+   * Secret Telegram sends with each webhook call. Needed for the bot to answer
+   * /start (and for Telegram Stars payments); without it the webhook is off.
    */
-  TELEGRAM_WEBHOOK_SECRET: z.preprocess(
-    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
-    z.string().trim().min(1).optional(),
-  ),
+  TELEGRAM_WEBHOOK_SECRET: optional(z.string().trim().min(1)),
+  /**
+   * Public address of the Mini App (the Vercel URL). The bot answers /start
+   * with a button that opens it, and uses it for the chat's menu button.
+   */
+  MINIAPP_URL: optional(z.url()),
+  /**
+   * Public address of this API, to register the Telegram webhook at startup.
+   * Render sets RENDER_EXTERNAL_URL by itself, so it is rarely needed.
+   */
+  PUBLIC_URL: optional(z.url()),
+  RENDER_EXTERNAL_URL: optional(z.url()),
   SHOP_ID: z.uuid().optional(),
   CORS_ORIGIN: z.string().default('*'),
   /** Legacy: JSON array of wallets, imported once into the first shop. */

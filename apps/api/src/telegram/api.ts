@@ -15,6 +15,11 @@ export interface CreateInvoiceLinkParams {
   providerToken?: string;
 }
 
+/** Inline keyboard under a message; `web_app` buttons open the Mini App. */
+export interface InlineKeyboard {
+  inline_keyboard: Array<Array<{ text: string; web_app?: { url: string }; url?: string }>>;
+}
+
 interface TelegramResponse<T> {
   ok: boolean;
   result?: T;
@@ -78,11 +83,28 @@ export class TelegramApi {
   }
 
   /** Sends a plain-text message. The user must have started the bot first. */
-  sendMessage(chatId: number, text: string): Promise<unknown> {
+  sendMessage(chatId: number, text: string, replyMarkup?: InlineKeyboard): Promise<unknown> {
     return this.call<unknown>('sendMessage', {
       chat_id: chatId,
       text,
       link_preview_options: { is_disabled: true },
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    });
+  }
+
+  /** Points Telegram's updates at this API, authenticated with `secret`. */
+  setWebhook(url: string, secret: string, allowedUpdates: string[]): Promise<true> {
+    return this.call<true>('setWebhook', {
+      url,
+      secret_token: secret,
+      allowed_updates: allowedUpdates,
+    });
+  }
+
+  /** Default menu button of every private chat with the bot: opens the Mini App. */
+  setChatMenuButton(text: string, url: string): Promise<true> {
+    return this.call<true>('setChatMenuButton', {
+      menu_button: { type: 'web_app', text, web_app: { url } },
     });
   }
 

@@ -3,6 +3,7 @@ import { loadEnv } from './config/env.js';
 import { createDb, createPool } from './db/client.js';
 import { createApp } from './app.js';
 import { importLegacyWallets } from './services/shop.js';
+import { configureBot } from './services/bot.js';
 
 const env = loadEnv();
 const pool = createPool(env.DATABASE_URL);
@@ -13,6 +14,9 @@ const app = createApp({ env, db });
 importLegacyWallets(db, env).catch((error: unknown) => {
   console.error('Could not import PAYMENT_METHODS wallets:', error);
 });
+
+// Webhook (so the bot answers /start) and the chat's menu button.
+void configureBot(env);
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`tma-shop API listening on http://localhost:${info.port}`);

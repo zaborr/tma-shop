@@ -24,6 +24,7 @@ import {
   loadSavedAddress,
   saveAddress,
 } from '../lib/addressCrypto.js';
+import { askWriteAccess } from '../lib/writeAccess.js';
 
 export function CartPage(): React.JSX.Element {
   const navigate = useNavigate();
@@ -101,6 +102,8 @@ export function CartPage(): React.JSX.Element {
       const { orderId } = await api.createOrder(contactName, shippingDetails);
       // The server empties the cart when it creates the order.
       void refresh();
+      // So the bot can tell the customer how the order goes.
+      void askWriteAccess();
       if (!starsCheckout) {
         // Manual crypto payment: show wallets and collect the tx hash.
         navigate(to(`/orders/${orderId}`), { replace: true });
