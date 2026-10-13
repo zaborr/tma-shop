@@ -28,11 +28,18 @@ function AdminSettings(): React.JSX.Element {
   if (!view.data) return <Loader />;
 
   return (
-    <ProfileForm
-      key={`${view.data.name}|${view.data.description}|${view.data.imageUrl ?? ''}`}
-      view={view.data}
-      onSaved={() => setReloadKey((k) => k + 1)}
-    />
+    <List>
+      <ProfileForm
+        key={`${view.data.name}|${view.data.description}|${view.data.imageUrl ?? ''}`}
+        view={view.data}
+        onSaved={() => setReloadKey((k) => k + 1)}
+      />
+      <AutoCancelForm
+        key={`auto-cancel-${view.data.autoCancelHours}`}
+        view={view.data}
+        onSaved={() => setReloadKey((k) => k + 1)}
+      />
+    </List>
   );
 }
 
@@ -73,7 +80,7 @@ function ProfileForm({
   };
 
   return (
-    <List>
+    <>
       <ErrorBanner message={actions.error} />
       <Section header="Store profile" footer="Shown in the shop list and at the top of the catalog.">
         <Input header="Name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -117,6 +124,47 @@ function ProfileForm({
           Admins
         </Cell>
       </Section>
-    </List>
+    </>
+  );
+}
+
+/** How long an unpaid order waits before it is cancelled automatically. */
+function AutoCancelForm({
+  view,
+  onSaved,
+}: {
+  view: ShopAdminView;
+  onSaved: () => void;
+}): React.JSX.Element {
+  const actions = useAdminActions(onSaved);
+  const [hours, setHours] = useState(String(view.autoCancelHours));
+  const value = Number(hours.trim());
+  const invalid = hours.trim() === '' || !Number.isInteger(value) || value < 0 || value > 720;
+
+  return (
+    <>
+      <ErrorBanner message={actions.error} />
+      <Section
+        header="Unpaid orders"
+        footer="Orders with no payment sent are cancelled after this many hours without activity, and the customer gets a message. Orders with a payment under review are never cancelled. 0 = never."
+      >
+        <Input
+          header="Cancel unpaid orders after (hours, 0 = never)"
+          inputMode="numeric"
+          status={invalid ? 'error' : 'default'}
+          value={hours}
+          onChange={(e) => setHours(e.target.value)}
+        />
+        <div style={{ padding: 16 }}>
+          <Button
+            stretched
+            disabled={invalid || value === view.autoCancelHours}
+            onClick={() => void actions.run(() => api.adminUpdateAutoCancel(value))}
+          >
+            Save
+          </Button>
+        </div>
+      </Section>
+    </>
   );
 }

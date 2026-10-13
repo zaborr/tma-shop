@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
 import { Input } from '../components/Field.js';
-import { unitPriceFor, type Order, type PaymentMethod } from '@tma-shop/shared';
+import { payBefore, unitPriceFor, type Order, type PaymentMethod } from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useMainButton } from '../hooks/useMainButton.js';
@@ -102,7 +102,7 @@ export function PaymentPage(): React.JSX.Element {
         {current.contactUsername && <Cell after={`@${current.contactUsername}`}>Contact</Cell>}
       </Section>
 
-      {!done && <StatusSection order={current} />}
+      {!done && <StatusSection order={current} autoCancelHours={shop.data.autoCancelHours} />}
 
       {needsPayment && methods.length > 0 && (
         <PaymentForm
@@ -186,10 +186,29 @@ function DoneSection({
   );
 }
 
-function StatusSection({ order }: { order: Order }): React.JSX.Element {
+function StatusSection({
+  order,
+  autoCancelHours,
+}: {
+  order: Order;
+  autoCancelHours: number;
+}): React.JSX.Element {
+  const deadline = payBefore(order, autoCancelHours);
   return (
     <>
       <StatusDetail order={order} />
+      {deadline && (
+        <Section>
+          <Cell multiline>
+            {`Please pay before ${deadline.toLocaleString(undefined, {
+              day: 'numeric',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}, or the order will be cancelled.`}
+          </Cell>
+        </Section>
+      )}
       {order.statusNote && (
         <Section header="Message from the shop">
           <Cell multiline>{order.statusNote}</Cell>

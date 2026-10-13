@@ -8,6 +8,7 @@ import {
   shopProfileInput,
   slug,
   updateAddressKeyRequest,
+  updateAutoCancelRequest,
   updateOrderFeeRequest,
   updateOrderStatusRequest,
   updateShippingRequest,
@@ -41,6 +42,7 @@ import {
 import {
   getShopAdminView,
   updateAddressKey,
+  updateAutoCancel,
   updateOrderFee,
   updateShippingZones,
   updateShopProfile,
@@ -81,6 +83,10 @@ export function adminRoutes(): Hono<AppBindings> {
   );
   app.put('/shop/address-key', zValidator('json', updateAddressKeyRequest), async (c) =>
     c.json(await updateAddressKey(c.get('db'), c.get('shopId'), c.req.valid('json').publicKey)),
+  );
+  // Unpaid orders are cancelled after this many hours (0 = never).
+  app.put('/shop/auto-cancel', zValidator('json', updateAutoCancelRequest), async (c) =>
+    c.json(await updateAutoCancel(c.get('db'), c.get('shopId'), c.req.valid('json').hours)),
   );
   // Fixed fee added once to every new order (0 hides it).
   app.put('/shop/fee', zValidator('json', updateOrderFeeRequest), async (c) =>

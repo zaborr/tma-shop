@@ -90,6 +90,7 @@ export function toShopConfigDTO(row: ShopRow, canManage = false): ShopConfig {
     starsEnabled: row.starsEnabled,
     orderFee: row.orderFee,
     orderFeeLabel: row.orderFeeLabel,
+    autoCancelHours: row.autoCancelHours,
     shippingZones: row.shippingZones,
     addressPublicKey: row.addressPublicKey,
     addressKeyFingerprint: row.addressKeyFingerprint,

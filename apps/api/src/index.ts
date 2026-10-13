@@ -5,6 +5,7 @@ import { createApp } from './app.js';
 import { importLegacyWallets } from './services/shop.js';
 import { configureBot } from './services/bot.js';
 import { scheduleRetention } from './services/retention.js';
+import { scheduleAutoCancel } from './services/autoCancel.js';
 
 const env = loadEnv();
 const pool = createPool(env.DATABASE_URL);
@@ -21,6 +22,9 @@ void configureBot(env);
 
 // Deletes personal data past its retention period, now and every 6 hours.
 scheduleRetention(db);
+
+// Cancels unpaid orders past each shop's deadline, now and every hour.
+scheduleAutoCancel(db, env);
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`tma-shop API listening on http://localhost:${info.port}`);

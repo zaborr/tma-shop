@@ -40,6 +40,8 @@ export const shop = z.object({
   orderFee: z.number().int().nonnegative(),
   /** How the fee is shown to customers, e.g. "Service fee". */
   orderFeeLabel: z.string().min(1).max(64),
+  /** Unpaid orders are cancelled after this many hours without activity (0 = never). */
+  autoCancelHours: z.number().int().min(0).max(720),
   /** Shipping zones; with active ones, checkout asks for a zone and an address. */
   shippingZones: z.array(shippingZone),
   /**
@@ -94,6 +96,7 @@ export const shopConfig = shop
     starsEnabled: true,
     orderFee: true,
     orderFeeLabel: true,
+    autoCancelHours: true,
     shippingZones: true,
     addressPublicKey: true,
     addressKeyFingerprint: true,
@@ -149,6 +152,21 @@ export const updateAddressKeyRequest = z.object({
   publicKey: z.string().trim().min(100).max(4000).nullable(),
 });
 export type UpdateAddressKeyRequest = z.infer<typeof updateAddressKeyRequest>;
+
+export const updateAutoCancelRequest = z.object({
+  hours: z.number().int().min(0).max(720),
+});
+export type UpdateAutoCancelRequest = z.infer<typeof updateAutoCancelRequest>;
+
+/** When an unpaid order will be cancelled, or null when it will not be. */
+export function payBefore(
+  order: { status: string; amountPaid: number; amountSubmitted: number; updatedAt: string },
+  autoCancelHours: number,
+): Date | null {
+  if (autoCancelHours <= 0 || order.status !== 'pending') return null;
+  if (order.amountPaid > 0 || order.amountSubmitted > 0) return null;
+  return new Date(Date.parse(order.updatedAt) + autoCancelHours * 60 * 60 * 1000);
+}
 
 export const updateWalletsRequest = z.object({
   wallets: z.array(walletInput).max(50),
