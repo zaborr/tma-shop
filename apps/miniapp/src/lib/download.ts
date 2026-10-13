@@ -40,5 +40,5 @@ export function toCsv(rows: ReadonlyArray<ReadonlyArray<string | number>>): stri
     const text = String(value);
     return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
-  return `﻿${rows.map((row) => row.map(quote).join(',')).join('\r\n')}\r\n`;
+  return `\uFEFF${rows.map((row) => row.map(quote).join(',')).join('\r\n')}\r\n`;
 }

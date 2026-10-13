@@ -27,9 +27,18 @@ export interface WorkbookOptions {
 
 const STYLE = { normal: 0, bold: 1, money: 2, date: 3, link: 4 } as const;
 
+/** Drops control characters XML 1.0 does not allow (keeps tab, LF and CR). */
+function stripControlChars(text: string): string {
+  let out = '';
+  for (const ch of text) {
+    const code = ch.charCodeAt(0);
+    if (code >= 0x20 || code === 0x09 || code === 0x0a || code === 0x0d) out += ch;
+  }
+  return out;
+}
+
 function escapeXml(text: string): string {
-  return text
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
+  return stripControlChars(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -250,5 +259,5 @@ export function buildCsv(rows: readonly CellValue[][], options: WorkbookOptions 
   const quote = (text: string): string =>
     /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   const body = rows.map((row) => row.map((v) => quote(format(v))).join(',')).join('\r\n');
-  return Buffer.from(`﻿${body}\r\n`, 'utf8');
+  return Buffer.from(`\uFEFF${body}\r\n`, 'utf8');
 }

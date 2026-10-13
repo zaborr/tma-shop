@@ -74,6 +74,6 @@ describe('zip / xlsx', () => {
       ['a', 'b'],
       ['x, y', { money: 3 }],
     ]).toString('utf8');
-    expect(csv).toBe('﻿a,b\r\n"x, y",3.00\r\n');
+    expect(csv).toBe('\uFEFFa,b\r\n"x, y",3.00\r\n');
   });
 });
