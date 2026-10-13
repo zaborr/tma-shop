@@ -17,12 +17,11 @@ export async function upsertUser(
 ): Promise<UserRow> {
   const isAdmin = adminIds.includes(tgUser.id);
   const profile = {
+    // Only what the shop needs: no surname, photo or Premium status.
     firstName: tgUser.first_name,
-    lastName: tgUser.last_name ?? null,
     username: tgUser.username ?? null,
     languageCode: tgUser.language_code ?? null,
-    isPremium: tgUser.is_premium ?? false,
-    photoUrl: tgUser.photo_url ?? null,
+    lastSeenAt: new Date(),
   };
 
   const [row] = await db

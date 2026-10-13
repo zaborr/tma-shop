@@ -52,6 +52,11 @@ import { buildReport } from '../export/report.js';
 import { TelegramApi } from '../telegram/api.js';
 
 const idParam = z.object({ id: z.uuid() });
+
+/** The customer's chat, or none once the order is anonymized. */
+function customerChat(order: { userId: number | null }): number[] {
+  return order.userId === null ? [] : [order.userId];
+}
 const categoryInput = z.object({
   slug,
   title: z.string().min(1).max(128),
@@ -152,7 +157,7 @@ export function adminRoutes(): Hono<AppBindings> {
       if (order.status !== previous) {
         await notifyChats(
           c.get('env').BOT_TOKEN,
-          [order.userId],
+          customerChat(order),
           buildStatusMessage(shop.name, order, previous),
         );
       }
@@ -168,13 +173,13 @@ export function adminRoutes(): Hono<AppBindings> {
     const request = c.req.valid('json');
 
     const orders = await listAllOrders(db, shop.id);
-    const ids = [...new Set(orders.map((o) => o.userId))];
+    const ids = [...new Set(orders.flatMap((o) => (o.userId === null ? [] : [o.userId])))];
     const people =
       ids.length > 0 ? await db.select().from(users).where(inArray(users.telegramId, ids)) : [];
     const customers = new Map(
       people.map((u) => [
         u.telegramId,
-        { name: [u.firstName, u.lastName].filter(Boolean).join(' '), username: u.username },
+        { name: u.firstName, username: u.username },
       ]),
     );
 
@@ -210,12 +215,12 @@ export function adminRoutes(): Hono<AppBindings> {
   // Customer change requests: approve (apply + tell them what to pay) or reject.
   app.post('/orders/:id/change/approve', zValidator('param', idParam), async (c) => {
     const order = await approveOrderChange(c.get('db'), c.get('shopId'), c.req.valid('param').id);
-    await notifyChats(c.get('env').BOT_TOKEN, [order.userId], buildChangeDecisionMessage(order, true));
+    await notifyChats(c.get('env').BOT_TOKEN, customerChat(order), buildChangeDecisionMessage(order, true));
     return c.json(order);
   });
   app.post('/orders/:id/change/reject', zValidator('param', idParam), async (c) => {
     const order = await clearOrderChange(c.get('db'), c.get('shopId'), c.req.valid('param').id);
-    await notifyChats(c.get('env').BOT_TOKEN, [order.userId], buildChangeDecisionMessage(order, false));
+    await notifyChats(c.get('env').BOT_TOKEN, customerChat(order), buildChangeDecisionMessage(order, false));
     return c.json(order);
   });
 

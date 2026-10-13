@@ -172,3 +172,31 @@ export interface DeliveryAddress {
 export function shippingCost(zone: Pick<ShippingZone, 'price' | 'freeFrom'>, itemsTotal: number): number {
   return zone.freeFrom !== null && itemsTotal >= zone.freeFrom ? 0 : zone.price;
 }
+
+/**
+ * Platform-wide data retention: how long personal data is kept. A cleanup
+ * runs regularly and can be run by hand from Platform admin.
+ */
+export const retentionSettings = z.object({
+  /** Days after an order is delivered or cancelled before its address is deleted and it is unlinked from the customer (the @username stays). */
+  addressRetentionDays: z.number().int().min(1).max(3650),
+  /** Days an untouched cart is kept. */
+  cartRetentionDays: z.number().int().min(1).max(3650),
+  /** Days without opening the app before a user with no orders is deleted. */
+  inactiveUserDays: z.number().int().min(1).max(3650),
+});
+export type RetentionSettings = z.infer<typeof retentionSettings>;
+
+export const retentionStatus = retentionSettings.extend({
+  lastRunAt: z.string().nullable(),
+});
+export type RetentionStatus = z.infer<typeof retentionStatus>;
+
+/** What one cleanup run did. */
+export const retentionReport = z.object({
+  ordersAnonymized: z.number().int().nonnegative(),
+  cartsDeleted: z.number().int().nonnegative(),
+  usersDeleted: z.number().int().nonnegative(),
+  ranAt: z.string(),
+});
+export type RetentionReport = z.infer<typeof retentionReport>;

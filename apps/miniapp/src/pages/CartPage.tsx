@@ -47,7 +47,7 @@ export function CartPage(): React.JSX.Element {
   const [address, setAddress] = useState<DeliveryAddress>(() => {
     const saved = loadSavedAddress();
     if (saved) return { ...EMPTY_ADDRESS, ...saved };
-    const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ');
+    const name = user?.firstName ?? '';
     return { ...EMPTY_ADDRESS, name };
   });
   const [remember, setRemember] = useState(true);

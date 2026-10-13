@@ -121,13 +121,12 @@ export const productVariants = pgTable('product_variants', {
 export const users = pgTable('users', {
   telegramId: bigint('telegram_id', { mode: 'number' }).primaryKey(),
   firstName: text('first_name').notNull(),
-  lastName: text('last_name'),
   username: text('username'),
   languageCode: text('language_code'),
-  isPremium: boolean('is_premium').notNull().default(false),
-  photoUrl: text('photo_url'),
   role: userRoleEnum('role').notNull().default('customer'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  /** Last time they opened the Mini App; inactive users are deleted (retention). */
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const carts = pgTable(
@@ -171,9 +170,10 @@ export const orders = pgTable('orders', {
   shopId: uuid('shop_id')
     .notNull()
     .references(() => shops.id, { onDelete: 'cascade' }),
-  userId: bigint('user_id', { mode: 'number' })
-    .notNull()
-    .references(() => users.telegramId, { onDelete: 'cascade' }),
+  /** Customer; null once the order is anonymized (data retention). */
+  userId: bigint('user_id', { mode: 'number' }).references(() => users.telegramId, {
+    onDelete: 'set null',
+  }),
   status: orderStatusEnum('status').notNull().default('pending'),
   /** Total including `fee`. */
   total: integer('total').notNull(),
@@ -207,7 +207,24 @@ export const orders = pgTable('orders', {
   changeRequest: jsonb('change_request').$type<OrderChangeRequest>(),
   /** Confirmed payments and refunds, oldest first. */
   paymentLog: jsonb('payment_log').$type<PaymentLogEntry[]>().notNull().default([]),
+  /** When it was delivered or cancelled; retention counts from here. */
+  closedAt: timestamp('closed_at', { withTimezone: true }),
+  /** When the address and the link to the customer were removed (retention). */
+  anonymizedAt: timestamp('anonymized_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Platform-wide settings (a single row, id = 1). */
+export const platformSettings = pgTable('platform_settings', {
+  id: integer('id').primaryKey().default(1),
+  /** Days after an order is closed before its address and customer link go. */
+  addressRetentionDays: integer('address_retention_days').notNull().default(30),
+  /** Days an untouched cart is kept. */
+  cartRetentionDays: integer('cart_retention_days').notNull().default(30),
+  /** Days without opening the app before a user with no orders is deleted. */
+  inactiveUserDays: integer('inactive_user_days').notNull().default(30),
+  lastRetentionRunAt: timestamp('last_retention_run_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

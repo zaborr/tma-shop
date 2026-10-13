@@ -5,7 +5,9 @@ import type { Pool } from 'pg';
 import { createApp } from '../app.js';
 import type { Env } from '../config/env.js';
 import { createDb, createPool, type Database } from '../db/client.js';
-import { categories, products, shops } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
+import { categories, orders, products, shops, users } from '../db/schema.js';
+import { runRetention } from '../services/retention.js';
 
 /**
  * Full-stack integration test against a real Postgres. Skipped automatically
@@ -244,6 +246,57 @@ describeDb('API integration', () => {
     expect(body.amountDue).toBe(-150);
     expect(body.statusNote).toBe('Sold out');
     expect(await stock()).toBe(before);
+  });
+
+  it('anonymizes closed orders and deletes inactive users (data retention)', async () => {
+    const token = await authToken(CUSTOMER_ID, 'Alice');
+    const auth = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const admin = await authToken(ADMIN_ID, 'Ivan');
+    const adminAuth = { Authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
+
+    await app.request('/api/cart/items', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ productId, quantity: 1 }),
+    });
+    const create = await app.request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@test_user' }),
+    });
+    const { orderId } = (await create.json()) as { orderId: string };
+    for (const status of ['paid', 'fulfilled']) {
+      const res = await app.request(`/api/admin/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: adminAuth,
+        body: JSON.stringify({ status }),
+      });
+      expect(res.status).toBe(200);
+    }
+
+    // Closed 31 days ago; and someone who has not opened the app since then.
+    const old = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+    await db.update(orders).set({ closedAt: old }).where(eq(orders.id, orderId));
+    await db.insert(users).values({ telegramId: 999000111, firstName: 'Ghost', lastSeenAt: old });
+
+    const report = await runRetention(db);
+    expect(report.ordersAnonymized).toBeGreaterThanOrEqual(1);
+    expect(report.usersDeleted).toBeGreaterThanOrEqual(1);
+
+    const [row] = await db.select().from(orders).where(eq(orders.id, orderId));
+    expect(row?.userId).toBeNull();
+    expect(row?.anonymizedAt).not.toBeNull();
+    expect(row?.contactUsername).not.toBeNull();
+    const ghost = await db.select().from(users).where(eq(users.telegramId, 999000111));
+    expect(ghost).toHaveLength(0);
+
+    // The customer no longer sees it; the active customer is kept.
+    const mine = (await (await app.request('/api/orders', { headers: auth })).json()) as Array<{
+      id: string;
+    }>;
+    expect(mine.some((o) => o.id === orderId)).toBe(false);
+    const alice = await db.select().from(users).where(eq(users.telegramId, CUSTOMER_ID));
+    expect(alice).toHaveLength(1);
   });
 
   it('enforces admin-only routes', async () => {
