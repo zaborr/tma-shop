@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
   shippingCost,
   type Order,
@@ -12,6 +12,17 @@ import { lineStock, loadVariants, quantitiesByProduct, tieredPrice } from './var
 import { ApiError } from '../lib/errors.js';
 
 type OrderItemRow = typeof orderItems.$inferSelect;
+type OrderRow = typeof orders.$inferSelect;
+type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+/**
+ * Reads an order and locks its row until the transaction ends, so two admin
+ * taps at once (confirm, approve, refund) cannot both apply.
+ */
+async function lockOrder(tx: Tx, where: SQL | undefined): Promise<OrderRow | undefined> {
+  const [row] = await tx.select().from(orders).where(where).for('update');
+  return row;
+}
 
 /** Key of an order or cart line: product plus variant. */
 export function lineKey(productId: string, variantId: string | null | undefined): string {
@@ -278,7 +289,7 @@ export async function markOrderPaid(
   paymentChargeId: string,
 ): Promise<Order> {
   return db.transaction(async (tx) => {
-    const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderId) });
+    const order = await lockOrder(tx, eq(orders.id, orderId));
     if (!order) throw ApiError.notFound('Order not found');
 
     const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
@@ -574,9 +585,7 @@ export async function approveOrderChange(
   orderId: string,
 ): Promise<Order> {
   return db.transaction(async (tx) => {
-    const order = await tx.query.orders.findFirst({
-      where: and(eq(orders.shopId, shopId), eq(orders.id, orderId)),
-    });
+    const order = await lockOrder(tx, and(eq(orders.shopId, shopId), eq(orders.id, orderId)));
     if (!order) throw ApiError.notFound('Order not found');
     const change = order.changeRequest;
     if (!change) throw ApiError.conflict('no_change', 'There is no change to approve');
@@ -657,43 +666,46 @@ export async function approveOrderChange(
 
 /** Records that the admin sent back the overpaid amount (`amountPaid > total`). */
 export async function recordRefund(db: Database, shopId: string, orderId: string): Promise<Order> {
-  const order = await db.query.orders.findFirst({
-    where: and(eq(orders.shopId, shopId), eq(orders.id, orderId)),
-  });
-  if (!order) throw ApiError.notFound('Order not found');
-  const refund = order.amountPaid - order.total;
-  if (refund <= 0) throw ApiError.conflict('nothing_to_refund', 'Nothing is owed to the customer');
+  return db.transaction(async (tx) => {
+    const order = await lockOrder(tx, and(eq(orders.shopId, shopId), eq(orders.id, orderId)));
+    if (!order) throw ApiError.notFound('Order not found');
+    const refund = order.amountPaid - order.total;
+    if (refund <= 0) throw ApiError.conflict('nothing_to_refund', 'Nothing is owed to the customer');
 
-  const entry: PaymentLogEntry = {
-    type: 'refund',
-    amount: refund,
-    network: null,
-    txHash: null,
-    at: new Date().toISOString(),
-  };
-  const [updated] = await db
-    .update(orders)
-    .set({
-      amountPaid: order.total,
-      paymentLog: [...order.paymentLog, entry],
-      updatedAt: new Date(),
-    })
-    .where(eq(orders.id, order.id))
-    .returning();
-  if (!updated) throw new Error('Failed to update order');
-  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, updated.id));
-  return toOrderDTO(updated, items);
+    const entry: PaymentLogEntry = {
+      type: 'refund',
+      amount: refund,
+      network: null,
+      txHash: null,
+      at: new Date().toISOString(),
+    };
+    const [updated] = await tx
+      .update(orders)
+      .set({
+        amountPaid: order.total,
+        paymentLog: [...order.paymentLog, entry],
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, order.id))
+      .returning();
+    if (!updated) throw new Error('Failed to update order');
+    const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, updated.id));
+    return toOrderDTO(updated, items);
+  });
 }
 
-async function attachItems(db: Database, rows: (typeof orders.$inferSelect)[]): Promise<Order[]> {
+/** Adds the items to each order, with one query for all of them. */
+async function attachItems(db: Database, rows: OrderRow[]): Promise<Order[]> {
   if (rows.length === 0) return [];
-  const result: Order[] = [];
-  for (const order of rows) {
-    const items: OrderItemRow[] = await db
-      .select()
-      .from(orderItems)
-      .where(eq(orderItems.orderId, order.id));
-    result.push(toOrderDTO(order, items));
+  const items = await db
+    .select()
+    .from(orderItems)
+    .where(inArray(orderItems.orderId, rows.map((row) => row.id)));
+  const byOrder = new Map<string, OrderItemRow[]>();
+  for (const item of items) {
+    const list = byOrder.get(item.orderId);
+    if (list) list.push(item);
+    else byOrder.set(item.orderId, [item]);
   }
-  return result;
+  return rows.map((row) => toOrderDTO(row, byOrder.get(row.id) ?? []));
 }

@@ -1,8 +1,15 @@
+import { timingSafeEqual } from 'node:crypto';
 import { Hono } from 'hono';
 import type { AppBindings } from '../context.js';
 import type { TelegramUpdate } from '../telegram/types.js';
 import { handlePaymentUpdate } from '../services/payments.js';
 import { ApiError } from '../lib/errors.js';
+
+function safeEqual(a: string, b: string): boolean {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
 
 /**
  * Telegram webhook endpoint. Telegram authenticates itself with the secret token
@@ -14,8 +21,10 @@ export function webhookRoutes(): Hono<AppBindings> {
 
   app.post('/telegram', async (c) => {
     const env = c.get('env');
-    const secret = c.req.header('X-Telegram-Bot-Api-Secret-Token');
-    if (secret !== env.TELEGRAM_WEBHOOK_SECRET) {
+    // No secret configured: the webhook is off (nobody can fake a payment).
+    if (!env.TELEGRAM_WEBHOOK_SECRET) throw ApiError.notFound('Webhook disabled');
+    const secret = c.req.header('X-Telegram-Bot-Api-Secret-Token') ?? '';
+    if (!safeEqual(secret, env.TELEGRAM_WEBHOOK_SECRET)) {
       throw ApiError.unauthorized('Invalid webhook secret');
     }
 

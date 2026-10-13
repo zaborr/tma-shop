@@ -66,13 +66,10 @@ function deriveSecretKey(botToken: string): Buffer {
 }
 
 /**
- * Builds the data-check-string: every field except `hash` and `signature`,
- * sorted alphabetically by key, formatted as `key=value`, joined by newlines.
- * Values are the URL-decoded ones (as produced by `URLSearchParams`).
- *
- * `signature` is excluded because it belongs to Telegram's separate Ed25519
- * third-party validation flow and is not part of the HMAC check string used by
- * current Telegram clients.
+ * Builds the data-check-string: every field except `hash` (including
+ * `signature`, which current Telegram clients sign too), sorted alphabetically
+ * by key, formatted as `key=value`, joined by newlines. Values are the
+ * URL-decoded ones (as produced by `URLSearchParams`).
  */
 function buildDataCheckString(params: URLSearchParams): string {
   const pairs: string[] = [];

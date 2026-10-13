@@ -88,6 +88,19 @@ export async function handlePaymentUpdate(
 
   const payment = update.message?.successful_payment;
   if (payment) {
+    // Only a Stars payment of the invoiced order total confirms an order.
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.id, payment.invoice_payload),
+    });
+    if (
+      !order ||
+      payment.currency !== 'XTR' ||
+      order.currency !== 'XTR' ||
+      payment.total_amount !== order.total
+    ) {
+      console.error(`Ignored a Stars payment that does not match order ${payment.invoice_payload}`);
+      return;
+    }
     await markOrderPaid(db, payment.invoice_payload, payment.telegram_payment_charge_id);
   }
 }

@@ -20,7 +20,14 @@ const envSchema = z.object({
         .map((part) => Number(part)),
     )
     .pipe(z.array(z.number().int().positive())),
-  TELEGRAM_WEBHOOK_SECRET: z.string().min(1).default('dev-webhook-secret'),
+  /**
+   * Secret Telegram sends with each webhook call (only needed for Telegram
+   * Stars payments). Without it the webhook endpoint is switched off.
+   */
+  TELEGRAM_WEBHOOK_SECRET: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().trim().min(1).optional(),
+  ),
   SHOP_ID: z.uuid().optional(),
   CORS_ORIGIN: z.string().default('*'),
   /** Legacy: JSON array of wallets, imported once into the first shop. */

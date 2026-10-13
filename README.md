@@ -153,11 +153,11 @@ tma-shop/
 | `JWT_SECRET`               | Secret for signing session JWTs (≥16 chars)       | —       |
 | `JWT_TTL_SECONDS`          | Session lifetime                                  | `3600`  |
 | `INITDATA_MAX_AGE_SECONDS` | Max accepted `initData` age                       | `86400` |
-| `ADMIN_TELEGRAM_IDS`       | Comma-separated admin user ids                    | —       |
-| `TELEGRAM_WEBHOOK_SECRET`  | Secret token for the webhook                      | —       |
+| `ADMIN_TELEGRAM_IDS`       | Comma-separated platform super-admin user ids     | —       |
+| `TELEGRAM_WEBHOOK_SECRET`  | Webhook secret, only for Telegram Stars; unset = webhook off | —       |
 | `SHOP_ID`                  | Active shop id (optional; resolved automatically) | —       |
-| `CORS_ORIGIN`              | Allowed Mini App origin(s)                        | `*`     |
-| `PAYMENT_METHODS`          | JSON array of crypto wallets for manual-verification checkout (see `.env.example`); empty = Stars checkout | `[]` |
+| `CORS_ORIGIN`              | Allowed Mini App origin(s), e.g. `https://your-app.vercel.app` | `*`     |
+| `PAYMENT_METHODS`          | Legacy: JSON array of wallets imported once into the first shop; wallets are managed in each shop's admin afterwards | `[]` |
 
 ---
 

@@ -64,11 +64,13 @@ export async function getProductById(
   db: Database,
   shopId: string,
   productId: string,
+  includeHidden = false,
 ): Promise<Product | undefined> {
   const row = await db.query.products.findFirst({
     where: and(eq(products.shopId, shopId), eq(products.id, productId)),
   });
-  if (!row) return undefined;
+  // Hidden products stay hidden from customers, even with a direct link.
+  if (!row || (!row.isActive && !includeHidden)) return undefined;
   const variants = await loadVariants(db, [row.id], { activeOnly: true });
   return toProductDTO(row, variants.get(row.id));
 }
