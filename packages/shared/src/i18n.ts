@@ -5,3 +5,11 @@ export type Lang = 'en' | 'es';
 export function langFrom(code: string | null | undefined): Lang {
   return code?.toLowerCase().startsWith('es') ? 'es' : 'en';
 }
+
+/** A user's language: the one they chose in the app, else their Telegram one. */
+export function userLang(
+  preferred: string | null | undefined,
+  telegramCode: string | null | undefined,
+): Lang {
+  return preferred === 'en' || preferred === 'es' ? preferred : langFrom(telegramCode);
+}

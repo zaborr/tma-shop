@@ -11,6 +11,7 @@ import { adminRoutes } from './routes/admin.js';
 import { webhookRoutes } from './routes/webhook.js';
 import { shopsRoutes } from './routes/shops.js';
 import { platformRoutes } from './routes/platform.js';
+import { meRoutes } from './routes/me.js';
 
 export function createApp(deps: AppDeps): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
@@ -49,6 +50,7 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
   api.route('/auth', authRoutes());
   api.route('/shops', shopsRoutes());
   api.route('/platform', platformRoutes());
+  api.route('/me', meRoutes());
 
   // Shop routes: the `X-Shop` header (id or slug) picks the shop.
   for (const path of ['/shop', '/categories', '/products', '/cart', '/orders', '/admin']) {

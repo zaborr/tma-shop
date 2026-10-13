@@ -7,8 +7,20 @@ export type { MessageKey };
 
 const dictionaries: Record<Lang, Record<MessageKey, string>> = { en, es };
 
-/** The user's Telegram language, read from the launch data (browser language as a fallback). */
-function detect(): Lang {
+const STORAGE_KEY = 'tma-shop:lang';
+
+/** Language chosen on this device earlier (kept so the app opens in it straight away). */
+function remembered(): Lang | null {
+  try {
+    const value = window.localStorage.getItem(STORAGE_KEY);
+    return value === 'en' || value === 'es' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Language of the user's Telegram, from the launch data (browser language as a fallback). */
+export function telegramLang(): Lang {
   try {
     const raw = retrieveRawInitData();
     const user = raw ? new URLSearchParams(raw).get('user') : null;
@@ -21,11 +33,34 @@ function detect(): Lang {
 }
 
 let current: Lang | null = null;
+const listeners = new Set<(lang: Lang) => void>();
 
-/** Current language: Spanish or English. */
+/** Current language: the one chosen in the app, else Telegram's. */
 export function lang(): Lang {
-  current ??= detect();
+  current ??= remembered() ?? telegramLang();
   return current;
+}
+
+/**
+ * Switches the app language. `chosen` is what the user picked (null = follow
+ * Telegram); it is remembered on this device so the next launch starts in it.
+ */
+export function setLang(next: Lang, chosen: Lang | null = next): void {
+  try {
+    if (chosen) window.localStorage.setItem(STORAGE_KEY, chosen);
+    else window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage unavailable: the choice still lives on the server.
+  }
+  if (next === current) return;
+  current = next;
+  for (const listener of listeners) listener(next);
+}
+
+/** Calls `listener` whenever the language changes; returns the unsubscribe. */
+export function onLangChange(listener: (lang: Lang) => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 /** Locale for dates and numbers in the current language. */

@@ -1,5 +1,7 @@
 import { langFrom, type Lang } from '@tma-shop/shared';
 import type { Env } from '../config/env.js';
+import type { Database } from '../db/client.js';
+import { languagesOf } from './notifications.js';
 import { tr } from '../i18n/messages.js';
 import { TelegramApi, type InlineKeyboard } from '../telegram/api.js';
 import type { TelegramUpdate } from '../telegram/types.js';
@@ -63,13 +65,17 @@ export async function handleBotMessage(
   env: Env,
   update: TelegramUpdate,
   telegram = new TelegramApi(env.BOT_TOKEN),
+  db?: Database,
 ): Promise<void> {
   const message = update.message;
   if (!message?.text || message.chat?.type !== 'private') return;
+  // The language chosen in the app wins over Telegram's.
+  const fromId = message.from?.id;
+  const known = db && fromId !== undefined ? (await languagesOf(db, [fromId])).get(fromId) : undefined;
   const reply = buildStartReply(
     await miniAppUrl(telegram),
     message.from?.first_name,
-    langFrom(message.from?.language_code),
+    known ?? langFrom(message.from?.language_code),
   );
   await telegram.sendMessage(message.chat.id, reply.text, reply.keyboard);
 }

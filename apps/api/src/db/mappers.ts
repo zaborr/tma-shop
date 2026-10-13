@@ -18,6 +18,7 @@ import type {
   shops,
   users,
 } from './schema.js';
+import { userLang } from '@tma-shop/shared';
 import { expandWallets, explorerTxUrl } from '../config/payment-methods.js';
 
 type ProductRow = typeof products.$inferSelect;
@@ -127,6 +128,8 @@ export function toSessionUserDTO(row: UserRow): SessionUser {
     username: row.username,
     languageCode: row.languageCode,
     role: row.role,
+    language: userLang(row.preferredLang, row.languageCode),
+    preferredLanguage: row.preferredLang === 'en' || row.preferredLang === 'es' ? row.preferredLang : null,
   };
 }
 

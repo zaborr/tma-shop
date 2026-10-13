@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { miniApp, retrieveLaunchParams, useSignal } from '@telegram-apps/sdk-react';
 import { AppRoot, Placeholder } from '@telegram-apps/telegram-ui';
@@ -26,7 +27,7 @@ import { ShopsPage } from './pages/ShopsPage.js';
 import { PlatformPage } from './pages/platform/PlatformPage.js';
 import { PlatformShopPage } from './pages/platform/PlatformShopPage.js';
 import { PlatformRetentionPage } from './pages/platform/PlatformRetentionPage.js';
-import { t } from './i18n/index.js';
+import { lang, onLangChange, t } from './i18n/index.js';
 
 function platform(): 'ios' | 'base' {
   try {
@@ -83,11 +84,14 @@ function Shell(): React.JSX.Element {
 
 export function App(): React.JSX.Element {
   const isDark = useSignal(miniApp.isDark);
+  // Changing the language redraws every screen (same page, same session).
+  const [language, setLanguage] = useState(lang());
+  useEffect(() => onLangChange(setLanguage), []);
 
   return (
     <AppRoot appearance={isDark ? 'dark' : 'light'} platform={platform()}>
       <SessionProvider>
-        <HashRouter>
+        <HashRouter key={language}>
           <Shell />
         </HashRouter>
       </SessionProvider>

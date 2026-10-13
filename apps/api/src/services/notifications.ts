@@ -1,5 +1,5 @@
 import { inArray } from 'drizzle-orm';
-import { langFrom, type Lang, type Order, type OrderStatus } from '@tma-shop/shared';
+import { userLang, type Lang, type Order, type OrderStatus } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { users } from '../db/schema.js';
 import { tr } from '../i18n/messages.js';
@@ -144,10 +144,14 @@ export async function languagesOf(db: Database, telegramIds: number[]): Promise<
   const result = new Map<number, Lang>();
   if (telegramIds.length === 0) return result;
   const rows = await db
-    .select({ id: users.telegramId, languageCode: users.languageCode })
+    .select({
+      id: users.telegramId,
+      languageCode: users.languageCode,
+      preferredLang: users.preferredLang,
+    })
     .from(users)
     .where(inArray(users.telegramId, telegramIds));
-  for (const row of rows) result.set(row.id, langFrom(row.languageCode));
+  for (const row of rows) result.set(row.id, userLang(row.preferredLang, row.languageCode));
   return result;
 }
 

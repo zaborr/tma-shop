@@ -125,6 +125,8 @@ export const users = pgTable('users', {
   firstName: text('first_name').notNull(),
   username: text('username'),
   languageCode: text('language_code'),
+  /** Language chosen in the app ('en' | 'es'); null = follow Telegram. */
+  preferredLang: text('preferred_lang'),
   role: userRoleEnum('role').notNull().default('customer'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   /** Last time they opened the Mini App; inactive users are deleted (retention). */
