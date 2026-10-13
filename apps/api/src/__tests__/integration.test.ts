@@ -8,6 +8,7 @@ import { createDb, createPool, type Database } from '../db/client.js';
 import { eq } from 'drizzle-orm';
 import { categories, orders, products, shops, users } from '../db/schema.js';
 import { runRetention } from '../services/retention.js';
+import { cancelExpiredOrders } from '../services/autoCancel.js';
 
 /**
  * Full-stack integration test against a real Postgres. Skipped automatically
@@ -297,6 +298,96 @@ describeDb('API integration', () => {
     expect(mine.some((o) => o.id === orderId)).toBe(false);
     const alice = await db.select().from(users).where(eq(users.telegramId, CUSTOMER_ID));
     expect(alice).toHaveLength(1);
+  });
+
+  it('reserves stock when a payment is sent and releases it when rejected', async () => {
+    const token = await authToken(CUSTOMER_ID, 'Alice');
+    const auth = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const admin = await authToken(ADMIN_ID, 'Ivan');
+    const adminAuth = { Authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
+    const stock = async (): Promise<number> =>
+      ((await (await app.request(`/api/products/${productId}`)).json()) as { stock: number }).stock;
+
+    await db
+      .update(shops)
+      .set({ wallets: [{ network: 'Base', token: 'USDC', address: '0xabc0000000000000000000000000000000000000' }] })
+      .where(eq(shops.id, shopId));
+    const config = (await (await app.request('/api/shop')).json()) as {
+      paymentMethods: Array<{ id: string }>;
+    };
+    const methodId = config.paymentMethods[0]!.id;
+
+    await app.request('/api/cart/items', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ productId, quantity: 1 }),
+    });
+    const create = await app.request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@test_user' }),
+    });
+    const { orderId } = (await create.json()) as { orderId: string };
+    const before = await stock();
+
+    const pay = (txHash: string): Promise<Response> =>
+      Promise.resolve(
+        app.request(`/api/orders/${orderId}/payment`, {
+          method: 'POST',
+          headers: auth,
+          body: JSON.stringify({ methodId, txHash }),
+        }),
+      );
+    const setStatus = (status: string): Promise<Response> =>
+      Promise.resolve(
+        app.request(`/api/admin/orders/${orderId}`, {
+          method: 'PATCH',
+          headers: adminAuth,
+          body: JSON.stringify({ status }),
+        }),
+      );
+
+    expect((await pay('0xreserve0001')).status).toBe(200);
+    expect(await stock()).toBe(before - 1);
+
+    expect((await setStatus('pending')).status).toBe(200);
+    expect(await stock()).toBe(before);
+
+    expect((await pay('0xreserve0002')).status).toBe(200);
+    expect(await stock()).toBe(before - 1);
+    expect((await setStatus('paid')).status).toBe(200);
+    // Confirming does not take the stock a second time.
+    expect(await stock()).toBe(before - 1);
+  });
+
+  it('cancels unpaid orders after the shop deadline', async () => {
+    const token = await authToken(CUSTOMER_ID, 'Alice');
+    const auth = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    await app.request('/api/cart/items', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ productId, quantity: 1 }),
+    });
+    const create = await app.request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@test_user' }),
+    });
+    const { orderId } = (await create.json()) as { orderId: string };
+
+    const fresh = await cancelExpiredOrders(db, { BOT_TOKEN } as Env);
+    const [stillPending] = await db.select().from(orders).where(eq(orders.id, orderId));
+    expect(stillPending?.status).toBe('pending');
+    expect(fresh).toBe(0);
+
+    await db
+      .update(orders)
+      .set({ updatedAt: new Date(Date.now() - 49 * 60 * 60 * 1000) })
+      .where(eq(orders.id, orderId));
+    expect(await cancelExpiredOrders(db, { BOT_TOKEN } as Env)).toBeGreaterThanOrEqual(1);
+    const [row] = await db.select().from(orders).where(eq(orders.id, orderId));
+    expect(row?.status).toBe('cancelled');
+    expect(row?.closedAt).not.toBeNull();
   });
 
   it('enforces admin-only routes', async () => {

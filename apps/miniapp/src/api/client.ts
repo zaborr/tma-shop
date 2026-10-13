@@ -295,6 +295,14 @@ export class ApiClient {
     });
   }
 
+  /** Hours without activity before an unpaid order is cancelled (0 = never). */
+  adminUpdateAutoCancel(hours: number): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/auto-cancel', {
+      method: 'PUT',
+      body: JSON.stringify({ hours }),
+    });
+  }
+
   adminUpdateOrderFee(orderFee: number, orderFeeLabel: string): Promise<ShopAdminView> {
     return this.request<ShopAdminView>('/admin/shop/fee', {
       method: 'PUT',

@@ -341,29 +341,29 @@ export async function markOrderPaid(
       .returning();
     if (!updated) throw new Error('Failed to update order');
 
-    if (!order.stockApplied) {
-      for (const item of items) {
-        if (item.variantId) {
-          await tx
-            .update(productVariants)
-            .set({ stock: sql`GREATEST(${productVariants.stock} - ${item.quantity}, 0)` })
-            .where(
-              and(
-                eq(productVariants.id, item.variantId),
-                sql`${productVariants.stock} IS NOT NULL`,
-              ),
-            );
-        } else {
-          await tx
-            .update(products)
-            .set({ stock: sql`GREATEST(${products.stock} - ${item.quantity}, 0)` })
-            .where(and(eq(products.id, item.productId), sql`${products.stock} IS NOT NULL`));
-        }
-      }
-    }
+    if (!order.stockApplied) await takeStock(tx, items);
 
     return toOrderDTO(updated, items);
   });
+}
+
+/** Takes an order's items out of tracked stock (never below 0). */
+async function takeStock(tx: Tx, items: OrderItemRow[]): Promise<void> {
+  for (const item of items) {
+    if (item.variantId) {
+      await tx
+        .update(productVariants)
+        .set({ stock: sql`GREATEST(${productVariants.stock} - ${item.quantity}, 0)` })
+        .where(
+          and(eq(productVariants.id, item.variantId), sql`${productVariants.stock} IS NOT NULL`),
+        );
+    } else {
+      await tx
+        .update(products)
+        .set({ stock: sql`GREATEST(${products.stock} - ${item.quantity}, 0)` })
+        .where(and(eq(products.id, item.productId), sql`${products.stock} IS NOT NULL`));
+    }
+  }
 }
 
 /** Items whose tracked stock is below what the order needs, as readable lines. */
@@ -475,6 +475,11 @@ export async function changeOrderStatus(
       set.paymentTxHash = null;
       set.paymentNetwork = null;
       set.amountSubmitted = 0;
+      // Give back the stock reserved by that payment (not stock already paid for).
+      if (locked.stockApplied && locked.amountPaid === 0) {
+        await restoreStock(tx, items);
+        set.stockApplied = false;
+      }
     }
     if (change.status === 'shipped') {
       set.trackingNumber = change.trackingNumber?.trim() || null;
@@ -509,41 +514,54 @@ export async function submitCryptoPayment(
   paymentNetwork: string,
   txHash: string,
 ): Promise<Order> {
-  const order = await db.query.orders.findFirst({
-    where: and(eq(orders.shopId, shopId), eq(orders.id, orderId), eq(orders.userId, userId)),
-  });
-  if (!order) throw ApiError.notFound('Order not found');
-  if (order.status !== 'pending' && order.status !== 'awaiting_payment') {
-    throw ApiError.conflict('not_payable', `Order is ${order.status} and cannot take a payment`);
-  }
-  const due = order.total - order.amountPaid;
-  if (due <= 0) throw ApiError.conflict('nothing_due', 'Nothing is left to pay for this order');
+  return db.transaction(async (tx) => {
+    const order = await lockOrder(
+      tx,
+      and(eq(orders.shopId, shopId), eq(orders.id, orderId), eq(orders.userId, userId)),
+    );
+    if (!order) throw ApiError.notFound('Order not found');
+    if (order.status !== 'pending' && order.status !== 'awaiting_payment') {
+      throw ApiError.conflict('not_payable', `Order is ${order.status} and cannot take a payment`);
+    }
+    const due = order.total - order.amountPaid;
+    if (due <= 0) throw ApiError.conflict('nothing_due', 'Nothing is left to pay for this order');
 
-  // A transaction can only pay once: not for another order, and not twice here.
-  const reused = await db.query.orders.findFirst({
-    where: or(
-      and(eq(orders.paymentTxHash, txHash), ne(orders.id, order.id)),
-      sql`${orders.paymentLog} @> ${JSON.stringify([{ txHash }])}::jsonb`,
-    ),
-  });
-  if (reused) {
-    throw ApiError.conflict('tx_already_used', 'This transaction was already used for a payment');
-  }
+    // A transaction can only pay once: not for another order, and not twice here.
+    const reused = await tx.query.orders.findFirst({
+      where: or(
+        and(eq(orders.paymentTxHash, txHash), ne(orders.id, order.id)),
+        sql`${orders.paymentLog} @> ${JSON.stringify([{ txHash }])}::jsonb`,
+      ),
+    });
+    if (reused) {
+      throw ApiError.conflict('tx_already_used', 'This transaction was already used for a payment');
+    }
 
-  const [updated] = await db
-    .update(orders)
-    .set({
-      status: 'awaiting_payment',
-      paymentNetwork,
-      paymentTxHash: txHash,
-      amountSubmitted: due,
-      updatedAt: new Date(),
-    })
-    .where(eq(orders.id, order.id))
-    .returning();
-  if (!updated) throw new Error('Failed to update order');
-  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, updated.id));
-  return toOrderDTO(updated, items);
+    // Reserve the stock now that the customer says they paid, so nobody else
+    // can buy the same units while the payment is checked. If it is already
+    // short, the payment is still recorded and the admin is warned on confirm.
+    const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+    let stockApplied = order.stockApplied;
+    if (!stockApplied && (await stockShortages(tx, items)).length === 0) {
+      await takeStock(tx, items);
+      stockApplied = true;
+    }
+
+    const [updated] = await tx
+      .update(orders)
+      .set({
+        status: 'awaiting_payment',
+        paymentNetwork,
+        paymentTxHash: txHash,
+        amountSubmitted: due,
+        stockApplied,
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, order.id))
+      .returning();
+    if (!updated) throw new Error('Failed to update order');
+    return toOrderDTO(updated, items);
+  });
 }
 
 /** Statuses a customer may delete: nothing paid or under verification. */
@@ -573,7 +591,14 @@ export async function deleteOrder(
     );
   }
 
-  await db.delete(orders).where(eq(orders.id, order.id));
+  await db.transaction(async (tx) => {
+    // Stock reserved by a payment that was never confirmed goes back.
+    if (order.stockApplied && order.amountPaid === 0 && order.status !== 'cancelled') {
+      const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+      await restoreStock(tx, items);
+    }
+    await tx.delete(orders).where(eq(orders.id, order.id));
+  });
 }
 
 /** Orders a customer may ask to modify: already paid or under verification. */

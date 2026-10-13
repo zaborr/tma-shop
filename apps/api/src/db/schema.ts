@@ -53,6 +53,8 @@ export const shops = pgTable('shops', {
   /** Fixed fee added once to every order (minor units of the order's token). */
   orderFee: integer('order_fee').notNull().default(0),
   orderFeeLabel: text('order_fee_label').notNull().default('Service fee'),
+  /** Unpaid orders are cancelled after this many hours without activity (0 = never). */
+  autoCancelHours: integer('auto_cancel_hours').notNull().default(48),
   /** Shipping zones with a flat cost per order. */
   shippingZones: jsonb('shipping_zones').$type<ShippingZone[]>().notNull().default([]),
   /** RSA-OAEP public key (base64 SPKI) used to encrypt delivery addresses. */

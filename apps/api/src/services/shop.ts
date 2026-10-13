@@ -102,6 +102,15 @@ export async function updateOrderFee(
   return toShopAdminDTO(row);
 }
 
+/** Hours without activity before an unpaid order is cancelled (0 = never). */
+export async function updateAutoCancel(
+  db: Database,
+  shopId: string,
+  hours: number,
+): Promise<ShopAdminView> {
+  return toShopAdminDTO(await updateShop(db, shopId, { autoCancelHours: hours }));
+}
+
 /** Name, description and image — editable by the shop's own admins. */
 export async function updateShopProfile(
   db: Database,
