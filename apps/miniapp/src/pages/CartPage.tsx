@@ -49,7 +49,7 @@ export function CartPage(): React.JSX.Element {
       }
       const { invoiceLink } = await api.createInvoice(orderId);
       if (openInvoice.isAvailable()) {
-        const status = await openInvoice(invoiceLink, 'url');
+        await openInvoice(invoiceLink, 'url');
         navigate(to('/orders'));
       } else {
         // Outside Telegram (browser dev) we cannot open the native invoice.
