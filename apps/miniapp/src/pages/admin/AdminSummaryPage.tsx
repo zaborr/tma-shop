@@ -39,6 +39,7 @@ interface CurrencyTotal {
   items: number;
   revenue: number;
   fees: number;
+  shipping: number;
 }
 
 /** Totals per product (and per currency) over the selected paid orders. */
@@ -53,10 +54,12 @@ function summarize(orders: Order[]): { products: ProductTotal[]; currencies: Cur
       items: 0,
       revenue: 0,
       fees: 0,
+      shipping: 0,
     };
     cur.orders += 1;
     cur.revenue += order.total;
     cur.fees += order.fee;
+    cur.shipping += order.shipping;
 
     for (const item of order.items) {
       const key = `${itemKey(item)}:${order.currency}`;
@@ -95,7 +98,8 @@ function summaryText(
   for (const c of currencies) {
     lines.push(
       `${c.currency}: ${c.orders} orders, ${c.items} items, ${formatPrice(c.revenue, c.currency)}` +
-        (c.fees > 0 ? ` (fees ${formatPrice(c.fees, c.currency)})` : ''),
+        (c.fees > 0 ? ` (fees ${formatPrice(c.fees, c.currency)})` : '') +
+        (c.shipping > 0 ? ` (shipping ${formatPrice(c.shipping, c.currency)})` : ''),
     );
   }
   lines.push('', 'Products:');
@@ -167,6 +171,8 @@ function AdminSummary(): React.JSX.Element {
             key={c.currency}
             subtitle={`${c.orders} orders · ${c.items} items${
               c.fees > 0 ? ` · fees ${formatPrice(c.fees, c.currency)}` : ''
+            }${
+              c.shipping > 0 ? ` · shipping ${formatPrice(c.shipping, c.currency)}` : ''
             }`}
             after={<strong>{formatPrice(c.revenue, c.currency)}</strong>}
             multiline

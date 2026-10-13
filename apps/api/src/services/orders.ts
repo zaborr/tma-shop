@@ -1,5 +1,10 @@
 import { and, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
-import type { Order, OrderChangeRequest, PaymentLogEntry } from '@tma-shop/shared';
+import {
+  shippingCost,
+  type Order,
+  type OrderChangeRequest,
+  type PaymentLogEntry,
+} from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { cartItems, orderItems, orders, productVariants, products, shops } from '../db/schema.js';
 import { toOrderDTO, variantLabel } from '../db/mappers.js';
@@ -68,11 +73,41 @@ export function buildOrderDraft(lines: DraftLine[]): OrderDraft {
 }
 
 /** Creates an order from the user's current cart inside a single transaction. */
+/** Shape of the encrypted address envelope built by the Mini App (not decrypted here). */
+interface AddressEnvelope {
+  v: number;
+  kid: string;
+  key: string;
+  iv: string;
+  data: string;
+}
+
+function parseEnvelope(text: string): AddressEnvelope | null {
+  try {
+    const value = JSON.parse(text) as Partial<AddressEnvelope>;
+    const ok =
+      value.v === 1 &&
+      typeof value.kid === 'string' &&
+      typeof value.key === 'string' &&
+      typeof value.iv === 'string' &&
+      typeof value.data === 'string';
+    return ok ? (value as AddressEnvelope) : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface CheckoutShipping {
+  shippingZoneId?: string | undefined;
+  encryptedAddress?: string | undefined;
+}
+
 export async function createOrderFromCart(
   db: Database,
   shopId: string,
   userId: number,
   contactUsername: string | null = null,
+  checkout: CheckoutShipping = {},
 ): Promise<Order> {
   return db.transaction(async (tx) => {
     const shop = await tx.query.shops.findFirst({ where: eq(shops.id, shopId) });
@@ -125,6 +160,35 @@ export async function createOrderFromCart(
     }));
     const draft = buildOrderDraft(draftLines);
 
+    // Shipped shops: a zone and an address encrypted with the shop's current key.
+    const zones = shop.shippingZones.filter((z) => z.isActive);
+    let shipping = 0;
+    let shippingZoneName: string | null = null;
+    let encryptedAddress: string | null = null;
+    let addressKeyFingerprint: string | null = null;
+    if (zones.length > 0) {
+      const zone = zones.find((z) => z.id === checkout.shippingZoneId);
+      if (!zone) throw ApiError.badRequest('shipping_required', 'Choose a shipping zone');
+      if (!shop.addressPublicKey || !shop.addressKeyFingerprint) {
+        throw ApiError.conflict(
+          'shop_not_ready',
+          'This shop cannot take orders with delivery yet. Please try again later.',
+        );
+      }
+      const envelope = checkout.encryptedAddress ? parseEnvelope(checkout.encryptedAddress) : null;
+      if (!envelope) throw ApiError.badRequest('address_required', 'Enter your delivery address');
+      if (envelope.kid !== shop.addressKeyFingerprint) {
+        throw ApiError.conflict(
+          'stale_key',
+          'The shop updated its security key. Please reopen the shop and try again.',
+        );
+      }
+      shipping = shippingCost(zone, draft.total);
+      shippingZoneName = zone.name;
+      encryptedAddress = checkout.encryptedAddress ?? null;
+      addressKeyFingerprint = envelope.kid;
+    }
+
     const [order] = await tx
       .insert(orders)
       .values({
@@ -132,8 +196,12 @@ export async function createOrderFromCart(
         userId,
         status: 'pending',
         // The shop's per-order fee is frozen on the order and charged once.
-        total: draft.total + shop.orderFee,
+        total: draft.total + shop.orderFee + shipping,
         fee: shop.orderFee,
+        shipping,
+        shippingZoneName,
+        encryptedAddress,
+        addressKeyFingerprint,
         currency,
         contactUsername,
       })
@@ -462,8 +530,8 @@ export async function requestOrderChange(
 
   const changeRequest: OrderChangeRequest = {
     items,
-    // The order's fee stays the same: it is charged once per order.
-    total: items.reduce((sum, item) => sum + item.subtotal, 0) + order.fee,
+    // Fee and shipping stay the same: they are charged once per order.
+    total: items.reduce((sum, item) => sum + item.subtotal, 0) + order.fee + order.shipping,
     requestedAt: new Date().toISOString(),
   };
   const [updated] = await db

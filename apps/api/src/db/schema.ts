@@ -16,6 +16,7 @@ import type {
   PaymentLogEntry,
   PriceTier,
   ProductOption,
+  ShippingZone,
   WalletInput,
 } from '@tma-shop/shared';
 
@@ -51,6 +52,11 @@ export const shops = pgTable('shops', {
   /** Fixed fee added once to every order (minor units of the order's token). */
   orderFee: integer('order_fee').notNull().default(0),
   orderFeeLabel: text('order_fee_label').notNull().default('Service fee'),
+  /** Shipping zones with a flat cost per order. */
+  shippingZones: jsonb('shipping_zones').$type<ShippingZone[]>().notNull().default([]),
+  /** RSA-OAEP public key (base64 SPKI) used to encrypt delivery addresses. */
+  addressPublicKey: text('address_public_key'),
+  addressKeyFingerprint: text('address_key_fingerprint'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -172,6 +178,12 @@ export const orders = pgTable('orders', {
   total: integer('total').notNull(),
   /** Per-order fee charged once, frozen at creation. */
   fee: integer('fee').notNull().default(0),
+  /** Shipping charged once, frozen at creation (0 = free or not shipped). */
+  shipping: integer('shipping').notNull().default(0),
+  shippingZoneName: text('shipping_zone_name'),
+  /** Address encrypted on the customer's device; the server cannot read it. */
+  encryptedAddress: text('encrypted_address'),
+  addressKeyFingerprint: text('address_key_fingerprint'),
   currency: text('currency').notNull(),
   paymentChargeId: text('payment_charge_id'),
   /** Crypto payment method label chosen by the customer, e.g. "USDC · Base". */

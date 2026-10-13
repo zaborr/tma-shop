@@ -54,6 +54,17 @@ export const order = z.object({
   total: moneyAmount,
   /** Per-order fee charged once, frozen when the order was created. */
   fee: moneyAmount,
+  /** Shipping cost charged once (0 when free or not shipped). */
+  shipping: moneyAmount,
+  /** Name of the shipping zone chosen at checkout. */
+  shippingZoneName: z.string().nullable(),
+  /**
+   * Delivery address encrypted on the customer's device with the shop's public
+   * key (JSON envelope). Only the shop admin's private key opens it.
+   */
+  encryptedAddress: z.string().nullable(),
+  /** Fingerprint of the key the address was encrypted with. */
+  addressKeyFingerprint: z.string().nullable(),
   currency: currencyCode,
   /** Telegram payment charge id once paid. */
   paymentChargeId: z.string().nullable(),

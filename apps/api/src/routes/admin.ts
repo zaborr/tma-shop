@@ -6,7 +6,9 @@ import {
   productInput,
   shopProfileInput,
   slug,
+  updateAddressKeyRequest,
   updateOrderFeeRequest,
+  updateShippingRequest,
   updateWalletsRequest,
 } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
@@ -33,7 +35,9 @@ import {
 import { buildChangeDecisionMessage, notifyChats } from '../services/notifications.js';
 import {
   getShopAdminView,
+  updateAddressKey,
   updateOrderFee,
+  updateShippingZones,
   updateShopProfile,
   updateShopWallets,
 } from '../services/shop.js';
@@ -58,6 +62,13 @@ export function adminRoutes(): Hono<AppBindings> {
   );
   app.put('/shop/wallets', zValidator('json', updateWalletsRequest), async (c) =>
     c.json(await updateShopWallets(c.get('db'), c.get('shopId'), c.req.valid('json').wallets)),
+  );
+  // Shipping zones (flat cost per order) and the address encryption public key.
+  app.put('/shop/shipping', zValidator('json', updateShippingRequest), async (c) =>
+    c.json(await updateShippingZones(c.get('db'), c.get('shopId'), c.req.valid('json').zones)),
+  );
+  app.put('/shop/address-key', zValidator('json', updateAddressKeyRequest), async (c) =>
+    c.json(await updateAddressKey(c.get('db'), c.get('shopId'), c.req.valid('json').publicKey)),
   );
   // Fixed fee added once to every new order (0 hides it).
   app.put('/shop/fee', zValidator('json', updateOrderFeeRequest), async (c) =>

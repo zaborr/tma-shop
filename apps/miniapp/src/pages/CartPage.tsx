@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { shippingCost, type DeliveryAddress } from '@tma-shop/shared';
 import { useNavigate } from 'react-router-dom';
 import { openInvoice } from '@telegram-apps/sdk-react';
 import { Button, Cell, Input, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
@@ -11,6 +12,18 @@ import { lineName } from '../lib/variants.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { Loader } from '../components/Loader.js';
 import { useShopPath } from '../providers/ShopProvider.js';
+import {
+  AddressForm,
+  addressComplete,
+  EMPTY_ADDRESS,
+  trimAddress,
+} from '../components/AddressForm.js';
+import {
+  cryptoAvailable,
+  encryptAddress,
+  loadSavedAddress,
+  saveAddress,
+} from '../lib/addressCrypto.js';
 
 export function CartPage(): React.JSX.Element {
   const navigate = useNavigate();
@@ -24,6 +37,24 @@ export function CartPage(): React.JSX.Element {
   const contactName = contact.trim().replace(/^@/, '');
   const contactValid = /^[A-Za-z0-9_]{5,32}$/.test(contactName);
   const shop = useAsync(() => api.getShop(), []);
+
+  // Shipping: shops with active zones ask for a zone and a delivery address.
+  const zones = (shop.data?.shippingZones ?? []).filter((z) => z.isActive);
+  const needsShipping = zones.length > 0;
+  const [zoneId, setZoneId] = useState<string | null>(null);
+  const zone = zones.find((z) => z.id === zoneId) ?? (zones.length === 1 ? zones[0] : undefined);
+  const [address, setAddress] = useState<DeliveryAddress>(() => {
+    const saved = loadSavedAddress();
+    if (saved) return { ...EMPTY_ADDRESS, ...saved };
+    const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ');
+    return { ...EMPTY_ADDRESS, name };
+  });
+  const [remember, setRemember] = useState(true);
+  const itemsTotal = cart ? cart.total - cart.fee : 0;
+  const shipping = zone ? shippingCost(zone, itemsTotal) : 0;
+  const grandTotal = (cart?.total ?? 0) + shipping;
+  const shippingReady =
+    !needsShipping || (zone !== undefined && addressComplete(address));
   // Telegram Stars only for a Stars-priced cart in a shop with no crypto wallets;
   // everything else goes to the manual crypto payment page.
   const starsCheckout =
@@ -40,7 +71,34 @@ export function CartPage(): React.JSX.Element {
         setError('Enter your Telegram username so the shop can contact you.');
         return;
       }
-      const { orderId } = await api.createOrder(contactName);
+      let shippingDetails: { shippingZoneId: string; encryptedAddress: string } | null = null;
+      if (needsShipping) {
+        const config = shop.data;
+        if (!zone) {
+          setError('Choose a shipping zone.');
+          return;
+        }
+        if (!addressComplete(address)) {
+          setError('Fill in your delivery address (fields marked with *).');
+          return;
+        }
+        if (!config?.addressPublicKey || !config.addressKeyFingerprint || !cryptoAvailable()) {
+          setError('This shop cannot take orders with delivery yet. Please try again later.');
+          return;
+        }
+        const clean = trimAddress(address);
+        shippingDetails = {
+          shippingZoneId: zone.id,
+          encryptedAddress: await encryptAddress(
+            clean,
+            config.addressPublicKey,
+            config.addressKeyFingerprint,
+          ),
+        };
+        // Remembered only on this phone, to prefill the next order.
+        saveAddress(remember ? clean : null);
+      }
+      const { orderId } = await api.createOrder(contactName, shippingDetails);
       // The server empties the cart when it creates the order.
       void refresh();
       if (!starsCheckout) {
@@ -61,15 +119,27 @@ export function CartPage(): React.JSX.Element {
     } finally {
       setBusy(false);
     }
-  }, [navigate, to, starsCheckout, refresh, contactValid, contactName]);
+  }, [
+    navigate,
+    to,
+    starsCheckout,
+    refresh,
+    contactValid,
+    contactName,
+    needsShipping,
+    shop.data,
+    zone,
+    address,
+    remember,
+  ]);
 
   const hasItems = (cart?.lines.length ?? 0) > 0;
 
   useMainButton({
-    text: cart ? `Checkout · ${formatPrice(cart.total, cart.currency)}` : 'Checkout',
+    text: cart ? `Checkout · ${formatPrice(grandTotal, cart.currency)}` : 'Checkout',
     visible: hasItems,
     // Wait for the shop config so checkout never picks the wrong payment flow.
-    enabled: shop.data !== null && contactValid,
+    enabled: shop.data !== null && contactValid && shippingReady,
     loading: busy || shop.loading,
     onClick: checkout,
   });
@@ -131,8 +201,53 @@ export function CartPage(): React.JSX.Element {
             {shop.data?.orderFeeLabel ?? 'Service fee'}
           </Cell>
         )}
-        <Cell after={cart ? formatPrice(cart.total, cart.currency) : ''}>Total</Cell>
+        {needsShipping && (
+          <Cell after={zone && cart ? formatPrice(shipping, cart.currency) : '—'}>
+            {zone ? `Shipping · ${zone.name}` : 'Shipping'}
+          </Cell>
+        )}
+        <Cell after={cart ? formatPrice(grandTotal, cart.currency) : ''}>Total</Cell>
       </Section>
+      {needsShipping && cart && (
+        <Section header="Shipping zone">
+          {zones.map((z) => {
+            const cost = shippingCost(z, itemsTotal);
+            return (
+              <Cell
+                key={z.id}
+                onClick={() => setZoneId(z.id)}
+                subtitle={
+                  z.freeFrom !== null
+                    ? `Free from ${formatPrice(z.freeFrom, cart.currency)}`
+                    : undefined
+                }
+                after={
+                  <span>
+                    {cost === 0 ? 'Free' : formatPrice(cost, cart.currency)}
+                    {zone?.id === z.id ? ' ✓' : ''}
+                  </span>
+                }
+              >
+                {z.name}
+              </Cell>
+            );
+          })}
+        </Section>
+      )}
+      {needsShipping && (
+        <>
+          <AddressForm value={address} onChange={setAddress} />
+          <Section>
+            <Cell
+              onClick={() => setRemember((r) => !r)}
+              after={remember ? '✓' : ''}
+              multiline
+            >
+              Remember this address on this phone
+            </Cell>
+          </Section>
+        </>
+      )}
       <Section
         header="Your Telegram username"
         footer={
