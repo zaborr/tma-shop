@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { catalogQuery, currencyCode, product, slug } from './index.js';
+import {
+  catalogQuery,
+  currencyCode,
+  priceTiers,
+  product,
+  slug,
+  unitPriceFor,
+} from './index.js';
 
 describe('common schemas', () => {
   it('accepts kebab-case slugs and rejects others', () => {
@@ -49,5 +56,33 @@ describe('product', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
     };
     expect(product.safeParse(base).success).toBe(false);
+  });
+});
+
+describe('quantity tiers', () => {
+  const tiers = [
+    { minQty: 5, price: 900 },
+    { minQty: 15, price: 800 },
+  ];
+
+  it('uses the product price below the first tier', () => {
+    expect(unitPriceFor(1000, null, tiers, 4)).toBe(1000);
+  });
+
+  it('uses the highest tier reached', () => {
+    expect(unitPriceFor(1000, null, tiers, 5)).toBe(900);
+    expect(unitPriceFor(1000, null, tiers, 14)).toBe(900);
+    expect(unitPriceFor(1000, null, tiers, 30)).toBe(800);
+  });
+
+  it('keeps a variant’s price difference', () => {
+    expect(unitPriceFor(1000, 1200, tiers, 15)).toBe(1000);
+  });
+
+  it('sorts tiers and rejects repeated quantities', () => {
+    expect(priceTiers.parse([{ minQty: 15, price: 8 }, { minQty: 5, price: 9 }])[0]?.minQty).toBe(5);
+    expect(priceTiers.safeParse([{ minQty: 5, price: 9 }, { minQty: 5, price: 8 }]).success).toBe(
+      false,
+    );
   });
 });

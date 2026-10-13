@@ -15,6 +15,7 @@ import {
   isSoldOut,
   isValueAvailable,
   priceRange,
+  tierTable,
 } from '../lib/variants.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { useShopPath } from '../providers/ShopProvider.js';
@@ -79,6 +80,8 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
     onClick: onAdd,
   });
 
+  const tiers = tierTable(product, variant);
+
   const choose = (index: number, value: string): void =>
     setSelected((prev) => prev.map((v, i) => (i === index ? (v === value ? null : value) : v)));
 
@@ -117,6 +120,27 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
           </div>
         </Section>
       ))}
+
+      {tiers.length > 0 && (
+        <Section
+          header="Volume pricing"
+          footer={
+            withVariants
+              ? 'Price per unit. All options of this product count together.'
+              : 'Price per unit, depending on how many you buy.'
+          }
+        >
+          {tiers.map((tier) => (
+            <Cell key={tier.from} after={formatPrice(tier.price, product.currency)}>
+              {tier.to === null
+                ? `${tier.from}+ units`
+                : tier.from === tier.to
+                  ? `${tier.from} unit${tier.from === 1 ? '' : 's'}`
+                  : `${tier.from}–${tier.to} units`}
+            </Cell>
+          ))}
+        </Section>
+      )}
 
       {addError && (
         <Section>

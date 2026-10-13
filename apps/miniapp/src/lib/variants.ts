@@ -1,4 +1,4 @@
-import type { Product, ProductVariant } from '@tma-shop/shared';
+import { unitPriceFor, type Product, type ProductVariant } from '@tma-shop/shared';
 
 /** Active variants (the catalog only sends active ones; admin lists all). */
 export function activeVariants(product: Product): ProductVariant[] {
@@ -68,4 +68,21 @@ export function itemKey(item: { productId: string; variantId?: string | null }):
 /** Display name of an order line, with its variant. */
 export function itemName(item: { title: string; variantLabel?: string | null }): string {
   return lineName(item.title, item.variantLabel);
+}
+
+/**
+ * Price table for one unit of a product (or variant): `[{ from, to, price }]`,
+ * `to` = null for the last, open-ended tier. Empty when there are no tiers.
+ */
+export function tierTable(
+  product: Product,
+  variant: ProductVariant | null,
+): Array<{ from: number; to: number | null; price: number }> {
+  if (product.priceTiers.length === 0) return [];
+  const starts = [1, ...product.priceTiers.map((t) => t.minQty)];
+  return starts.map((from, i) => ({
+    from,
+    to: i + 1 < starts.length ? (starts[i + 1] ?? from) - 1 : null,
+    price: unitPriceFor(product.price, variant?.priceOverride ?? null, product.priceTiers, from),
+  }));
 }
