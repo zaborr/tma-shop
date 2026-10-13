@@ -11,7 +11,7 @@ const BOT_TOKEN = '7654321:AAFakeBotTokenForTestsOnly_0123456789';
  */
 function signInitData(fields: Record<string, string>, token: string = BOT_TOKEN): string {
   const dataCheckString = Object.keys(fields)
-    .filter((key) => key !== 'hash' && key !== 'signature')
+    .filter((key) => key !== 'hash')
     .sort()
     .map((key) => `${key}=${fields[key]}`)
     .join('\n');
@@ -121,7 +121,7 @@ describe('validateInitData', () => {
     expect(result.error.code).toBe('malformed');
   });
 
-  it('ignores the signature field in the HMAC check', () => {
+  it('includes the signature field in the HMAC check', () => {
     const fields = { ...makeFields(recent), signature: 'ed25519-third-party-signature' };
     const result = validateInitData(signInitData(fields), BOT_TOKEN, { now });
 

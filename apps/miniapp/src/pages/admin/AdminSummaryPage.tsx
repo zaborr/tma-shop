@@ -9,6 +9,7 @@ import { formatPrice } from '../../lib/format.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { AdminOnly, formatDate, itemsSummary, statusLabel } from './common.js';
+import { useShopPath } from '../../providers/ShopProvider.js';
 
 type Scope = 'all' | 'toFulfil' | 'fulfilled';
 
@@ -119,6 +120,7 @@ export function AdminSummaryPage(): React.JSX.Element {
 
 function AdminSummary(): React.JSX.Element {
   const navigate = useNavigate();
+  const to = useShopPath();
   const [scope, setScope] = useState<Scope>('all');
   const [copied, setCopied] = useState(false);
   const orders = useAsync(() => api.adminGetOrders(), []);
@@ -191,7 +193,7 @@ function AdminSummary(): React.JSX.Element {
           {selected.map((order) => (
             <Cell
               key={order.id}
-              onClick={() => navigate(`/admin/orders/${order.id}`)}
+              onClick={() => navigate(to(`/admin/orders/${order.id}`))}
               subtitle={`${statusLabel(order)} · ${formatDate(order.createdAt)}`}
               description={itemsSummary(order)}
               after={formatPrice(order.total, order.currency)}

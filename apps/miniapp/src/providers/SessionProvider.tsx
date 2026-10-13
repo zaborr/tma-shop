@@ -9,7 +9,8 @@ interface SessionValue {
   status: Status;
   user: SessionUser | null;
   error: string | null;
-  isAdmin: boolean;
+  /** Platform super-admin: creates shops, hides them and assigns their admins. */
+  isSuperAdmin: boolean;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -43,7 +44,7 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
   }, []);
 
   const value = useMemo<SessionValue>(
-    () => ({ status, user, error, isAdmin: user?.role === 'admin' }),
+    () => ({ status, user, error, isSuperAdmin: user?.role === 'admin' }),
     [status, user, error],
   );
 

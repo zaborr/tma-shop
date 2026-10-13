@@ -50,7 +50,13 @@ describeDb('API integration', () => {
     await db.delete(shops);
     const [shop] = await db
       .insert(shops)
-      .values({ name: 'Test Shop', description: '', currency: 'XTR', starsEnabled: true })
+      .values({
+        name: 'Test Shop',
+        slug: `test-shop-${Date.now()}`,
+        description: '',
+        currency: 'XTR',
+        starsEnabled: true,
+      })
       .returning();
     shopId = shop!.id;
     const [cat] = await db
@@ -139,7 +145,7 @@ describeDb('API integration', () => {
     // Create order
     const create = await app.request('/api/orders', {
       method: 'POST',
-      headers: { ...auth, 'Content-Type': 'application/json' },
+      headers: auth,
       body: JSON.stringify({ contactUsername: '@test_user' }),
     });
     expect(create.status).toBe(201);

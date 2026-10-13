@@ -7,6 +7,7 @@ import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { ProductForm } from './ProductForm.js';
 import { AdminOnly, TOKENS } from './common.js';
+import { useShopPath } from '../../providers/ShopProvider.js';
 
 /** `/admin/products/new` creates a product; `/admin/products/:id` edits one. */
 export function AdminProductPage(): React.JSX.Element {
@@ -19,6 +20,7 @@ export function AdminProductPage(): React.JSX.Element {
 
 function AdminProduct(): React.JSX.Element {
   const navigate = useNavigate();
+  const to = useShopPath();
   const { id } = useParams();
   const isNew = id === undefined || id === 'new';
 
@@ -40,7 +42,7 @@ function AdminProduct(): React.JSX.Element {
   const defaultToken = TOKENS.find((t) => t === shop.data?.currency) ?? 'USDC';
   // After editing go back to the catalog; after creating stay, to add another.
   const onSaved = (): void => {
-    if (!isNew) navigate('/admin/catalog');
+    if (!isNew) navigate(to('/admin/catalog'));
   };
 
   return (

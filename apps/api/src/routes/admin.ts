@@ -1,7 +1,14 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { orderStatus, productInput, slug, updateOrderFeeRequest } from '@tma-shop/shared';
+import {
+  orderStatus,
+  productInput,
+  shopProfileInput,
+  slug,
+  updateOrderFeeRequest,
+  updateWalletsRequest,
+} from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth } from '../auth/middleware.js';
 import {
@@ -24,7 +31,12 @@ import {
   setOrderStatus,
 } from '../services/orders.js';
 import { buildChangeDecisionMessage, notifyChats } from '../services/notifications.js';
-import { updateOrderFee } from '../services/shop.js';
+import {
+  getShopAdminView,
+  updateOrderFee,
+  updateShopProfile,
+  updateShopWallets,
+} from '../services/shop.js';
 import { ApiError } from '../lib/errors.js';
 
 const idParam = z.object({ id: z.uuid() });
@@ -39,16 +51,17 @@ export function adminRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
   app.use('*', requireAuth, requireAdmin);
 
-  // Shop settings: fixed fee added once to every new order (0 hides it).
+  // Shop settings (admin view includes wallets and admin ids).
+  app.get('/shop', (c) => c.json(getShopAdminView(c.get('shop'))));
+  app.put('/shop/profile', zValidator('json', shopProfileInput), async (c) =>
+    c.json(await updateShopProfile(c.get('db'), c.get('shopId'), c.req.valid('json'))),
+  );
+  app.put('/shop/wallets', zValidator('json', updateWalletsRequest), async (c) =>
+    c.json(await updateShopWallets(c.get('db'), c.get('shopId'), c.req.valid('json').wallets)),
+  );
+  // Fixed fee added once to every new order (0 hides it).
   app.put('/shop/fee', zValidator('json', updateOrderFeeRequest), async (c) =>
-    c.json(
-      await updateOrderFee(
-        c.get('db'),
-        c.get('shopId'),
-        c.req.valid('json'),
-        c.get('env').PAYMENT_METHODS,
-      ),
-    ),
+    c.json(await updateOrderFee(c.get('db'), c.get('shopId'), c.req.valid('json'))),
   );
 
   // Products

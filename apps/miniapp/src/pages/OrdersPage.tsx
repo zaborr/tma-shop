@@ -7,6 +7,7 @@ import { useAsync } from '../hooks/useAsync.js';
 import { formatPrice, pluralize } from '../lib/format.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
+import { useShopPath } from '../providers/ShopProvider.js';
 
 const STATUS_META: Record<OrderStatus, { label: string; type: 'number' | 'dot' }> = {
   pending: { label: 'Awaiting payment', type: 'dot' },
@@ -21,6 +22,7 @@ const DELETABLE: OrderStatus[] = ['pending', 'cancelled'];
 
 export function OrdersPage(): React.JSX.Element {
   const navigate = useNavigate();
+  const to = useShopPath();
   const [reloadKey, setReloadKey] = useState(0);
   const { data: orders, loading, error } = useAsync(() => api.getOrders(), [reloadKey]);
   const [armed, setArmed] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export function OrdersPage(): React.JSX.Element {
         {orders.map((order) => (
           <Cell
             key={order.id}
-            onClick={() => navigate(`/orders/${order.id}`)}
+            onClick={() => navigate(to(`/orders/${order.id}`))}
             subtitle={pluralize(order.items.length, 'item', 'items')}
             after={formatPrice(order.total, order.currency)}
             description={

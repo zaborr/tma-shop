@@ -1,25 +1,44 @@
 import { z } from 'zod';
-import { paymentMethod, type PaymentMethod } from '@tma-shop/shared';
+import { walletInput, type PaymentMethod, type WalletInput } from '@tma-shop/shared';
 
 /**
- * Crypto wallets the shop accepts, configured with the `PAYMENT_METHODS`
- * environment variable as a JSON array. `id` is optional and derived from the
- * token and network when omitted. One entry may list several networks and/or
- * tokens separated by `/` (same address), and is expanded into one method per
- * combination. Example:
+ * Wallets as entered by an admin. One entry may list several networks and/or
+ * tokens separated by `/` (same address), e.g.
  *
- *   [{"network":"Ethereum/Base","token":"USDC/EURC","address":"0xabc..."},
- *    {"network":"Solana","token":"USDC/EURC","address":"7xKX..."}]
+ *   {"network":"Ethereum/Base","token":"USDC/EURC","address":"0xabc..."}
  *
+ * and is expanded into one payment method per combination.
  * Payments are not checked on-chain: the customer submits a transaction hash
  * and an admin confirms it manually from the admin panel.
  */
-const rawMethod = paymentMethod.extend({ id: paymentMethod.shape.id.optional() });
+export function expandWallets(wallets: readonly WalletInput[]): PaymentMethod[] {
+  const methods: PaymentMethod[] = [];
+  const seen = new Set<string>();
+  for (const wallet of wallets) {
+    const networks = splitList(wallet.network).map(prettyNetwork);
+    const tokens = splitList(wallet.token).map((token) => token.toUpperCase());
+    for (const network of networks) {
+      for (const token of tokens) {
+        const base = slugify(`${token}-${network}`).slice(0, 60) || 'wallet';
+        // Same token + network twice (different addresses): keep both, unique ids.
+        let id = base;
+        for (let n = 2; seen.has(id); n += 1) id = `${base}-${n}`;
+        seen.add(id);
+        methods.push({ id, network, token, address: wallet.address.trim() });
+      }
+    }
+  }
+  return methods;
+}
 
-export const paymentMethodsSchema = z
+/**
+ * Legacy `PAYMENT_METHODS` env var: a JSON array of wallets, imported once into
+ * the first shop on startup. Since multi-store, wallets live on each shop.
+ */
+export const walletsEnvSchema = z
   .string()
   .default('[]')
-  .transform((value, ctx): PaymentMethod[] => {
+  .transform((value, ctx): WalletInput[] => {
     let parsed: unknown;
     try {
       parsed = JSON.parse(value.trim() || '[]');
@@ -27,7 +46,8 @@ export const paymentMethodsSchema = z
       ctx.addIssue({ code: 'custom', message: 'PAYMENT_METHODS must be a JSON array' });
       return z.NEVER;
     }
-    const result = z.array(rawMethod).safeParse(parsed);
+    // Older configs may carry an `id`; it is derived again on expansion.
+    const result = z.array(walletInput.extend({ id: z.string().optional() })).safeParse(parsed);
     if (!result.success) {
       ctx.addIssue({
         code: 'custom',
@@ -37,29 +57,7 @@ export const paymentMethodsSchema = z
       });
       return z.NEVER;
     }
-    const methods = result.data.flatMap((method) => {
-      const networks = splitList(method.network).map(prettyNetwork);
-      const tokens = splitList(method.token).map((token) => token.toUpperCase());
-      const expanded = networks.length * tokens.length > 1;
-      return networks.flatMap((network) =>
-        tokens.map((token) => {
-          const derived = slugify(`${token}-${network}`);
-          return {
-            id: method.id ? (expanded ? `${method.id}-${derived}` : method.id) : derived,
-            network,
-            token,
-            address: method.address.trim(),
-          };
-        }),
-      );
-    });
-    if (methods.length === 0) return [];
-    const ids = new Set(methods.map((method) => method.id));
-    if (ids.size !== methods.length) {
-      ctx.addIssue({ code: 'custom', message: 'PAYMENT_METHODS has duplicate ids' });
-      return z.NEVER;
-    }
-    return methods;
+    return result.data.map(({ network, token, address }) => ({ network, token, address }));
   });
 
 /** "Ethereum/Base" or "USDC, EURC" → trimmed, non-empty parts. */

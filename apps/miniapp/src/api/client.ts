@@ -6,10 +6,20 @@ import type {
   CreateOrderResponse,
   InvoiceResponse,
   Order,
+  PlatformShopInput,
   Product,
   ProductInput,
+  ShopAdminView,
   ShopConfig,
+  ShopProfileInput,
+  ShopSummary,
+  WalletInput,
 } from '@tma-shop/shared';
+
+export interface ShopsResponse {
+  shops: ShopSummary[];
+  isSuperAdmin: boolean;
+}
 
 export interface ProductPage {
   items: Product[];
@@ -39,15 +49,22 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
 export class ApiClient {
   private token: string | null = null;
+  private shop: string | null = null;
 
   setToken(token: string | null): void {
     this.token = token;
+  }
+
+  /** Shop (id or slug) that shop-scoped calls — catalog, cart, orders, admin — apply to. */
+  setShop(shop: string | null): void {
+    this.shop = shop;
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers);
     if (init.body) headers.set('Content-Type', 'application/json');
     if (this.token) headers.set('Authorization', `Bearer ${this.token}`);
+    if (this.shop) headers.set('X-Shop', this.shop);
 
     const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
     if (res.status === 204) return undefined as T;
@@ -66,6 +83,33 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify({ initData }),
     });
+  }
+
+  // --- shops & platform ---
+  getShops(): Promise<ShopsResponse> {
+    return this.request<ShopsResponse>('/shops');
+  }
+
+  platformGetShops(): Promise<ShopAdminView[]> {
+    return this.request<ShopAdminView[]>('/platform/shops');
+  }
+
+  platformCreateShop(input: PlatformShopInput): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/platform/shops', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  platformUpdateShop(shopId: string, input: PlatformShopInput): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>(`/platform/shops/${shopId}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
+  }
+
+  platformDeleteShop(shopId: string): Promise<void> {
+    return this.request<void>(`/platform/shops/${shopId}`, { method: 'DELETE' });
   }
 
   // --- catalog ---
@@ -165,8 +209,26 @@ export class ApiClient {
 
   // --- admin ---
   /** Sets the fixed fee added once to each new order (0 = none) and its label. */
-  adminUpdateOrderFee(orderFee: number, orderFeeLabel: string): Promise<ShopConfig> {
-    return this.request<ShopConfig>('/admin/shop/fee', {
+  adminGetShop(): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop');
+  }
+
+  adminUpdateProfile(input: ShopProfileInput): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/profile', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
+  }
+
+  adminUpdateWallets(wallets: WalletInput[]): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/wallets', {
+      method: 'PUT',
+      body: JSON.stringify({ wallets }),
+    });
+  }
+
+  adminUpdateOrderFee(orderFee: number, orderFeeLabel: string): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/fee', {
       method: 'PUT',
       body: JSON.stringify({ orderFee, orderFeeLabel }),
     });

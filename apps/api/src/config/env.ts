@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { paymentMethodsSchema } from './payment-methods.js';
+import { walletsEnvSchema } from './payment-methods.js';
 
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
@@ -8,6 +8,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
   JWT_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
   INITDATA_MAX_AGE_SECONDS: z.coerce.number().int().positive().default(86_400),
+  /** Platform super-admins: create shops, hide them and assign their admins. */
   ADMIN_TELEGRAM_IDS: z
     .string()
     .default('')
@@ -22,8 +23,8 @@ const envSchema = z.object({
   TELEGRAM_WEBHOOK_SECRET: z.string().min(1).default('dev-webhook-secret'),
   SHOP_ID: z.uuid().optional(),
   CORS_ORIGIN: z.string().default('*'),
-  /** JSON array of crypto wallets for manual-verification checkout. */
-  PAYMENT_METHODS: paymentMethodsSchema,
+  /** Legacy: JSON array of wallets, imported once into the first shop. */
+  PAYMENT_METHODS: walletsEnvSchema,
 });
 
 export type Env = z.infer<typeof envSchema>;

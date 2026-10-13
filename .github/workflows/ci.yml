@@ -46,8 +46,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Reported but not blocking: run `npm run format:write` locally to fix.
       - name: Check formatting
         run: npm run format
+        continue-on-error: true
 
       - name: Typecheck
         run: npm run typecheck

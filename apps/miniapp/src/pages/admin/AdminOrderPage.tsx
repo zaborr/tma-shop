@@ -15,6 +15,7 @@ import {
   useAdminActions,
   type AdminActions,
 } from './common.js';
+import { useShopPath } from '../../providers/ShopProvider.js';
 
 const breakAll: React.CSSProperties = { wordBreak: 'break-all', whiteSpace: 'normal' };
 
@@ -30,6 +31,7 @@ export function AdminOrderPage(): React.JSX.Element {
 function AdminOrder(): React.JSX.Element {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const to = useShopPath();
   const [reloadKey, setReloadKey] = useState(0);
   const actions = useAdminActions(() => setReloadKey((k) => k + 1));
   const order = useAsync(() => api.adminGetOrder(id), [id, reloadKey]);
@@ -121,7 +123,7 @@ function AdminOrder(): React.JSX.Element {
         </Section>
       )}
 
-      <ActionsSection order={o} actions={actions} onDeleted={() => navigate('/admin/orders')} />
+      <ActionsSection order={o} actions={actions} onDeleted={() => navigate(to('/admin/orders'))} />
     </List>
   );
 }

@@ -2,7 +2,12 @@ import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { backButton } from '@telegram-apps/sdk-react';
 
-/** Shows the Telegram BackButton on every screen except the catalog root. */
+const SHOP_ROOT = /^\/s\/[^/]+\/?$/;
+
+/**
+ * Telegram BackButton: hidden on the shop list; on a shop's catalog it goes back
+ * to the shop list; everywhere else it goes back one screen.
+ */
 export function useBackButton(): void {
   const navigate = useNavigate();
   const location = useLocation();
@@ -14,7 +19,8 @@ export function useBackButton(): void {
       return;
     }
     backButton.show();
-    const off = backButton.onClick(() => navigate(-1));
+    const atShopRoot = SHOP_ROOT.test(location.pathname);
+    const off = backButton.onClick(() => (atShopRoot ? navigate('/') : navigate(-1)));
     return () => {
       off();
     };

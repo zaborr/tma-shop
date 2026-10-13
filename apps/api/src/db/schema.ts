@@ -11,7 +11,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import type { OrderChangeRequest, PaymentLogEntry } from '@tma-shop/shared';
+import type { OrderChangeRequest, PaymentLogEntry, WalletInput } from '@tma-shop/shared';
 
 export const userRoleEnum = pgEnum('user_role', ['customer', 'admin']);
 
@@ -25,8 +25,20 @@ export const orderStatusEnum = pgEnum('order_status', [
 
 export const shops = pgTable('shops', {
   id: uuid('id').primaryKey().defaultRandom(),
+  /** URL-friendly unique name. */
+  slug: text('slug').notNull().unique('shops_slug_unique'),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
+  imageUrl: text('image_url'),
+  /** Hidden shops are only visible to their admins and platform super-admins. */
+  isVisible: boolean('is_visible').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+  /** Telegram ids of this shop's admins. */
+  adminIds: jsonb('admin_ids').$type<number[]>().notNull().default([]),
+  /** Wallets as entered by the admins (may join networks/tokens with "/"). */
+  wallets: jsonb('wallets').$type<WalletInput[]>().notNull().default([]),
+  /** Set once wallets were saved or imported, so the legacy env import runs only once. */
+  walletsInitialized: boolean('wallets_initialized').notNull().default(false),
   currency: text('currency').notNull().default('XTR'),
   botUsername: text('bot_username'),
   starsEnabled: boolean('stars_enabled').notNull().default(true),

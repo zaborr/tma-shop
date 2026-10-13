@@ -1,6 +1,7 @@
 import type { Env } from './config/env.js';
 import type { Database } from './db/client.js';
 import type { SessionClaims } from './auth/jwt.js';
+import type { ShopRow } from './services/shop.js';
 
 /** Dependencies shared across the whole API, injected at app construction. */
 export interface AppDeps {
@@ -12,8 +13,12 @@ export interface AppDeps {
 export interface AppVariables {
   env: Env;
   db: Database;
-  /** Id of the active shop, resolved per request from env or the database. */
+  /** Id of the shop this request is for (`X-Shop` header). */
   shopId: string;
+  /** The shop row itself. */
+  shop: ShopRow;
+  /** Whether the caller (if signed in) is this shop's admin or a super-admin. */
+  canManage: boolean;
   /** Present only on routes behind the auth middleware. */
   claims: SessionClaims;
 }

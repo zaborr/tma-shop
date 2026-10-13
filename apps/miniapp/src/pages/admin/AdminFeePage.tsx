@@ -5,6 +5,7 @@ import { useAsync } from '../../hooks/useAsync.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { OrderFeeForm } from './OrderFeeForm.js';
+import { useShop } from '../../providers/ShopProvider.js';
 import { AdminOnly, ErrorBanner, useAdminActions } from './common.js';
 
 /** Fixed fee added once to every new order (0 = none, hidden from customers). */
@@ -18,7 +19,11 @@ export function AdminFeePage(): React.JSX.Element {
 
 function AdminFee(): React.JSX.Element {
   const [reloadKey, setReloadKey] = useState(0);
-  const actions = useAdminActions(() => setReloadKey((k) => k + 1));
+  const { reload } = useShop();
+  const actions = useAdminActions(() => {
+    setReloadKey((k) => k + 1);
+    reload();
+  });
   const shop = useAsync(() => api.getShop(), [reloadKey]);
 
   if (shop.loading && !shop.data) return <Loader />;

@@ -4,8 +4,8 @@ import type { UserRole } from '@tma-shop/shared';
 export interface SessionClaims {
   /** Telegram user id (subject). */
   sub: number;
+  /** `admin` = platform super-admin when the session was issued. */
   role: UserRole;
-  shopId: string;
 }
 
 const ALG = 'HS256';
@@ -22,7 +22,7 @@ export async function signSession(
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAt = new Date((issuedAt + ttlSeconds) * 1000);
 
-  const token = await new SignJWT({ role: claims.role, shopId: claims.shopId })
+  const token = await new SignJWT({ role: claims.role })
     .setProtectedHeader({ alg: ALG })
     .setSubject(String(claims.sub))
     .setIssuedAt(issuedAt)
@@ -40,13 +40,8 @@ export async function verifySession(token: string, secret: string): Promise<Sess
 function claimsFromPayload(payload: JWTPayload): SessionClaims {
   const sub = Number(payload.sub);
   const role = payload.role;
-  const shopId = payload.shopId;
-  if (
-    !Number.isFinite(sub) ||
-    (role !== 'customer' && role !== 'admin') ||
-    typeof shopId !== 'string'
-  ) {
+  if (!Number.isFinite(sub) || (role !== 'customer' && role !== 'admin')) {
     throw new Error('Malformed session token payload');
   }
-  return { sub, role, shopId };
+  return { sub, role };
 }

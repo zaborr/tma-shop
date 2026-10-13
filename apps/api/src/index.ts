@@ -2,11 +2,17 @@ import { serve } from '@hono/node-server';
 import { loadEnv } from './config/env.js';
 import { createDb, createPool } from './db/client.js';
 import { createApp } from './app.js';
+import { importLegacyWallets } from './services/shop.js';
 
 const env = loadEnv();
 const pool = createPool(env.DATABASE_URL);
 const db = createDb(pool);
 const app = createApp({ env, db });
+
+// One-time move of the old PAYMENT_METHODS env wallets into the first shop.
+importLegacyWallets(db, env).catch((error: unknown) => {
+  console.error('Could not import PAYMENT_METHODS wallets:', error);
+});
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`tma-shop API listening on http://localhost:${info.port}`);

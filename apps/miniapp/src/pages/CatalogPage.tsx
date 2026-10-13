@@ -4,15 +4,17 @@ import { Badge, Button, Cell, Input, List, Section } from '@telegram-apps/telegr
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useCart } from '../providers/CartProvider.js';
-import { useSession } from '../providers/SessionProvider.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { ProductCard } from '../components/ProductCard.js';
+import { ProductImage } from '../components/ProductImage.js';
+import { useShop, useShopPath } from '../providers/ShopProvider.js';
 
 export function CatalogPage(): React.JSX.Element {
   const navigate = useNavigate();
+  const to = useShopPath();
   const { itemCount } = useCart();
-  const { isAdmin } = useSession();
+  const { shop, canManage } = useShop();
   const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState('');
 
@@ -26,13 +28,23 @@ export function CatalogPage(): React.JSX.Element {
     <List>
       <Section>
         <Cell
-          onClick={() => navigate('/cart')}
+          before={<ProductImage url={shop.imageUrl} alt={shop.name} size={48} />}
+          subtitle={shop.description || undefined}
+          description={shop.isVisible ? undefined : '🙈 Hidden — only admins can see this shop'}
+          multiline
+        >
+          <strong>{shop.name}</strong>
+        </Cell>
+      </Section>
+      <Section>
+        <Cell
+          onClick={() => navigate(to('/cart'))}
           after={itemCount > 0 ? <Badge type="number">{itemCount}</Badge> : undefined}
         >
           🛒 Cart
         </Cell>
-        <Cell onClick={() => navigate('/orders')}>📦 My orders</Cell>
-        {isAdmin && <Cell onClick={() => navigate('/admin')}>🛠️ Admin</Cell>}
+        <Cell onClick={() => navigate(to('/orders'))}>📦 My orders</Cell>
+        {canManage && <Cell onClick={() => navigate(to('/admin'))}>🛠️ Admin</Cell>}
       </Section>
 
       <Section header="Catalog">
