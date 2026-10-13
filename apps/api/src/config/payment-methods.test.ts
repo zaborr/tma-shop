@@ -52,26 +52,3 @@ describe('explorerTxUrl', () => {
     expect(explorerTxUrl('USDC · Polygon', '0xabc')).toBeNull();
   });
 });
-
-describe('payment links', () => {
-  it('builds EIP-681 and Solana Pay requests with the exact amount', async () => {
-    const { paymentUri, metamaskUrl } = await import('@tma-shop/shared');
-    const [base] = paymentMethodsOf({
-      evmAddress: EVM,
-      solanaAddress: null,
-      accepted: [{ chain: 'base', token: 'USDC' }],
-    });
-    const [sol] = paymentMethodsOf({
-      evmAddress: null,
-      solanaAddress: SOL,
-      accepted: [{ chain: 'solana', token: 'EURC' }],
-    });
-    expect(paymentUri(base!, 2550, 'Shop', 'Order #1')).toBe(
-      `ethereum:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913@8453/transfer?address=${EVM}&uint256=25500000`,
-    );
-    expect(metamaskUrl(base!, 2550)).toContain('https://metamask.app.link/send/0x833589');
-    expect(paymentUri(sol!, 2550, 'Shop', 'Order #1')).toBe(
-      `solana:${SOL}?amount=25.50&spl-token=HzwqbKZw8HxMN6bF2yFZNrht3c2iXXzpKcFu7uBEDKtr&label=Shop&message=Order+%231`,
-    );
-  });
-});

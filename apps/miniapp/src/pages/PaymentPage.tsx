@@ -2,14 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
 import { Input } from '../components/Field.js';
-import {
-  metamaskUrl,
-  payBefore,
-  paymentUri,
-  unitPriceFor,
-  type Order,
-  type PaymentMethod,
-} from '@tma-shop/shared';
+import { payBefore, unitPriceFor, type Order, type PaymentMethod } from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useMainButton } from '../hooks/useMainButton.js';
@@ -18,9 +11,7 @@ import { formatPrice, formatTokenAmount } from '../lib/format.js';
 import { activeVariants, hasVariants, itemKey, itemName } from '../lib/variants.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
-import { useShop, useShopPath } from '../providers/ShopProvider.js';
-import { QrCode } from '../components/QrCode.js';
-import { openLink } from '@telegram-apps/sdk-react';
+import { useShopPath } from '../providers/ShopProvider.js';
 import { TrackingText } from '../components/TrackingText.js';
 import { locale, t } from '../i18n/index.js';
 
@@ -403,7 +394,6 @@ function PaymentForm({
         >
           <span style={breakAll}>{method.address}</span>
         </Cell>
-        <WalletShortcuts method={method} cents={due} orderId={order.id} />
       </Section>
 
       <Section
@@ -720,62 +710,6 @@ function ChangeEditor({
           )}
         </div>
       </Section>
-    </>
-  );
-}
-
-/** Opens a link outside Telegram (the wallet app picks it up). */
-function openExternal(url: string): void {
-  if (openLink.isAvailable()) openLink(url);
-  else window.open(url, '_blank', 'noopener');
-}
-
-/**
- * QR with the whole payment (address, token, amount) for wallet apps, and a
- * button that opens it in MetaMask on this phone (Base / Ethereum).
- */
-function WalletShortcuts({
-  method,
-  cents,
-  orderId,
-}: {
-  method: PaymentMethod;
-  cents: number;
-  orderId: string;
-}): React.JSX.Element {
-  const { shop } = useShop();
-  const [showQr, setShowQr] = useState(false);
-  const uri = paymentUri(method, cents, shop.name, t('orders.orderNumber', { id: orderId.slice(0, 8) }));
-  const metamask = metamaskUrl(method, cents);
-
-  return (
-    <>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 16px 12px' }}>
-        <Button size="s" mode="bezeled" onClick={() => setShowQr((v) => !v)}>
-          {showQr ? t('pay.hideQr') : t('pay.showQr')}
-        </Button>
-        {metamask && (
-          <Button size="s" mode="bezeled" onClick={() => openExternal(metamask)}>
-            {t('pay.openMetamask')}
-          </Button>
-        )}
-      </div>
-      {showQr && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 8,
-            padding: '0 16px 16px',
-          }}
-        >
-          <QrCode text={uri} />
-          <span style={{ fontSize: 13, textAlign: 'center', color: 'var(--tgui--hint_color)' }}>
-            {t(method.chain === 'solana' ? 'pay.qrHintSolana' : 'pay.qrHintEvm')}
-          </span>
-        </div>
-      )}
     </>
   );
 }
