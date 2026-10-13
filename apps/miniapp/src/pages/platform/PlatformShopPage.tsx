@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { Input, Textarea } from '../../components/Field.js';
 import type { PlatformShopInput, ShopAdminView } from '@tma-shop/shared';
-import { api } from '../../api/client.js';
+import { api, type ShopContents } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { useSession } from '../../providers/SessionProvider.js';
 import { toSlug } from '../../lib/slug.js';
@@ -95,8 +95,6 @@ function ShopForm({ shop }: { shop: ShopAdminView | null }): React.JSX.Element {
     setBusy(false);
   };
 
-  const deleteKey = `delete-shop:${shop?.id ?? ''}`;
-
   return (
     <List>
       <ErrorBanner message={actions.error} />
@@ -184,22 +182,143 @@ function ShopForm({ shop }: { shop: ShopAdminView | null }): React.JSX.Element {
             {shop ? 'Save shop' : 'Create shop'}
           </Button>
           {saved && <Cell>Saved ✓</Cell>}
-          {shop && (
+        </div>
+      </Section>
+
+      {shop && (
+        <DeleteShopSection shop={shop} onDeleted={() => navigate('/platform', { replace: true })} />
+      )}
+    </List>
+  );
+}
+
+type DeleteStep = 'idle' | 'review' | 'type' | 'final';
+
+/**
+ * Deleting a shop with everything in it, in several deliberate steps: see what
+ * goes, type the shop's name, then tap the final button twice.
+ */
+function DeleteShopSection({
+  shop,
+  onDeleted,
+}: {
+  shop: ShopAdminView;
+  onDeleted: () => void;
+}): React.JSX.Element {
+  const actions = useAdminActions(() => undefined);
+  const [step, setStep] = useState<DeleteStep>('idle');
+  const [contents, setContents] = useState<ShopContents | null>(null);
+  const [typed, setTyped] = useState('');
+  const nameMatches = typed.trim() === shop.name.trim();
+  const danger: React.CSSProperties = { color: 'var(--tgui--destructive_text_color)' };
+
+  const cancel = (): void => {
+    setStep('idle');
+    setTyped('');
+  };
+  const cancelButton = (
+    <Button stretched mode="bezeled" onClick={cancel}>
+      Keep the shop
+    </Button>
+  );
+
+  return (
+    <>
+    <ErrorBanner message={actions.error} />
+    <Section header="Danger zone">
+      {step === 'idle' && (
+        <div style={{ padding: 16 }}>
+          <Button
+            stretched
+            mode="plain"
+            onClick={() =>
+              void actions.run(async () => {
+                setContents(await api.platformShopContents(shop.id));
+                setStep('review');
+              })
+            }
+          >
+            <span style={danger}>Delete shop…</span>
+          </Button>
+        </div>
+      )}
+
+      {step === 'review' && contents && (
+        <>
+          <Cell multiline style={danger}>
+            {`Step 1 of 3 · Deleting "${shop.name}" also deletes, for good:`}
+          </Cell>
+          <Cell after={String(contents.orders)}>Orders (with their payment records)</Cell>
+          <Cell after={String(contents.products)}>Products and their variants</Cell>
+          <Cell after={String(contents.categories)}>Categories</Cell>
+          <Cell after={String(contents.carts)}>Customer carts</Cell>
+          <Cell multiline>
+            This cannot be undone. If you only want customers to stop seeing it, set it to Hidden
+            instead.
+          </Cell>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
+            <Button stretched mode="plain" onClick={() => setStep('type')}>
+              <span style={danger}>I understand, continue</span>
+            </Button>
+            {cancelButton}
+          </div>
+        </>
+      )}
+
+      {step === 'type' && (
+        <>
+          <Cell multiline style={danger}>
+            Step 2 of 3 · Type the shop name exactly to confirm.
+          </Cell>
+          <Input
+            header={`Shop name: ${shop.name}`}
+            placeholder={shop.name}
+            status={typed && !nameMatches ? 'error' : 'default'}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
             <Button
               stretched
               mode="plain"
+              disabled={!nameMatches}
+              onClick={() => setStep('final')}
+            >
+              <span style={nameMatches ? danger : undefined}>Continue</span>
+            </Button>
+            {cancelButton}
+          </div>
+        </>
+      )}
+
+      {step === 'final' && (
+        <>
+          <Cell multiline style={danger}>
+            Step 3 of 3 · Last chance. Tap the red button twice to delete everything.
+          </Cell>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
+            <Button
+              stretched
+              mode="filled"
+              style={{ background: 'var(--tgui--destructive_text_color)' }}
               onClick={() =>
-                void actions.twoTap(deleteKey, async () => {
-                  await api.platformDeleteShop(shop.id);
-                  navigate('/platform', { replace: true });
+                void actions.twoTap('delete-forever', async () => {
+                  await api.platformDeleteShopWithEverything(shop.id, typed);
+                  onDeleted();
                 })
               }
             >
-              {actions.tapLabel(deleteKey, 'Delete shop', 'Tap again to delete everything')}
+              {actions.tapLabel(
+                'delete-forever',
+                'Delete forever',
+                'Tap again: delete everything now',
+              )}
             </Button>
-          )}
-        </div>
-      </Section>
-    </List>
+            {cancelButton}
+          </div>
+        </>
+      )}
+    </Section>
+    </>
   );
 }

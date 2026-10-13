@@ -7,7 +7,9 @@ import { requireAuth, requireSuperAdmin } from '../auth/middleware.js';
 import {
   createShop,
   deleteShop,
+  deleteShopWithEverything,
   listAllShops,
+  shopContents,
   updatePlatformShop,
 } from '../services/shop.js';
 import { getRetention, runRetention, updateRetention } from '../services/retention.js';
@@ -37,6 +39,24 @@ export function platformRoutes(): Hono<AppBindings> {
     await deleteShop(c.get('db'), c.req.valid('param').id);
     return c.body(null, 204);
   });
+
+  // Deleting a shop with its orders: first see what goes, then confirm by name.
+  app.get('/shops/:id/contents', zValidator('param', idParam), async (c) =>
+    c.json(await shopContents(c.get('db'), c.req.valid('param').id)),
+  );
+  app.post(
+    '/shops/:id/delete-all',
+    zValidator('param', idParam),
+    zValidator('json', z.object({ confirmName: z.string().min(1).max(128) })),
+    async (c) =>
+      c.json(
+        await deleteShopWithEverything(
+          c.get('db'),
+          c.req.valid('param').id,
+          c.req.valid('json').confirmName,
+        ),
+      ),
+  );
 
   // Data retention: how long personal data is kept, and a manual cleanup.
   app.get('/retention', async (c) => c.json(await getRetention(c.get('db'))));
