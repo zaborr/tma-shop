@@ -53,9 +53,30 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
 export class ApiClient {
   private token: string | null = null;
   private shop: string | null = null;
+  private reauth: (() => Promise<string>) | null = null;
+  private reauthing: Promise<string> | null = null;
 
   setToken(token: string | null): void {
     this.token = token;
+  }
+
+  /** How to get a fresh session when the current one expires (the app stays open for hours). */
+  setReauth(reauth: (() => Promise<string>) | null): void {
+    this.reauth = reauth;
+  }
+
+  private async refreshToken(): Promise<boolean> {
+    if (!this.reauth) return false;
+    // Several calls can expire at once: share one refresh.
+    this.reauthing ??= this.reauth().finally(() => {
+      this.reauthing = null;
+    });
+    try {
+      this.token = await this.reauthing;
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /** Shop (id or slug) that shop-scoped calls — catalog, cart, orders, admin — apply to. */
@@ -63,13 +84,16 @@ export class ApiClient {
     this.shop = shop;
   }
 
-  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  private async request<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
     const headers = new Headers(init.headers);
     if (init.body) headers.set('Content-Type', 'application/json');
     if (this.token) headers.set('Authorization', `Bearer ${this.token}`);
     if (this.shop) headers.set('X-Shop', this.shop);
 
     const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+    if (res.status === 401 && !retried && path !== '/auth' && (await this.refreshToken())) {
+      return this.request<T>(path, init, true);
+    }
     if (res.status === 204) return undefined as T;
 
     const data: unknown = await res.json().catch(() => null);

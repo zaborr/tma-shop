@@ -22,7 +22,12 @@ export function catalogRoutes(): Hono<AppBindings> {
   });
 
   app.get('/products/:id', zValidator('param', idParam), async (c) => {
-    const product = await getProductById(c.get('db'), c.get('shopId'), c.req.valid('param').id);
+    const product = await getProductById(
+      c.get('db'),
+      c.get('shopId'),
+      c.req.valid('param').id,
+      c.get('canManage'),
+    );
     if (!product) throw ApiError.notFound('Product not found');
     return c.json(product);
   });

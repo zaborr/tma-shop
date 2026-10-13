@@ -29,6 +29,8 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
         const session = await api.auth(initDataRaw);
         if (cancelled) return;
         api.setToken(session.token);
+        // Sessions last an hour; renew silently with the same launch data.
+        api.setReauth(async () => (await api.auth(initDataRaw)).token);
         setUser(session.user);
         setStatus('ready');
       } catch (err) {
