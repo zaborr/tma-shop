@@ -61,16 +61,3 @@ export async function cancelExpiredOrders(db: Database, env: Env): Promise<numbe
   }
   return cancelled;
 }
-
-/** Checks for expired unpaid orders now and every hour while the server is up. */
-export function scheduleAutoCancel(db: Database, env: Env): void {
-  const run = (): void => {
-    cancelExpiredOrders(db, env)
-      .then((count) => {
-        if (count > 0) console.log(`Auto-cancelled ${count} unpaid order(s).`);
-      })
-      .catch((error: unknown) => console.error('Auto-cancel failed:', error));
-  };
-  run();
-  setInterval(run, 60 * 60 * 1000).unref();
-}

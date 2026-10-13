@@ -1,0 +1,35 @@
+import type { Env } from '../config/env.js';
+import type { Database } from '../db/client.js';
+import { cancelExpiredOrders } from './autoCancel.js';
+import { runRetention } from './retention.js';
+
+/** Hours between maintenance runs. Fewer runs keep the database asleep longer (Neon). */
+export const MAINTENANCE_EVERY_HOURS = 3;
+
+/**
+ * Background housekeeping, all in one go so the database wakes up once:
+ * cancels unpaid orders past their shop's deadline, then applies the data
+ * retention policy.
+ */
+export async function runMaintenance(db: Database, env: Env): Promise<void> {
+  try {
+    const cancelled = await cancelExpiredOrders(db, env);
+    if (cancelled > 0) console.log(`Auto-cancelled ${cancelled} unpaid order(s).`);
+  } catch (error) {
+    console.error('Auto-cancel failed:', error);
+  }
+  try {
+    const report = await runRetention(db);
+    const total = report.ordersAnonymized + report.cartsDeleted + report.usersDeleted;
+    if (total > 0) console.log('Data retention:', report);
+  } catch (error) {
+    console.error('Data retention failed:', error);
+  }
+}
+
+/** Runs the maintenance now and every few hours while the server is up. */
+export function scheduleMaintenance(db: Database, env: Env): void {
+  const run = (): void => void runMaintenance(db, env);
+  run();
+  setInterval(run, MAINTENANCE_EVERY_HOURS * 60 * 60 * 1000).unref();
+}
