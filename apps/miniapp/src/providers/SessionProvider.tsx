@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { retrieveRawInitData } from '@telegram-apps/sdk-react';
 import type { SessionUser } from '@tma-shop/shared';
 import { api } from '../api/client.js';
+import { t } from '../i18n/index.js';
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -25,7 +26,7 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
     async function authenticate(): Promise<void> {
       try {
         const initDataRaw = retrieveRawInitData();
-        if (!initDataRaw) throw new Error('Launch the app from Telegram');
+        if (!initDataRaw) throw new Error(t('env.description'));
         const session = await api.auth(initDataRaw);
         if (cancelled) return;
         api.setToken(session.token);
@@ -35,7 +36,7 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
         setStatus('ready');
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Authentication failed');
+        setError(err instanceof Error ? err.message : t('app.signInFailed'));
         setStatus('error');
       }
     }

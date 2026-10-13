@@ -4,6 +4,7 @@ import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { AdminOnly, isSale, needsAttention, toMajor } from './common.js';
 import { useShop, useShopPath } from '../../providers/ShopProvider.js';
+import { t, tn } from '../../i18n/index.js';
 
 /** Admin menu: one entry per section, with live counters. */
 export function AdminHomePage(): React.JSX.Element {
@@ -29,88 +30,95 @@ function AdminHome(): React.JSX.Element {
 
   return (
     <List>
-      <Section header="Orders">
+      <Section header={t('adminHome.orders')}>
         <Cell
           onClick={() => navigate(to('/admin/orders?filter=attention'))}
-          subtitle="Payments to verify, change requests, refunds"
+          subtitle={t('adminHome.toReviewHint')}
           after={toReview > 0 ? <Badge type="number">{toReview}</Badge> : undefined}
         >
-          🔔 To review
+          {t('adminHome.toReview')}
         </Cell>
         <Cell
           onClick={() => navigate(to('/admin/orders'))}
-          subtitle={orders.data ? `${all.length} orders` : 'Loading…'}
+          subtitle={orders.data ? tn(all.length, 'count.orders.one', 'count.orders.other') : t('common.loading')}
         >
-          📦 All orders
+          {t('adminHome.allOrders')}
         </Cell>
         <Cell
           onClick={() => navigate(to('/admin/summary'))}
-          subtitle={orders.data ? `${sales} paid orders` : 'Loading…'}
+          subtitle={orders.data ? tn(sales, 'count.paidOrders.one', 'count.paidOrders.other') : t('common.loading')}
         >
-          📊 Sales summary
+          {t('adminHome.summary')}
         </Cell>
         <Cell
           onClick={() => navigate(to('/admin/export'))}
-          subtitle="Excel / CSV to your chat · shipping list"
+          subtitle={t('adminHome.exportHint')}
         >
-          📤 Export
+          {t('adminHome.export')}
         </Cell>
       </Section>
 
-      <Section header="Catalog">
+      <Section header={t('catalog.title')}>
         <Cell
           onClick={() => navigate(to('/admin/catalog'))}
-          subtitle={products.data ? `${products.data.length} products` : 'Loading…'}
+          subtitle={
+            products.data
+              ? tn(products.data.length, 'count.products.one', 'count.products.other')
+              : t('common.loading')
+          }
         >
-          🗂️ Categories & products
+          {t('adminHome.catalog')}
         </Cell>
-        <Cell onClick={() => navigate(to('/admin/products/new'))}>➕ New product</Cell>
+        <Cell onClick={() => navigate(to('/admin/products/new'))}>{t('adminHome.newProduct')}</Cell>
       </Section>
 
-      <Section header="Settings">
+      <Section header={t('adminHome.settings')}>
         <Cell
           onClick={() => navigate(to('/admin/settings'))}
-          subtitle={config.isVisible ? config.name : `${config.name} · 🙈 hidden`}
+          subtitle={config.isVisible ? config.name : t('adminHome.nameHidden', { name: config.name })}
         >
-          🏪 Store profile
+          {t('adminHome.profile')}
         </Cell>
         <Cell
           onClick={() => navigate(to('/admin/wallets'))}
           subtitle={
             config.paymentMethods.length > 0
-              ? `${config.paymentMethods.length} payment options`
-              : '⚠️ None — customers can’t pay yet'
+              ? tn(config.paymentMethods.length, 'count.paymentOptions.one', 'count.paymentOptions.other')
+              : t('adminHome.noWallets')
           }
         >
-          👛 Wallets
+          {t('adminHome.wallets')}
         </Cell>
         <Cell
           onClick={() => navigate(to('/admin/fee'))}
           subtitle={
             fee > 0
-              ? `${config.orderFeeLabel}: ${toMajor(fee)} per order`
-              : 'Off'
+              ? t('adminHome.feeOn', { label: config.orderFeeLabel, amount: toMajor(fee) })
+              : t('common.off')
           }
         >
-          💸 Order fee
+          {t('adminHome.fee')}
         </Cell>
         <Cell
           onClick={() => navigate(to('/admin/shipping'))}
           subtitle={
             activeZones > 0
-              ? `${activeZones} zone${activeZones === 1 ? '' : 's'}${
-                  config.addressPublicKey ? '' : ' · ⚠️ no address key'
-                }`
-              : 'Off — no delivery address asked'
+              ? tn(activeZones, 'count.zones.one', 'count.zones.other') +
+                (config.addressPublicKey ? '' : t('adminHome.noAddressKey'))
+              : t('adminHome.shippingOff')
           }
         >
-          🚚 Shipping zones
+          {t('adminHome.shipping')}
         </Cell>
         <Cell
           onClick={() => navigate(to('/admin/address-key'))}
-          subtitle={config.addressKeyFingerprint ? `Key ${config.addressKeyFingerprint}` : 'Not set'}
+          subtitle={
+            config.addressKeyFingerprint
+              ? t('adminHome.keyId', { id: config.addressKeyFingerprint })
+              : t('common.notSet')
+          }
         >
-          🔑 Address key
+          {t('adminHome.addressKey')}
         </Cell>
       </Section>
     </List>

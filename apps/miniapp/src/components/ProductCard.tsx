@@ -5,6 +5,7 @@ import { formatPrice } from '../lib/format.js';
 import { ProductImage } from './ProductImage.js';
 import { isSoldOut, priceRange } from '../lib/variants.js';
 import { useShopPath } from '../providers/ShopProvider.js';
+import { t } from '../i18n/index.js';
 
 export function ProductCard({ product }: { product: Product }): React.JSX.Element {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ export function ProductCard({ product }: { product: Product }): React.JSX.Elemen
   const price =
     min === max
       ? formatPrice(min, product.currency)
-      : `from ${formatPrice(min, product.currency)}`;
+      : t('product.from', { price: formatPrice(min, product.currency) });
 
   return (
     <Cell
@@ -22,7 +23,7 @@ export function ProductCard({ product }: { product: Product }): React.JSX.Elemen
       before={<ProductImage url={product.imageUrl} alt={product.title} size={56} />}
       subtitle={product.description}
       after={price}
-      hint={outOfStock ? 'Out of stock' : undefined}
+      hint={outOfStock ? t('product.outOfStock') : undefined}
       multiline
     >
       {product.title}

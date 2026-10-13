@@ -11,6 +11,7 @@ import { ProductImage } from '../../components/ProductImage.js';
 import { CategoriesSection } from './CategoriesSection.js';
 import { AdminOnly, ErrorBanner, toInput, useAdminActions, type AdminActions } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
+import { t, tn } from '../../i18n/index.js';
 
 /** Categories (create, rename, reorder, delete) and the products grouped by category. */
 export function AdminCatalogPage(): React.JSX.Element {
@@ -39,7 +40,7 @@ function AdminCatalog(): React.JSX.Element {
     })),
     {
       key: 'none',
-      title: 'No category',
+      title: t('adminCatalog.noCategory'),
       items: productList.filter(
         (p) => p.categoryId === null || !categoryList.some((c) => c.id === p.categoryId),
       ),
@@ -51,7 +52,7 @@ function AdminCatalog(): React.JSX.Element {
       <ErrorBanner message={actions.error} />
 
       <Section>
-        <Cell onClick={() => navigate(to('/admin/products/new'))}>➕ New product</Cell>
+        <Cell onClick={() => navigate(to('/admin/products/new'))}>{t('adminHome.newProduct')}</Cell>
       </Section>
 
       <CategoriesSection
@@ -70,7 +71,7 @@ function AdminCatalog(): React.JSX.Element {
           .filter((group) => group.items.length > 0 || group.key !== 'none')
           .map((group) => (
             <Section key={group.key} header={`${group.title} · ${group.items.length}`}>
-              {group.items.length === 0 && <Cell>No products in this category</Cell>}
+              {group.items.length === 0 && <Cell>{t('adminCatalog.emptyCategory')}</Cell>}
               {group.items.map((product) => (
                 <ProductRow
                   key={product.id}
@@ -82,7 +83,7 @@ function AdminCatalog(): React.JSX.Element {
             </Section>
           ))}
 
-      <Section footer="Hidden products are not shown in the shop. Deleting a product that already has orders hides it instead, so order history stays intact.">
+      <Section footer={t('adminCatalog.footer')}>
         {null}
       </Section>
     </List>
@@ -92,12 +93,16 @@ function AdminCatalog(): React.JSX.Element {
 /** "12 in stock", "unlimited stock" or, with variants, "6 variants · 40 in stock". */
 function stockSummary(product: Product): string {
   if (product.options.length === 0) {
-    return product.stock === null ? 'unlimited stock' : `${product.stock} in stock`;
+    return product.stock === null
+      ? t('adminCatalog.unlimited')
+      : t('adminCatalog.inStock', { count: product.stock });
   }
   const active = product.variants.filter((v) => v.isActive);
   const tracked = active.every((v) => v.stock !== null);
   const total = active.reduce((sum, v) => sum + (v.stock ?? 0), 0);
-  return `${active.length} variants · ${tracked ? `${total} in stock` : 'unlimited stock'}`;
+  return `${tn(active.length, 'count.variants.one', 'count.variants.other')} · ${
+    tracked ? t('adminCatalog.inStock', { count: total }) : t('adminCatalog.unlimited')
+  }`;
 }
 
 function ProductRow({
@@ -116,7 +121,7 @@ function ProductRow({
       subtitle={[
         formatPrice(product.price, product.currency),
         stockSummary(product),
-        product.isActive ? null : '🙈 hidden',
+        product.isActive ? null : t('adminCatalog.hidden'),
       ]
         .filter(Boolean)
         .join(' · ')}
@@ -124,7 +129,7 @@ function ProductRow({
       description={
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
           <Button size="s" mode="bezeled" onClick={onEdit}>
-            Edit
+            {t('common.edit')}
           </Button>
           <Button
             size="s"
@@ -135,14 +140,14 @@ function ProductRow({
               )
             }
           >
-            {product.isActive ? 'Hide' : 'Show'}
+            {product.isActive ? t('common.hide') : t('common.show')}
           </Button>
           <Button
             size="s"
             mode="plain"
             onClick={() => void actions.twoTap(key, () => api.adminDeleteProduct(product.id))}
           >
-            {actions.tapLabel(key, 'Delete', 'Tap again to delete')}
+            {actions.tapLabel(key, t('common.delete'), t('common.tapAgainToDelete'))}
           </Button>
         </div>
       }

@@ -8,6 +8,7 @@ import { shopPath } from '../providers/ShopProvider.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { ProductImage } from '../components/ProductImage.js';
+import { t } from '../i18n/index.js';
 
 let startParamUsed = false;
 
@@ -43,13 +44,13 @@ export function ShopsPage(): React.JSX.Element {
     <List>
       {shops.length === 0 ? (
         <Placeholder
-          header="No shops yet"
-          description={isSuperAdmin ? 'Create the first one in Platform admin.' : 'Come back soon!'}
+          header={t('shops.empty')}
+          description={isSuperAdmin ? t('shops.emptyAdmin') : t('shops.emptyCustomer')}
         >
           <span style={{ fontSize: 48 }}>🏪</span>
         </Placeholder>
       ) : (
-        <Section header="Shops">
+        <Section header={t('shops.title')}>
           {shops.map((shop) => (
             <Cell
               key={shop.id}
@@ -57,7 +58,7 @@ export function ShopsPage(): React.JSX.Element {
               before={<ProductImage url={shop.imageUrl} alt={shop.name} size={56} />}
               subtitle={shop.description || undefined}
               description={
-                [shop.isVisible ? null : '🙈 Hidden', shop.canManage ? '🛠️ You manage it' : null]
+                [shop.isVisible ? null : t('shops.hidden'), shop.canManage ? t('shops.youManage') : null]
                   .filter(Boolean)
                   .join(' · ') || undefined
               }
@@ -70,9 +71,9 @@ export function ShopsPage(): React.JSX.Element {
       )}
 
       {isSuperAdmin && (
-        <Section header="Platform">
-          <Cell onClick={() => navigate('/platform')} subtitle="Create, hide and assign admins">
-            🛰️ Platform admin
+        <Section header={t('shops.platform')}>
+          <Cell onClick={() => navigate('/platform')} subtitle={t('shops.platformHint')}>
+            {t('shops.platformAdmin')}
           </Cell>
         </Section>
       )}

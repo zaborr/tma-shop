@@ -2,6 +2,7 @@ import { Button, Cell, Section } from '@telegram-apps/telegram-ui';
 import { Input } from '../../components/Field.js';
 import type { PriceTier, Product } from '@tma-shop/shared';
 import { toMajor } from './common.js';
+import { t } from '../../i18n/index.js';
 
 /** A tier as typed: "from" quantity and unit price in token units. */
 export interface TierDraft {
@@ -14,9 +15,9 @@ const QTY_RE = /^\d+$/;
 export const MAX_TIERS = 10;
 
 export function initialTiers(product: Product | null): TierDraft[] {
-  return (product?.priceTiers ?? []).map((t) => ({
-    minQty: String(t.minQty),
-    price: toMajor(t.price),
+  return (product?.priceTiers ?? []).map((tier) => ({
+    minQty: String(tier.minQty),
+    price: toMajor(tier.price),
   }));
 }
 
@@ -28,14 +29,14 @@ export function buildTiers(drafts: readonly TierDraft[]): { tiers: PriceTier[] }
     const qty = row.minQty.trim();
     const price = row.price.trim();
     if (!QTY_RE.test(qty) || Number(qty) < 2) {
-      return { error: 'Each tier starts at 2 units or more' };
+      return { error: t('tiers.min2') };
     }
-    if (!PRICE_RE.test(price)) return { error: `Invalid price for ${qty}+ units` };
+    if (!PRICE_RE.test(price)) return { error: t('tiers.badPrice', { qty }) };
     tiers.push({ minQty: Number(qty), price: Math.round(Number(price.replace(',', '.')) * 100) });
   }
   tiers.sort((a, b) => a.minQty - b.minQty);
-  if (tiers.some((t, i) => i > 0 && t.minQty === tiers[i - 1]?.minQty)) {
-    return { error: 'Two tiers start at the same quantity' };
+  if (tiers.some((tier, i) => i > 0 && tier.minQty === tiers[i - 1]?.minQty)) {
+    return { error: t('tiers.duplicate') };
   }
   return { tiers };
 }
@@ -55,19 +56,17 @@ export function TiersEditor({
   withVariants: boolean;
 }): React.JSX.Element {
   const update = (index: number, patch: Partial<TierDraft>): void =>
-    setTiers(tiers.map((t, i) => (i === index ? { ...t, ...patch } : t)));
+    setTiers(tiers.map((tier, i) => (i === index ? { ...tier, ...patch } : tier)));
 
   return (
     <Section
-      header="Quantity tiers"
-      footer={
-        `From 1 unit the price is ${basePrice || '—'} ${currency}. Add tiers for lower prices when buying more` +
-        (withVariants
-          ? '; all options count together and keep their own price difference (e.g. XL +2).'
-          : '.')
-      }
+      header={t('tiers.title')}
+      footer={t(withVariants ? 'tiers.footerVariants' : 'tiers.footer', {
+        price: basePrice || '—',
+        currency,
+      })}
     >
-      {tiers.length === 0 && <Cell multiline>No tiers: the same price for any quantity.</Cell>}
+      {tiers.length === 0 && <Cell multiline>{t('tiers.empty')}</Cell>}
       {tiers.map((tier, index) => {
         const qtyBad =
           tier.minQty.trim() !== '' &&
@@ -77,7 +76,7 @@ export function TiersEditor({
           <div key={index} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', padding: '0 8px' }}>
             <div style={{ flex: 1 }}>
               <Input
-                header="From (units)"
+                header={t('tiers.from')}
                 type="text"
                 inputMode="numeric"
                 placeholder="5"
@@ -88,7 +87,7 @@ export function TiersEditor({
             </div>
             <div style={{ flex: 1 }}>
               <Input
-                header={`Unit price (${currency})`}
+                header={t('tiers.unitPrice', { currency })}
                 type="text"
                 inputMode="decimal"
                 placeholder="9.00"
@@ -114,7 +113,7 @@ export function TiersEditor({
             mode="bezeled"
             onClick={() => setTiers([...tiers, { minQty: '', price: '' }])}
           >
-            ➕ Add tier
+            {t('tiers.add')}
           </Button>
         </div>
       )}

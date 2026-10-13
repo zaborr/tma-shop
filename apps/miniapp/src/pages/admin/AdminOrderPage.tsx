@@ -20,6 +20,7 @@ import {
 import { useShopPath } from '../../providers/ShopProvider.js';
 import { AddressSection } from './AddressSection.js';
 import { TrackingText } from '../../components/TrackingText.js';
+import { t } from '../../i18n/index.js';
 
 const breakAll: React.CSSProperties = { wordBreak: 'break-all', whiteSpace: 'normal' };
 
@@ -51,10 +52,12 @@ function AdminOrder(): React.JSX.Element {
     <List>
       <ErrorBanner message={actions.error} />
 
-      <Section header={`Order #${o.id.slice(0, 8)}`}>
-        <Cell after={statusLabel(o)}>Status</Cell>
-        <Cell after={formatDate(o.createdAt)}>Created</Cell>
-        {o.updatedAt !== o.createdAt && <Cell after={formatDate(o.updatedAt)}>Updated</Cell>}
+      <Section header={t('orders.orderNumber', { id: o.id.slice(0, 8) })}>
+        <Cell after={statusLabel(o)}>{t('adminOrder.status')}</Cell>
+        <Cell after={formatDate(o.createdAt)}>{t('adminOrder.created')}</Cell>
+        {o.updatedAt !== o.createdAt && (
+          <Cell after={formatDate(o.updatedAt)}>{t('adminOrder.updated')}</Cell>
+        )}
         <Cell
           after={
             o.contactUsername ? (
@@ -66,27 +69,27 @@ function AdminOrder(): React.JSX.Element {
             )
           }
         >
-          Customer
+          {t('adminOrder.customer')}
         </Cell>
-        <Cell after={o.userId === null ? '—' : String(o.userId)}>Telegram id</Cell>
+        <Cell after={o.userId === null ? '—' : String(o.userId)}>{t('adminOrder.telegramId')}</Cell>
         {o.anonymizedAt && (
-          <Cell multiline subtitle={`Since ${formatDate(o.anonymizedAt)}`}>
-            Anonymized: address and link to the customer deleted (data retention)
+          <Cell multiline subtitle={t('adminOrder.since', { date: formatDate(o.anonymizedAt) })}>
+            {t('adminOrder.anonymized')}
           </Cell>
         )}
         {o.trackingNumber && (
-          <Cell subtitle="Tracking" multiline>
+          <Cell subtitle={t('order.tracking')} multiline>
             <TrackingText value={o.trackingNumber} />
           </Cell>
         )}
         {o.statusNote && (
-          <Cell subtitle="Last note to the customer" multiline>
+          <Cell subtitle={t('adminOrder.lastNote')} multiline>
             {o.statusNote}
           </Cell>
         )}
       </Section>
 
-      <Section header={`Items · ${o.items.reduce((n, i) => n + i.quantity, 0)}`}>
+      <Section header={t('adminOrder.items', { count: o.items.reduce((n, i) => n + i.quantity, 0) })}>
         {o.items.map((item) => (
           <Cell
             key={itemKey(item)}
@@ -98,24 +101,26 @@ function AdminOrder(): React.JSX.Element {
           </Cell>
         ))}
         {o.fee > 0 && (
-          <Cell after={money(o.fee)}>{shop.data?.orderFeeLabel ?? 'Order fee'}</Cell>
+          <Cell after={money(o.fee)}>{shop.data?.orderFeeLabel ?? t('fee.title')}</Cell>
         )}
         {o.shippingZoneName && (
-          <Cell after={o.shipping > 0 ? money(o.shipping) : 'Free'}>
-            {`Shipping · ${o.shippingZoneName}`}
+          <Cell after={o.shipping > 0 ? money(o.shipping) : t('cart.free')}>
+            {t('cart.shippingZoneLine', { zone: o.shippingZoneName })}
           </Cell>
         )}
-        <Cell after={<strong>{money(o.total)}</strong>}>Total</Cell>
+        <Cell after={<strong>{money(o.total)}</strong>}>{t('cart.total')}</Cell>
       </Section>
 
-      <Section header="Payment">
-        <Cell after={money(o.amountPaid)}>Paid (confirmed)</Cell>
-        {o.amountSubmitted > 0 && <Cell after={money(o.amountSubmitted)}>To verify</Cell>}
-        {o.amountDue > 0 && <Cell after={money(o.amountDue)}>Still due</Cell>}
-        {o.amountDue < 0 && <Cell after={money(-o.amountDue)}>To refund</Cell>}
-        {o.paymentNetwork && <Cell after={o.paymentNetwork}>Last method</Cell>}
+      <Section header={t('adminOrder.payment')}>
+        <Cell after={money(o.amountPaid)}>{t('adminOrder.paid')}</Cell>
+        {o.amountSubmitted > 0 && (
+          <Cell after={money(o.amountSubmitted)}>{t('adminOrder.toVerify')}</Cell>
+        )}
+        {o.amountDue > 0 && <Cell after={money(o.amountDue)}>{t('adminOrder.due')}</Cell>}
+        {o.amountDue < 0 && <Cell after={money(-o.amountDue)}>{t('adminOrder.toRefund')}</Cell>}
+        {o.paymentNetwork && <Cell after={o.paymentNetwork}>{t('adminOrder.lastMethod')}</Cell>}
         {o.paymentTxHash && (
-          <Cell subtitle="Last transaction" multiline>
+          <Cell subtitle={t('adminOrder.lastTx')} multiline>
             {o.paymentTxUrl ? (
               <a href={o.paymentTxUrl} target="_blank" rel="noreferrer" style={breakAll}>
                 {o.paymentTxHash}
@@ -132,7 +137,7 @@ function AdminOrder(): React.JSX.Element {
       {o.changeRequest && <ChangeRequestSection order={o} actions={actions} />}
 
       {o.paymentLog.length > 0 && (
-        <Section header="Payment history">
+        <Section header={t('adminOrder.history')}>
           {o.paymentLog.map((entry, index) => (
             <Cell
               key={`${entry.at}-${index}`}
@@ -143,7 +148,7 @@ function AdminOrder(): React.JSX.Element {
               after={`${entry.type === 'refund' ? '−' : '+'}${money(entry.amount)}`}
               multiline
             >
-              {entry.type === 'refund' ? '↩️ Refund sent' : '💰 Payment received'}
+              {entry.type === 'refund' ? t('adminOrder.refundSent') : t('adminOrder.paymentReceived')}
             </Cell>
           ))}
         </Section>
@@ -169,13 +174,13 @@ function ChangeRequestSection({
 
   return (
     <Section
-      header="✏️ Change requested by the customer"
+      header={t('adminChange.title')}
       footer={
         diff > 0
-          ? `If approved, the customer pays ${money(diff)} more.`
+          ? t('adminChange.payMore', { amount: money(diff) })
           : diff < 0
-            ? `If approved, you refund ${money(-diff)}.`
-            : 'Same amount: nothing to pay or refund.'
+            ? t('adminChange.refund', { amount: money(-diff) })
+            : t('adminChange.same')
       }
     >
       {change.items.map((item) => {
@@ -202,7 +207,7 @@ function ChangeRequestSection({
             ❌ {itemName(item)}
           </Cell>
         ))}
-      <Cell after={`${money(order.total)} → ${money(change.total)}`}>Total</Cell>
+      <Cell after={`${money(order.total)} → ${money(change.total)}`}>{t('cart.total')}</Cell>
       <div style={{ display: 'flex', gap: 8, padding: 16 }}>
         <Button
           size="m"
@@ -211,7 +216,7 @@ function ChangeRequestSection({
             void actions.twoTap(`approve:${order.id}`, () => api.adminApproveChange(order.id))
           }
         >
-          {actions.tapLabel(`approve:${order.id}`, 'Approve')}
+          {actions.tapLabel(`approve:${order.id}`, t('adminChange.approve'))}
         </Button>
         <Button
           size="m"
@@ -220,7 +225,7 @@ function ChangeRequestSection({
             void actions.twoTap(`reject:${order.id}`, () => api.adminRejectChange(order.id))
           }
         >
-          {actions.tapLabel(`reject:${order.id}`, 'Reject')}
+          {actions.tapLabel(`reject:${order.id}`, t('adminChange.reject'))}
         </Button>
       </div>
     </Section>
@@ -257,24 +262,20 @@ function ActionsSection({
 
   return (
     <Section
-      header="Actions"
-      footer={
-        next.length > 0
-          ? 'When the status changes, the bot sends the customer a message (with your note, if you write one).'
-          : undefined
-      }
+      header={t('actions.title')}
+      footer={next.length > 0 ? t('actions.footer') : undefined}
     >
       {next.length > 0 && (
         <Textarea
-          header="Note to the customer (optional)"
-          placeholder="e.g. It will arrive on Friday"
+          header={t('actions.note')}
+          placeholder={t('actions.notePlaceholder')}
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
       )}
       {next.includes('shipped') && (
         <Input
-          header="Tracking number or link (optional)"
+          header={t('actions.tracking')}
           value={tracking}
           onChange={(e) => setTracking(e.target.value)}
         />
@@ -289,7 +290,7 @@ function ActionsSection({
             >
               {tapLabel(
                 `paid:${id}`,
-                `✅ Mark paid · ${money(order.amountSubmitted || order.amountDue)}`,
+                t('actions.markPaid', { amount: money(order.amountSubmitted || order.amountDue) }),
               )}
             </Button>
             {errorCode === 'stock_short' && (
@@ -298,7 +299,7 @@ function ActionsSection({
                 mode="bezeled"
                 onClick={() => void run(() => setStatus('paid', { force: true }))}
               >
-                Confirm anyway (stock will stay at 0)
+                {t('actions.confirmAnyway')}
               </Button>
             )}
             <Button
@@ -306,7 +307,7 @@ function ActionsSection({
               mode="bezeled"
               onClick={() => void twoTap(`reject:${id}`, () => setStatus('pending'))}
             >
-              {tapLabel(`reject:${id}`, 'Reject payment (customer sends it again)')}
+              {tapLabel(`reject:${id}`, t('actions.rejectPayment'))}
             </Button>
           </>
         )}
@@ -316,7 +317,7 @@ function ActionsSection({
             mode="filled"
             onClick={() => void run(() => setStatus('shipped', trackingInput()))}
           >
-            🚚 Mark shipped
+            {t('actions.markShipped')}
           </Button>
         )}
         {(order.status === 'paid' || order.status === 'shipped') && (
@@ -325,7 +326,7 @@ function ActionsSection({
             mode="bezeled"
             onClick={() => void twoTap(`delivered:${id}`, () => setStatus('fulfilled'))}
           >
-            {tapLabel(`delivered:${id}`, '📦 Mark delivered')}
+            {tapLabel(`delivered:${id}`, t('actions.markDelivered'))}
           </Button>
         )}
         {order.amountDue < 0 && (
@@ -334,7 +335,7 @@ function ActionsSection({
             mode="bezeled"
             onClick={() => void twoTap(`refund:${id}`, () => api.adminRecordRefund(id))}
           >
-            {tapLabel(`refund:${id}`, `↩️ Mark refunded · ${money(-order.amountDue)}`)}
+            {tapLabel(`refund:${id}`, t('actions.markRefunded', { amount: money(-order.amountDue) }))}
           </Button>
         )}
         {next.includes('cancelled') && (
@@ -346,8 +347,8 @@ function ActionsSection({
             {tapLabel(
               `cancel:${id}`,
               order.amountPaid > 0
-                ? `Cancel order (refund ${money(order.amountPaid)})`
-                : 'Cancel order',
+                ? t('actions.cancelRefund', { amount: money(order.amountPaid) })
+                : t('actions.cancel'),
             )}
           </Button>
         )}
@@ -361,7 +362,7 @@ function ActionsSection({
             })
           }
         >
-          {tapLabel(`delete:${id}`, 'Delete order', 'Tap again to delete')}
+          {tapLabel(`delete:${id}`, t('actions.delete'), t('common.tapAgainToDelete'))}
         </Button>
       </div>
     </Section>

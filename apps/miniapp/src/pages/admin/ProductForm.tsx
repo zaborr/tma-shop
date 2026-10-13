@@ -15,6 +15,7 @@ import {
   type VariantDraft,
 } from './VariantsEditor.js';
 import { buildTiers, initialTiers, TiersEditor, type TierDraft } from './TiersEditor.js';
+import { t } from '../../i18n/index.js';
 
 /** Create a product, or edit `product` when given. */
 export function ProductForm({
@@ -91,7 +92,7 @@ export function ProductForm({
       const saved = product
         ? await api.adminUpdateProduct(product.id, input)
         : await api.adminCreateProduct(input);
-      setMessage(`${product ? 'Saved' : 'Created'} "${saved.title}"`);
+      setMessage(t(product ? 'productForm.saved' : 'productForm.created', { name: saved.title }));
       if (!product) {
         setTitle('');
         setSlug('');
@@ -106,7 +107,7 @@ export function ProductForm({
       }
       onSaved();
     } catch (err) {
-      setMessage(err instanceof ApiClientError ? err.message : 'Could not save the product');
+      setMessage(err instanceof ApiClientError ? err.message : t('productForm.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -114,16 +115,16 @@ export function ProductForm({
 
   return (
     <>
-    <Section header={product ? `Edit product: ${product.title}` : 'Add product'}>
-      <Input header="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+    <Section header={product ? t('productForm.editTitle', { name: product.title }) : t('productForm.addTitle')}>
+      <Input header={t('productForm.title')} value={title} onChange={(e) => setTitle(e.target.value)} />
       <Input
-        header="Slug (optional, auto from title)"
+        header={t('productForm.slug')}
         placeholder={title ? toSlug(title) : 'te-verde-sencha'}
         value={slug}
         onChange={(e) => setSlug(e.target.value)}
       />
       <Cell
-        subtitle="Category"
+        subtitle={t('productForm.category')}
         multiline
         description={
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
@@ -132,7 +133,7 @@ export function ProductForm({
               mode={categoryId === null ? 'filled' : 'bezeled'}
               onClick={() => setCategoryId(null)}
             >
-              None
+              {t('productForm.none')}
             </Button>
             {categories.map((c) => (
               <Button
@@ -147,20 +148,20 @@ export function ProductForm({
           </div>
         }
       >
-        {categories.find((c) => c.id === categoryId)?.title ?? 'No category'}
+        {categories.find((c) => c.id === categoryId)?.title ?? t('adminCatalog.noCategory')}
       </Cell>
       <Cell
-        subtitle="Price currency"
+        subtitle={t('productForm.currency')}
         after={
           <div style={{ display: 'flex', gap: 8 }}>
-            {TOKENS.map((t) => (
+            {TOKENS.map((option) => (
               <Button
-                key={t}
+                key={option}
                 size="s"
-                mode={t === token ? 'filled' : 'bezeled'}
-                onClick={() => setToken(t)}
+                mode={option === token ? 'filled' : 'bezeled'}
+                onClick={() => setToken(option)}
               >
-                {t}
+                {option}
               </Button>
             ))}
           </div>
@@ -171,8 +172,8 @@ export function ProductForm({
       <Input
         header={
           withVariants
-            ? `Base price (${token}) — used by variants without their own`
-            : `Price (${token}, e.g. 12.90)`
+            ? t('productForm.basePrice', { token })
+            : t('productForm.price', { token })
         }
         type="text"
         inputMode="decimal"
@@ -181,7 +182,7 @@ export function ProductForm({
       />
       {!withVariants && (
         <Input
-          header={stockInvalid ? 'Stock — whole number, or empty' : 'Stock (empty = unlimited)'}
+          header={stockInvalid ? t('productForm.stockInvalid') : t('productForm.stock')}
           type="text"
           inputMode="numeric"
           status={stockInvalid ? 'error' : 'default'}
@@ -190,7 +191,7 @@ export function ProductForm({
         />
       )}
       <Input
-        header={imageInvalid ? 'Image URL — must start with https://' : 'Image URL (optional)'}
+        header={imageInvalid ? t('common.imageInvalid') : t('common.image')}
         type="url"
         placeholder="https://…/photo.jpg"
         status={imageInvalid ? 'error' : 'default'}
@@ -199,11 +200,11 @@ export function ProductForm({
       />
       {image !== '' && !imageInvalid && (
         <div style={{ padding: '8px 16px' }}>
-          <ProductImage url={image} alt="Preview" size={96} />
+          <ProductImage url={image} alt={t('common.preview')} size={96} />
         </div>
       )}
       <Textarea
-        header="Description"
+        header={t('productForm.description')}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
       />
@@ -234,11 +235,11 @@ export function ProductForm({
           disabled={!title.trim() || imageInvalid || (!withVariants && stockInvalid) || formError !== null}
           onClick={() => void submit()}
         >
-          {product ? 'Save changes' : 'Create product'}
+          {product ? t('productForm.saveChanges') : t('productForm.create')}
         </Button>
         {product && (
           <Button stretched mode="plain" onClick={onCancel}>
-            Cancel editing
+            {t('productForm.cancelEditing')}
           </Button>
         )}
         {message && <Cell multiline>{message}</Cell>}

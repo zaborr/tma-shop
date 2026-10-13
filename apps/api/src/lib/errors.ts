@@ -1,5 +1,7 @@
 import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import { langFrom } from '@tma-shop/shared';
+import { translateError } from '../i18n/errors.js';
 
 /** Application error carrying an HTTP status and a stable machine-readable code. */
 export class ApiError extends Error {
@@ -33,6 +35,8 @@ export class ApiError extends Error {
   }
 }
 
+/** JSON error body, with the message in the app's language (`X-Lang` header). */
 export function errorResponse(c: Context, error: ApiError) {
-  return c.json({ error: { code: error.code, message: error.message } }, error.status);
+  const message = translateError(error.message, langFrom(c.req.header('X-Lang')));
+  return c.json({ error: { code: error.code, message } }, error.status);
 }

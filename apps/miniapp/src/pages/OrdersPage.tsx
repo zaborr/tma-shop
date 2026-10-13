@@ -4,19 +4,24 @@ import { Badge, Button, Cell, List, Placeholder, Section } from '@telegram-apps/
 import type { OrderStatus } from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
-import { formatPrice, pluralize } from '../lib/format.js';
+import { formatPrice } from '../lib/format.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { useShopPath } from '../providers/ShopProvider.js';
+import { t, tn, type MessageKey } from '../i18n/index.js';
 
-const STATUS_META: Record<OrderStatus, { label: string; type: 'number' | 'dot' }> = {
-  pending: { label: 'Awaiting payment', type: 'dot' },
-  awaiting_payment: { label: 'Verifying payment', type: 'dot' },
-  paid: { label: 'Paid · preparing', type: 'dot' },
-  cancelled: { label: 'Cancelled', type: 'dot' },
-  shipped: { label: 'Shipped', type: 'dot' },
-  fulfilled: { label: 'Delivered', type: 'dot' },
-};
+/** Order status as the customer sees it. */
+function statusText(status: OrderStatus): string {
+  const keys: Record<OrderStatus, MessageKey> = {
+    pending: 'orderStatus.pending',
+    awaiting_payment: 'orderStatus.awaiting_payment',
+    paid: 'orderStatus.paid',
+    cancelled: 'orderStatus.cancelled',
+    shipped: 'orderStatus.shipped',
+    fulfilled: 'orderStatus.fulfilled',
+  };
+  return t(keys[status]);
+}
 
 /** Customers can delete orders with nothing paid or under verification. */
 const DELETABLE: OrderStatus[] = ['pending', 'cancelled'];
@@ -41,7 +46,7 @@ export function OrdersPage(): React.JSX.Element {
       await api.deleteOrder(orderId);
       setReloadKey((k) => k + 1);
     } catch (err) {
-      setDeleteError(err instanceof ApiClientError ? err.message : 'Could not delete the order');
+      setDeleteError(err instanceof ApiClientError ? err.message : t('orders.deleteFailed'));
     }
   };
 
@@ -49,7 +54,7 @@ export function OrdersPage(): React.JSX.Element {
   if (error) return <ErrorView message={error} />;
   if (!orders || orders.length === 0) {
     return (
-      <Placeholder header="No orders yet" description="Your orders will appear here">
+      <Placeholder header={t('orders.empty')} description={t('orders.emptyHint')}>
         <span style={{ fontSize: 48 }}>📦</span>
       </Placeholder>
     );
@@ -64,12 +69,12 @@ export function OrdersPage(): React.JSX.Element {
           </Cell>
         </Section>
       )}
-      <Section header="My orders">
+      <Section header={t('orders.title')}>
         {orders.map((order) => (
           <Cell
             key={order.id}
             onClick={() => navigate(to(`/orders/${order.id}`))}
-            subtitle={pluralize(order.items.length, 'item', 'items')}
+            subtitle={tn(order.items.length, 'items.one', 'items.other')}
             after={formatPrice(order.total, order.currency)}
             description={
               DELETABLE.includes(order.status) &&
@@ -84,7 +89,7 @@ export function OrdersPage(): React.JSX.Element {
                     void remove(order.id);
                   }}
                 >
-                  {armed === order.id ? 'Tap again to delete' : 'Delete'}
+                  {armed === order.id ? t('common.tapAgainToDelete') : t('common.delete')}
                 </Button>
               ) : (
                 <Badge type="dot" />
@@ -92,14 +97,14 @@ export function OrdersPage(): React.JSX.Element {
             }
             hint={
               order.changeRequest
-                ? 'Change requested'
+                ? t('orders.changeRequested')
                 : order.status === 'pending' && order.amountPaid > 0
-                  ? 'Difference to pay'
-                  : STATUS_META[order.status].label
+                  ? t('orders.differenceToPay')
+                  : statusText(order.status)
             }
             multiline
           >
-            Order #{order.id.slice(0, 8)}
+            {t('orders.orderNumber', { id: order.id.slice(0, 8) })}
           </Cell>
         ))}
       </Section>

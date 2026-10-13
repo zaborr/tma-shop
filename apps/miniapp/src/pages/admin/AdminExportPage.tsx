@@ -9,21 +9,22 @@ import { itemName } from '../../lib/variants.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { askWriteAccess } from '../../lib/writeAccess.js';
 import { AdminOnly, ErrorBanner } from './common.js';
+import { locale, t, tn, type MessageKey } from '../../i18n/index.js';
 
-const SCOPES: Array<{ key: ExportScope; label: string }> = [
-  { key: 'paid', label: 'Paid' },
-  { key: 'toFulfil', label: 'To ship' },
-  { key: 'shipped', label: 'Shipped' },
-  { key: 'fulfilled', label: 'Delivered' },
-  { key: 'unpaid', label: 'Not paid' },
-  { key: 'all', label: 'All' },
+const SCOPES: Array<{ key: ExportScope; label: MessageKey }> = [
+  { key: 'paid', label: 'export.paid' },
+  { key: 'toFulfil', label: 'filter.toShip' },
+  { key: 'shipped', label: 'orderStatus.shipped' },
+  { key: 'fulfilled', label: 'orderStatus.fulfilled' },
+  { key: 'unpaid', label: 'filter.unpaid' },
+  { key: 'all', label: 'catalog.all' },
 ];
 
 type Period = 'all' | 'thisMonth' | 'lastMonth';
-const PERIODS: Array<{ key: Period; label: string }> = [
-  { key: 'all', label: 'All time' },
-  { key: 'thisMonth', label: 'This month' },
-  { key: 'lastMonth', label: 'Last month' },
+const PERIODS: Array<{ key: Period; label: MessageKey }> = [
+  { key: 'all', label: 'export.allTime' },
+  { key: 'thisMonth', label: 'export.thisMonth' },
+  { key: 'lastMonth', label: 'export.lastMonth' },
 ];
 
 /** [from, to) of a period in local time, as ISO instants. */
@@ -89,9 +90,9 @@ function AdminExport(): React.JSX.Element {
         ...periodRange(period),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
-      setMessage(`Sent to your chat with the bot ✓ (${result.orders} orders)`);
+      setMessage(t('export.sent', { orders: tn(result.orders, 'count.orders.one', 'count.orders.other') }));
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Could not export');
+      setError(err instanceof ApiClientError ? err.message : t('export.failed'));
     } finally {
       setBusy(null);
     }
@@ -105,7 +106,7 @@ function AdminExport(): React.JSX.Element {
     try {
       const privateKey = loadPrivateKey(shop.id);
       if (!privateKey) {
-        setError('Paste your private key in Admin → Address key first.');
+        setError(t('export.needKey'));
         return;
       }
       const { from, to } = periodRange(period);
@@ -117,11 +118,26 @@ function AdminExport(): React.JSX.Element {
           (!to || o.createdAt < to),
       );
       if (orders.length === 0) {
-        setError('No orders with a delivery address match these filters.');
+        setError(t('export.noAddresses'));
         return;
       }
       const rows: Array<Array<string | number>> = [
-        ['Order', 'Date', 'Username', 'Zone', 'Name', 'Address', 'Address 2', 'Postal code', 'City', 'Region', 'Country', 'Phone', 'Notes', 'Items'],
+        [
+          t('csv.order'),
+          t('csv.date'),
+          t('csv.username'),
+          t('csv.zone'),
+          t('csv.name'),
+          t('csv.address'),
+          t('csv.address2'),
+          t('csv.postalCode'),
+          t('csv.city'),
+          t('csv.region'),
+          t('csv.country'),
+          t('csv.phone'),
+          t('csv.notes'),
+          t('csv.items'),
+        ],
       ];
       let failed = 0;
       for (const o of orders) {
@@ -129,7 +145,7 @@ function AdminExport(): React.JSX.Element {
           const a = await decryptAddress(o.encryptedAddress ?? '', privateKey);
           rows.push([
             `#${o.id.slice(0, 8)}`,
-            new Date(o.createdAt).toLocaleString(),
+            new Date(o.createdAt).toLocaleString(locale()),
             o.contactUsername ? `@${o.contactUsername}` : '',
             o.shippingZoneName ?? '',
             a.name,
@@ -152,9 +168,10 @@ function AdminExport(): React.JSX.Element {
       setMessage(
         result === 'failed'
           ? null
-          : `Shipping list ready: ${rows.length - 1} addresses${failed ? ` (${failed} need another key)` : ''}`,
+          : t('export.listReady', { count: rows.length - 1 }) +
+            (failed ? ` ${t('export.needOtherKey', { count: failed })}` : ''),
       );
-      if (result === 'failed') setError('This device could not save the file.');
+      if (result === 'failed') setError(t('export.saveFailed'));
     } finally {
       setBusy(null);
     }
@@ -169,7 +186,7 @@ function AdminExport(): React.JSX.Element {
         </Section>
       )}
 
-      <Section header="Orders">
+      <Section header={t('adminHome.orders')}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 12 }}>
           {SCOPES.map((s) => (
             <Button
@@ -178,12 +195,12 @@ function AdminExport(): React.JSX.Element {
               mode={s.key === scope ? 'filled' : 'bezeled'}
               onClick={() => setScope(s.key)}
             >
-              {s.label}
+              {t(s.label)}
             </Button>
           ))}
         </div>
       </Section>
-      <Section header="Period">
+      <Section header={t('export.period')}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 12 }}>
           {PERIODS.map((p) => (
             <Button
@@ -192,19 +209,19 @@ function AdminExport(): React.JSX.Element {
               mode={p.key === period ? 'filled' : 'bezeled'}
               onClick={() => setPeriod(p.key)}
             >
-              {p.label}
+              {t(p.label)}
             </Button>
           ))}
         </div>
       </Section>
 
       <Section
-        header="Send to my chat"
-        footer="The bot sends the file to your private chat with it. The Excel has 4 sheets: summary, orders, order lines and products sold. Addresses are not included (they are encrypted)."
+        header={t('export.toChat')}
+        footer={t('export.toChatFooter')}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
           <Button stretched loading={busy === 'xlsx'} onClick={() => void send('xlsx')}>
-            📊 Excel report
+            {t('export.excel')}
           </Button>
           <Button
             stretched
@@ -212,7 +229,7 @@ function AdminExport(): React.JSX.Element {
             loading={busy === 'csv-orders'}
             onClick={() => void send('csv-orders')}
           >
-            CSV · one row per order
+            {t('export.csvOrders')}
           </Button>
           <Button
             stretched
@@ -220,14 +237,14 @@ function AdminExport(): React.JSX.Element {
             loading={busy === 'csv-lines'}
             onClick={() => void send('csv-lines')}
           >
-            CSV · one row per product
+            {t('export.csvLines')}
           </Button>
         </div>
       </Section>
 
       <Section
-        header="Shipping list (CSV)"
-        footer="Decrypts the delivery addresses here with the private key on this device, so they never reach the server unencrypted."
+        header={t('export.shippingList')}
+        footer={t('export.shippingListFooter')}
       >
         <div style={{ padding: 16 }}>
           <Button
@@ -236,7 +253,7 @@ function AdminExport(): React.JSX.Element {
             loading={busy === 'shipping'}
             onClick={() => void shippingList()}
           >
-            📦 Shipping list
+            {t('export.shippingButton')}
           </Button>
         </div>
       </Section>

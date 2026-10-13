@@ -6,6 +6,7 @@ import type { ShippingZone } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { AdminOnly, ErrorBanner, toMajor, useAdminActions } from './common.js';
+import { t } from '../../i18n/index.js';
 
 const PRICE_RE = /^\d+([.,]\d{1,2})?$/;
 
@@ -91,12 +92,11 @@ function ShippingForm({
       {anyActive && !shop.addressPublicKey && (
         <Section>
           <Cell multiline>
-            ⚠️ Set up an address key first: without it customers can’t send their address and
-            orders with delivery are blocked.
+            {t('shipping.needKey')}
           </Cell>
           <div style={{ padding: '0 16px 16px' }}>
             <Button size="s" mode="bezeled" onClick={() => navigate(to('/admin/address-key'))}>
-              🔑 Address key
+              {t('adminHome.addressKey')}
             </Button>
           </div>
         </Section>
@@ -105,21 +105,21 @@ function ShippingForm({
       {rows.length === 0 && (
         <Section>
           <Cell multiline>
-            No zones: checkout doesn’t ask for an address. Add zones to ship physical products.
+            {t('shipping.empty')}
           </Cell>
         </Section>
       )}
 
       {rows.map((row, index) => (
-        <Section key={row.key} header={`Zone ${index + 1}`}>
+        <Section key={row.key} header={t('shipping.zone', { n: index + 1 })}>
           <Input
-            header="Name"
-            placeholder="Spain mainland"
+            header={t('shipping.name')}
+            placeholder={t('shipping.namePlaceholder')}
             value={row.name}
             onChange={(e) => update(row.key, { name: e.target.value })}
           />
           <Input
-            header="Cost per order (e.g. 4.90)"
+            header={t('shipping.cost')}
             type="text"
             inputMode="decimal"
             status={row.price.trim() === '' || PRICE_RE.test(row.price.trim()) ? 'default' : 'error'}
@@ -127,7 +127,7 @@ function ShippingForm({
             onChange={(e) => update(row.key, { price: e.target.value })}
           />
           <Input
-            header="Free from order amount (optional)"
+            header={t('shipping.freeFrom')}
             type="text"
             inputMode="decimal"
             placeholder="e.g. 50"
@@ -144,11 +144,11 @@ function ShippingForm({
                 mode={row.active ? 'bezeled' : 'plain'}
                 onClick={() => update(row.key, { active: !row.active })}
               >
-                {row.active ? 'On' : 'Off'}
+                {row.active ? t('variants.on') : t('variants.off')}
               </Button>
             }
           >
-            {row.active ? 'Offered at checkout' : 'Not offered'}
+            {row.active ? t('shipping.offered') : t('shipping.notOffered')}
           </Cell>
           <div style={{ padding: '0 16px 12px' }}>
             <Button
@@ -156,13 +156,13 @@ function ShippingForm({
               mode="plain"
               onClick={() => setRows((prev) => prev.filter((r) => r.key !== row.key))}
             >
-              Remove zone
+              {t('shipping.remove')}
             </Button>
           </div>
         </Section>
       ))}
 
-      <Section footer="Costs are charged once per order, in the order’s currency (USDC or EURC). Past orders keep the shipping they were charged.">
+      <Section footer={t('shipping.footer')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
           <Button
             stretched
@@ -175,10 +175,10 @@ function ShippingForm({
               setNextKey((k) => k + 1);
             }}
           >
-            ➕ Add zone
+            {t('shipping.add')}
           </Button>
           <Button stretched loading={busy} disabled={invalid} onClick={() => void save()}>
-            Save zones
+            {t('shipping.save')}
           </Button>
         </div>
       </Section>

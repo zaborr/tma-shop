@@ -6,6 +6,7 @@ import { api } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { Loader } from '../components/Loader.js';
 import { CartProvider } from './CartProvider.js';
+import { t } from '../i18n/index.js';
 
 interface ShopValue {
   shop: ShopConfig;
@@ -50,9 +51,9 @@ function ShopScope({ shopRef }: { shopRef: string }): React.JSX.Element {
 
   if (shop.error) {
     return (
-      <Placeholder header="Shop not available" description={shop.error}>
+      <Placeholder header={t('shop.unavailable')} description={shop.error}>
         <span style={{ fontSize: 48 }}>🏪</span>
-        <Button onClick={() => navigate('/')}>All shops</Button>
+        <Button onClick={() => navigate('/')}>{t('shop.allShops')}</Button>
       </Placeholder>
     );
   }

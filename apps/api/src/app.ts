@@ -28,7 +28,7 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
     cors({
       origin: origin === '*' ? '*' : origin.split(',').map((o) => o.trim()),
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowHeaders: ['Authorization', 'Content-Type', 'X-Shop'],
+      allowHeaders: ['Authorization', 'Content-Type', 'X-Shop', 'X-Lang'],
     }),
   );
 

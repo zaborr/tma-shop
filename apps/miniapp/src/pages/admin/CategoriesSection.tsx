@@ -5,6 +5,7 @@ import type { Category } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { toSlug } from '../../lib/slug.js';
 import { Loader } from '../../components/Loader.js';
+import { t, tn } from '../../i18n/index.js';
 
 /** Create, rename, reorder and delete the shop's categories. */
 export function CategoriesSection({
@@ -68,16 +69,16 @@ export function CategoriesSection({
 
   return (
     <Section
-      header="Categories"
-      footer="Customers can filter the catalog by category. Deleting a category keeps its products, without a category."
+      header={t('categories.title')}
+      footer={t('categories.footer')}
     >
       {loading && <Loader />}
-      {!loading && categories.length === 0 && <Cell>No categories yet</Cell>}
+      {!loading && categories.length === 0 && <Cell>{t('categories.empty')}</Cell>}
       {categories.map((category, index) =>
         renaming === category.id ? (
           <div key={category.id}>
             <Input
-              header={`Rename "${category.title}"`}
+              header={t('categories.rename', { name: category.title })}
               value={renameTitle}
               onChange={(e) => setRenameTitle(e.target.value)}
             />
@@ -88,17 +89,17 @@ export function CategoriesSection({
                 disabled={!renameTitle.trim()}
                 onClick={() => void rename(category)}
               >
-                Save
+                {t('common.save')}
               </Button>
               <Button size="s" mode="plain" onClick={() => setRenaming(null)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
         ) : (
           <Cell
             key={category.id}
-            subtitle={`${productCount(category.id)} products`}
+            subtitle={tn(productCount(category.id), 'count.products.one', 'count.products.other')}
             multiline
             description={
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
@@ -126,7 +127,7 @@ export function CategoriesSection({
                     setRenameTitle(category.title);
                   }}
                 >
-                  Rename
+                  {t('categories.renameButton')}
                 </Button>
                 <Button
                   size="s"
@@ -137,7 +138,7 @@ export function CategoriesSection({
                     )
                   }
                 >
-                  {tapLabel(`category:${category.id}`, 'Delete', 'Tap again to delete')}
+                  {tapLabel(`category:${category.id}`, t('common.delete'), t('common.tapAgainToDelete'))}
                 </Button>
               </div>
             }
@@ -147,14 +148,14 @@ export function CategoriesSection({
         ),
       )}
       <Input
-        header="New category"
-        placeholder="e.g. Green tea"
+        header={t('categories.new')}
+        placeholder={t('categories.newPlaceholder')}
         value={newTitle}
         onChange={(e) => setNewTitle(e.target.value)}
       />
       <div style={{ padding: '0 16px 16px' }}>
         <Button stretched mode="bezeled" disabled={!newTitle.trim()} onClick={() => void add()}>
-          Add category
+          {t('categories.add')}
         </Button>
       </div>
     </Section>

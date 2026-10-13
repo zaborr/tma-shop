@@ -13,6 +13,7 @@ import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { useShopPath } from '../providers/ShopProvider.js';
 import { TrackingText } from '../components/TrackingText.js';
+import { locale, t } from '../i18n/index.js';
 
 const breakAll: React.CSSProperties = { wordBreak: 'break-all', whiteSpace: 'normal' };
 const errorStyle: React.CSSProperties = { color: 'var(--tgui--destructive_text_color)' };
@@ -45,7 +46,7 @@ export function PaymentPage(): React.JSX.Element {
 
   // When nothing is left to do here, the main button takes the customer back.
   useMainButton({
-    text: 'Back to shop',
+    text: t('order.backToShop'),
     visible: current !== null && !needsPayment && !editing,
     onClick: () => navigate(to('/')),
   });
@@ -67,7 +68,7 @@ export function PaymentPage(): React.JSX.Element {
     <List>
       {done && <DoneSection kind={done} onShop={() => navigate(to('/'))} onOrders={() => navigate(to('/orders'))} />}
 
-      <Section header={`Order #${current.id.slice(0, 8)}`}>
+      <Section header={t('orders.orderNumber', { id: current.id.slice(0, 8) })}>
         {current.items.map((item) => (
           <Cell
             key={itemKey(item)}
@@ -83,23 +84,25 @@ export function PaymentPage(): React.JSX.Element {
         {current.shippingZoneName && (
           <Cell
             after={
-              current.shipping > 0 ? formatPrice(current.shipping, current.currency) : 'Free'
+              current.shipping > 0 ? formatPrice(current.shipping, current.currency) : t('cart.free')
             }
           >
-            {`Shipping · ${current.shippingZoneName}`}
+            {t('cart.shippingZoneLine', { zone: current.shippingZoneName })}
           </Cell>
         )}
-        <Cell after={formatPrice(current.total, current.currency)}>Total</Cell>
+        <Cell after={formatPrice(current.total, current.currency)}>{t('cart.total')}</Cell>
         {current.amountPaid > 0 && (
-          <Cell after={formatPrice(current.amountPaid, current.currency)}>Paid so far</Cell>
+          <Cell after={formatPrice(current.amountPaid, current.currency)}>{t('order.paidSoFar')}</Cell>
         )}
         {current.amountPaid > 0 && current.amountDue > 0 && (
-          <Cell after={formatPrice(current.amountDue, current.currency)}>Difference to pay</Cell>
+          <Cell after={formatPrice(current.amountDue, current.currency)}>{t('orders.differenceToPay')}</Cell>
         )}
         {current.amountDue < 0 && (
-          <Cell after={formatPrice(-current.amountDue, current.currency)}>Refund from the shop</Cell>
+          <Cell after={formatPrice(-current.amountDue, current.currency)}>{t('order.refund')}</Cell>
         )}
-        {current.contactUsername && <Cell after={`@${current.contactUsername}`}>Contact</Cell>}
+        {current.contactUsername && (
+          <Cell after={`@${current.contactUsername}`}>{t('order.contact')}</Cell>
+        )}
       </Section>
 
       {!done && <StatusSection order={current} autoCancelHours={shop.data.autoCancelHours} />}
@@ -117,8 +120,8 @@ export function PaymentPage(): React.JSX.Element {
       )}
       {needsPayment && methods.length === 0 && (
         <Placeholder
-          header={`No ${current.currency} wallet configured`}
-          description="Contact the shop to pay this order."
+          header={t('order.noWallet', { currency: current.currency })}
+          description={t('order.noWalletHint')}
         >
           <span style={{ fontSize: 48 }}>💳</span>
         </Placeholder>
@@ -140,10 +143,10 @@ export function PaymentPage(): React.JSX.Element {
             }}
           />
         ) : (
-          <Section footer="The shop has to approve changes. Then you pay the difference, or get the extra back if the order costs less.">
+          <Section footer={t('order.changeFooter')}>
             <div style={{ padding: 16 }}>
               <Button stretched mode="bezeled" onClick={() => setEditing(true)}>
-                ✏️ Request a change
+                {t('order.requestChange')}
               </Button>
             </div>
           </Section>
@@ -165,21 +168,17 @@ function DoneSection({
   return (
     <Section>
       <Placeholder
-        header={kind === 'payment' ? 'Payment sent!' : 'Change requested!'}
-        description={
-          kind === 'payment'
-            ? 'Thanks for your purchase. We will confirm your payment shortly — you can follow it in My orders.'
-            : 'The shop will review your change. You will get a message when it is approved.'
-        }
+        header={kind === 'payment' ? t('order.paymentSent') : t('order.changeSent')}
+        description={kind === 'payment' ? t('order.paymentSentHint') : t('order.changeSentHint')}
       >
         <span style={{ fontSize: 56 }}>✅</span>
       </Placeholder>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 16px 16px' }}>
         <Button stretched onClick={onShop}>
-          Back to shop
+          {t('order.backToShop')}
         </Button>
         <Button stretched mode="plain" onClick={onOrders}>
-          My orders
+          {t('orders.title')}
         </Button>
       </div>
     </Section>
@@ -200,17 +199,19 @@ function StatusSection({
       {deadline && (
         <Section>
           <Cell multiline>
-            {`Please pay before ${deadline.toLocaleString(undefined, {
-              day: 'numeric',
-              month: 'short',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}, or the order will be cancelled.`}
+            {t('order.payBefore', {
+              date: deadline.toLocaleString(locale(), {
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+            })}
           </Cell>
         </Section>
       )}
       {order.statusNote && (
-        <Section header="Message from the shop">
+        <Section header={t('order.shopMessage')}>
           <Cell multiline>{order.statusNote}</Cell>
         </Section>
       )}
@@ -224,11 +225,11 @@ function StatusDetail({ order }: { order: Order }): React.JSX.Element {
     case 'awaiting_payment':
       return (
         <Section
-          header="Payment submitted"
-          footer="We are checking your transaction. You will see the order as Paid once it is confirmed."
+          header={t('order.paymentSubmitted')}
+          footer={t('order.paymentSubmittedHint')}
         >
-          <Cell subtitle="Method">{order.paymentNetwork ?? '—'}</Cell>
-          <Cell subtitle="Transaction" multiline>
+          <Cell subtitle={t('order.method')}>{order.paymentNetwork ?? '—'}</Cell>
+          <Cell subtitle={t('order.transaction')} multiline>
             {order.paymentTxUrl ? (
               <a href={order.paymentTxUrl} target="_blank" rel="noreferrer" style={breakAll}>
                 {order.paymentTxHash}
@@ -244,17 +245,17 @@ function StatusDetail({ order }: { order: Order }): React.JSX.Element {
         <Section>
           <Cell multiline>
             {order.amountDue < 0
-              ? '✅ Payment confirmed — the shop will send you the difference back'
-              : '✅ Payment confirmed'}
+              ? t('order.confirmedRefund')
+              : t('order.confirmed')}
           </Cell>
         </Section>
       );
     case 'shipped':
       return (
         <Section>
-          <Cell multiline>🚚 Your order is on its way</Cell>
+          <Cell multiline>{t('order.onItsWay')}</Cell>
           {order.trackingNumber && (
-            <Cell subtitle="Tracking" multiline>
+            <Cell subtitle={t('order.tracking')} multiline>
               <TrackingText value={order.trackingNumber} />
             </Cell>
           )}
@@ -263,9 +264,9 @@ function StatusDetail({ order }: { order: Order }): React.JSX.Element {
     case 'fulfilled':
       return (
         <Section>
-          <Cell>📦 Order delivered</Cell>
+          <Cell>{t('order.delivered')}</Cell>
           {order.trackingNumber && (
-            <Cell subtitle="Tracking" multiline>
+            <Cell subtitle={t('order.tracking')} multiline>
               <TrackingText value={order.trackingNumber} />
             </Cell>
           )}
@@ -276,15 +277,15 @@ function StatusDetail({ order }: { order: Order }): React.JSX.Element {
         <Section>
           <Cell multiline>
             {order.amountDue < 0
-              ? `❌ Order cancelled — the shop will refund you ${money(-order.amountDue)}`
-              : '❌ Order cancelled'}
+              ? t('order.cancelledRefund', { amount: money(-order.amountDue) })
+              : t('order.cancelled')}
           </Cell>
         </Section>
       );
     case 'pending':
       return order.amountPaid > 0 ? (
         <Section>
-          <Cell multiline>Part of this order is paid — please pay the rest below</Cell>
+          <Cell multiline>{t('order.payRest')}</Cell>
         </Section>
       ) : (
         <></>
@@ -326,7 +327,7 @@ function PaymentForm({
       setTxHash('');
       onSubmitted();
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Could not submit the payment');
+      setError(err instanceof ApiClientError ? err.message : t('order.submitFailed'));
     } finally {
       setBusy(false);
     }
@@ -334,7 +335,7 @@ function PaymentForm({
 
   return (
     <>
-      <Section header={resubmit ? 'Wrong transaction? Submit it again' : '1. Choose a network'}>
+      <Section header={resubmit ? t('order.resubmit') : t('order.step1')}>
         {methods.map((m) => (
           <Cell
             key={m.id}
@@ -344,35 +345,35 @@ function PaymentForm({
             }}
             after={m.id === method.id ? '✓' : ''}
           >
-            {m.token} on {m.network}
+            {t('order.tokenOn', { token: m.token, network: m.network })}
           </Cell>
         ))}
       </Section>
 
       <Section
-        header="2. Send exactly this amount"
-        footer={`Send ${method.token} on the ${method.network} network only. Another network or token can mean losing the funds.`}
+        header={t('order.step2')}
+        footer={t('order.step2Warning', { token: method.token, network: method.network })}
       >
         <Cell
-          subtitle={order.amountPaid > 0 ? 'Difference to pay' : 'Amount'}
+          subtitle={order.amountPaid > 0 ? t('orders.differenceToPay') : t('order.amount')}
           after={
             <Button
               size="s"
               mode="bezeled"
               onClick={() => void copy('amount', (due / 100).toFixed(2))}
             >
-              {copied === 'amount' ? 'Copied' : 'Copy'}
+              {copied === 'amount' ? t('common.copied') : t('common.copy')}
             </Button>
           }
         >
           {amount}
         </Cell>
         <Cell
-          subtitle={`${method.network} address`}
+          subtitle={t('order.networkAddress', { network: method.network })}
           multiline
           after={
             <Button size="s" mode="bezeled" onClick={() => void copy('address', method.address)}>
-              {copied === 'address' ? 'Copied' : 'Copy'}
+              {copied === 'address' ? t('common.copied') : t('common.copy')}
             </Button>
           }
         >
@@ -381,12 +382,12 @@ function PaymentForm({
       </Section>
 
       <Section
-        header="3. Paste the transaction hash"
-        footer="You can find it in your wallet or exchange, in the details of the transfer."
+        header={t('order.step3')}
+        footer={t('order.step3Hint')}
       >
         <Input
-          header="Transaction hash"
-          placeholder="0x… / signature"
+          header={t('order.txHash')}
+          placeholder={t('order.txHashPlaceholder')}
           value={txHash}
           onChange={(e) => setTxHash(e.target.value)}
         />
@@ -397,7 +398,7 @@ function PaymentForm({
             disabled={txHash.trim().length < 8}
             onClick={() => void submit()}
           >
-            {resubmit ? 'Update transaction' : 'I have paid'}
+            {resubmit ? t('order.updateTx') : t('order.iHavePaid')}
           </Button>
           {error && (
             <Cell multiline style={errorStyle}>
@@ -416,9 +417,9 @@ function coveredAmount(order: Order): number {
 }
 
 function differenceLabel(diff: number, currency: string): string {
-  if (diff > 0) return `You would pay ${formatPrice(diff, currency)} more`;
-  if (diff < 0) return `You would get ${formatPrice(-diff, currency)} back`;
-  return 'Same amount — nothing to pay';
+  if (diff > 0) return t('change.payMore', { amount: formatPrice(diff, currency) });
+  if (diff < 0) return t('change.getBack', { amount: formatPrice(-diff, currency) });
+  return t('change.same');
 }
 
 function PendingChange({
@@ -442,7 +443,7 @@ function PendingChange({
       await api.withdrawOrderChange(order.id);
       onWithdrawn();
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Could not withdraw the request');
+      setError(err instanceof ApiClientError ? err.message : t('change.withdrawFailed'));
     } finally {
       setBusy(false);
     }
@@ -450,7 +451,7 @@ function PendingChange({
 
   return (
     <Section
-      header="Change requested — waiting for approval"
+      header={t('change.pending')}
       footer={differenceLabel(change.total - coveredAmount(order), order.currency)}
     >
       {change.items.map((item) => (
@@ -464,12 +465,12 @@ function PendingChange({
       ))}
       {order.fee > 0 && <Cell after={formatPrice(order.fee, order.currency)}>{feeLabel}</Cell>}
       {order.shipping > 0 && (
-        <Cell after={formatPrice(order.shipping, order.currency)}>Shipping</Cell>
+        <Cell after={formatPrice(order.shipping, order.currency)}>{t('cart.shipping')}</Cell>
       )}
-      <Cell after={formatPrice(change.total, order.currency)}>New total</Cell>
+      <Cell after={formatPrice(change.total, order.currency)}>{t('change.newTotal')}</Cell>
       <div style={{ padding: 16 }}>
         <Button stretched mode="plain" loading={busy} onClick={() => void withdraw()}>
-          Withdraw request
+          {t('change.withdraw')}
         </Button>
         {error && (
           <Cell multiline style={errorStyle}>
@@ -600,7 +601,7 @@ function ChangeEditor({
       );
       onRequested();
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Could not send the request');
+      setError(err instanceof ApiClientError ? err.message : t('change.sendFailed'));
     } finally {
       setBusy(false);
     }
@@ -608,8 +609,8 @@ function ChangeEditor({
 
   return (
     <>
-      <Section header="Change your order" footer={differenceLabel(diff, order.currency)}>
-        {lines.length === 0 && <Cell multiline>Keep at least one product.</Cell>}
+      <Section header={t('change.title')} footer={differenceLabel(diff, order.currency)}>
+        {lines.length === 0 && <Cell multiline>{t('change.keepOne')}</Cell>}
         {priced.map((line) => (
           <Cell
             key={itemKey(line)}
@@ -634,7 +635,7 @@ function ChangeEditor({
                   +
                 </Button>
                 <Button size="s" mode="plain" onClick={() => setQty(itemKey(line), 0)}>
-                  Remove
+                  {t('cart.remove')}
                 </Button>
               </div>
             }
@@ -646,13 +647,13 @@ function ChangeEditor({
           <Cell after={formatPrice(order.fee, order.currency)}>{feeLabel}</Cell>
         )}
         {order.shipping > 0 && (
-          <Cell after={formatPrice(order.shipping, order.currency)}>Shipping</Cell>
+          <Cell after={formatPrice(order.shipping, order.currency)}>{t('cart.shipping')}</Cell>
         )}
-        <Cell after={formatPrice(total, order.currency)}>New total</Cell>
+        <Cell after={formatPrice(total, order.currency)}>{t('change.newTotal')}</Cell>
       </Section>
 
       {addable.length > 0 && (
-        <Section header="Add products">
+        <Section header={t('change.addProducts')}>
           {addable.map((candidate) => (
             <Cell
               key={itemKey(candidate)}
@@ -663,7 +664,7 @@ function ChangeEditor({
                   mode="bezeled"
                   onClick={() => setLines((prev) => [...prev, candidate])}
                 >
-                  Add
+                  {t('common.add')}
                 </Button>
               }
               multiline
@@ -682,10 +683,10 @@ function ChangeEditor({
             disabled={lines.length === 0}
             onClick={() => void submit()}
           >
-            Send change for approval
+            {t('change.send')}
           </Button>
           <Button stretched mode="plain" onClick={onCancel}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           {error && (
             <Cell multiline style={errorStyle}>

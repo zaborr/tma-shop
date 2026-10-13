@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Section } from '@telegram-apps/telegram-ui';
 import { Input } from '../../components/Field.js';
 import { toMajor } from './common.js';
+import { t } from '../../i18n/index.js';
 
 /** Fixed fee added once to every new order; 0 hides it everywhere. */
 export function OrderFeeForm({
@@ -32,15 +33,11 @@ export function OrderFeeForm({
 
   return (
     <Section
-      header="Order fee"
-      footer={
-        fee > 0
-          ? `Each new order includes "${label}" once, in the order's currency (USDC or EURC). Set 0 to remove it.`
-          : 'No fee is charged now, and it is not shown to customers. Set an amount to add it once to every new order.'
-      }
+      header={t('fee.title')}
+      footer={fee > 0 ? t('fee.footerOn', { label }) : t('fee.footerOff')}
     >
       <Input
-        header="Amount (e.g. 1.50 — 0 for none)"
+        header={t('fee.amount')}
         type="text"
         inputMode="decimal"
         status={invalid ? 'error' : 'default'}
@@ -48,8 +45,8 @@ export function OrderFeeForm({
         onChange={(e) => setAmount(e.target.value)}
       />
       <Input
-        header="Name shown to customers"
-        placeholder="Service fee"
+        header={t('fee.name')}
+        placeholder={t('cart.serviceFee')}
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
@@ -61,7 +58,7 @@ export function OrderFeeForm({
           disabled={invalid || (cents === fee && name.trim() === label)}
           onClick={() => void save()}
         >
-          Save fee
+          {t('fee.save')}
         </Button>
       </div>
     </Section>

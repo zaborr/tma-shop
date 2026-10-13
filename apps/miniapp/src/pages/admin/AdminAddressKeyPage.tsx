@@ -12,6 +12,7 @@ import {
 } from '../../lib/addressCrypto.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { AdminOnly, ErrorBanner, useAdminActions } from './common.js';
+import { t } from '../../i18n/index.js';
 
 /**
  * The shop's address key pair. The public key is stored on the server; the
@@ -87,19 +88,17 @@ function AdminAddressKey(): React.JSX.Element {
     setPasteError(null);
     const pem = pasted.trim();
     if (!pem.includes('PRIVATE KEY')) {
-      setPasteError('Paste the whole key, from -----BEGIN PRIVATE KEY----- to the END line.');
+      setPasteError(t('key.pasteWhole'));
       return;
     }
     const matches = shop.addressPublicKey ? await privateKeyMatches(pem, shop.addressPublicKey) : false;
     if (!matches && !allowMismatch) {
-      setPasteError(
-        'This key doesn’t match the shop’s current key. Tap “Save anyway” only if it is an older key you need to read old addresses.',
-      );
+      setPasteError(t('key.mismatch'));
       setAllowMismatch(true);
       return;
     }
     if (!savePrivateKey(shop.id, pem)) {
-      setPasteError('This device doesn’t allow saving it (private browsing?).');
+      setPasteError(t('key.cannotSave'));
       return;
     }
     setPasted('');
@@ -124,29 +123,31 @@ function AdminAddressKey(): React.JSX.Element {
       <ErrorBanner message={actions.error} />
 
       <Section
-        header="Address key"
-        footer="Customers’ phones encrypt the delivery address with the shop’s public key. Only the private key can read it — the server and the platform never can."
+        header={t('key.title')}
+        footer={t('key.footer')}
       >
-        <Cell after={hasKey ? (shop.addressKeyFingerprint ?? '✓') : 'Not set'}>Shop public key</Cell>
+        <Cell after={hasKey ? (shop.addressKeyFingerprint ?? '✓') : t('common.notSet')}>
+          {t('key.public')}
+        </Cell>
         <Cell
           after={
             deviceKey === 'checking'
               ? '…'
               : deviceKey === 'matches'
-                ? '✓ Matches'
+                ? t('key.matches')
                 : deviceKey === 'other'
-                  ? '⚠️ Other key'
-                  : 'None'
+                  ? t('key.other')
+                  : t('productForm.none')
           }
         >
-          Private key on this device
+          {t('key.onDevice')}
         </Cell>
       </Section>
 
       {newPrivateKey && (
         <Section
-          header="⚠️ Save your private key now"
-          footer="It is stored on this device only. Keep a copy in a password manager: if you lose it, the addresses can’t be read by anyone. Never share it."
+          header={t('key.saveNow')}
+          footer={t('key.saveNowFooter')}
         >
           <Textarea value={newPrivateKey} readOnly />
           <div style={{ padding: 16 }}>
@@ -154,19 +155,15 @@ function AdminAddressKey(): React.JSX.Element {
               stretched
               onClick={() => void copyText(newPrivateKey).then(setCopied)}
             >
-              {copied ? 'Copied ✓' : 'Copy private key'}
+              {copied ? t('key.copied') : t('key.copy')}
             </Button>
           </div>
         </Section>
       )}
 
       <Section
-        header={hasKey ? 'Replace key' : 'Create key'}
-        footer={
-          hasKey
-            ? 'A new key applies to new orders. Addresses already received can only be read with the old private key, so keep it.'
-            : 'Generates the key pair on this phone. The public key goes to the shop; the private key is shown once and kept on this device.'
-        }
+        header={hasKey ? t('key.replace') : t('key.create')}
+        footer={hasKey ? t('key.replaceFooter') : t('key.createFooter')}
       >
         <div style={{ padding: 16 }}>
           <Button
@@ -178,18 +175,18 @@ function AdminAddressKey(): React.JSX.Element {
             }
           >
             {hasKey
-              ? actions.tapLabel('generate', '🔄 Generate a new key pair', 'Tap again — old addresses need the old key')
-              : '🔑 Generate key pair'}
+              ? actions.tapLabel('generate', t('key.generateNew'), t('key.generateNewConfirm'))
+              : t('key.generate')}
           </Button>
         </div>
       </Section>
 
       <Section
-        header="Use your private key on this device"
-        footer="Paste the private key you saved to read addresses here (e.g. on a new phone)."
+        header={t('key.useHere')}
+        footer={t('key.useHereFooter')}
       >
         <Textarea
-          header="Private key"
+          header={t('key.private')}
           placeholder="-----BEGIN PRIVATE KEY----- …"
           value={pasted}
           onChange={(e) => {
@@ -204,7 +201,7 @@ function AdminAddressKey(): React.JSX.Element {
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
           <Button stretched disabled={!pasted.trim()} onClick={() => void savePasted()}>
-            {allowMismatch ? 'Save anyway' : 'Save on this device'}
+            {allowMismatch ? t('key.saveAnyway') : t('key.saveHere')}
           </Button>
           {deviceKey !== 'none' && (
             <Button
@@ -217,18 +214,18 @@ function AdminAddressKey(): React.JSX.Element {
                 })
               }
             >
-              {actions.tapLabel('forget', 'Forget the key on this device')}
+              {actions.tapLabel('forget', t('key.forget'))}
             </Button>
           )}
         </div>
       </Section>
 
       <Section
-        header="Advanced"
-        footer="Use a public key made elsewhere (RSA 2048+, “BEGIN PUBLIC KEY”). Removing the key turns off checkout with delivery."
+        header={t('key.advanced')}
+        footer={t('key.advancedFooter')}
       >
         <Textarea
-          header="Public key"
+          header={t('key.publicField')}
           placeholder="-----BEGIN PUBLIC KEY----- …"
           value={pastedPublic}
           onChange={(e) => setPastedPublic(e.target.value)}
@@ -240,7 +237,7 @@ function AdminAddressKey(): React.JSX.Element {
             disabled={pastedPublic.trim().length < 100}
             onClick={() => void uploadPublic()}
           >
-            Set this public key
+            {t('key.setPublic')}
           </Button>
           {hasKey && (
             <Button
@@ -250,7 +247,7 @@ function AdminAddressKey(): React.JSX.Element {
                 void actions.twoTap('remove', () => api.adminUpdateAddressKey(null))
               }
             >
-              {actions.tapLabel('remove', 'Remove the shop key')}
+              {actions.tapLabel('remove', t('key.remove'))}
             </Button>
           )}
         </div>
