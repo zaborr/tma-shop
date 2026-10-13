@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Input, Section } from '@telegram-apps/telegram-ui';
+import { Button, Section } from '@telegram-apps/telegram-ui';
+import { Input } from '../../components/Field.js';
 import { toMajor } from './common.js';
 
 /** Fixed fee added once to every new order; 0 hides it everywhere. */
