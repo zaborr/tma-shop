@@ -13,7 +13,7 @@ import {
   updateOrderFeeRequest,
   updateOrderStatusRequest,
   updateShippingRequest,
-  updateWalletsRequest,
+  updatePaymentSetupRequest,
 } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth } from '../auth/middleware.js';
@@ -47,13 +47,15 @@ import {
   updateOrderFee,
   updateShippingZones,
   updateShopProfile,
-  updateShopWallets,
+  updatePaymentSetup,
+  shopNotificationChatIds,
 } from '../services/shop.js';
 import { ApiError } from '../lib/errors.js';
 import { users } from '../db/schema.js';
 import { buildReport } from '../export/report.js';
 import { TelegramApi } from '../telegram/api.js';
 import { tr } from '../i18n/messages.js';
+import { describeCustomer } from '../services/customers.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -71,14 +73,41 @@ export function adminRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
   app.use('*', requireAuth, requireAdmin);
 
-  // Shop settings (admin view includes wallets and admin ids).
+  // Shop settings (admin view includes the payment setup and admin ids).
   app.get('/shop', (c) => c.json(getShopAdminView(c.get('shop'))));
   app.put('/shop/profile', zValidator('json', shopProfileInput), async (c) =>
     c.json(await updateShopProfile(c.get('db'), c.get('shopId'), c.req.valid('json'))),
   );
-  app.put('/shop/wallets', zValidator('json', updateWalletsRequest), async (c) =>
-    c.json(await updateShopWallets(c.get('db'), c.get('shopId'), c.req.valid('json').wallets)),
-  );
+  // Receiving addresses and accepted networks. Any address change is reported
+  // to every admin of the shop and to the platform admins.
+  app.put('/shop/payments', zValidator('json', updatePaymentSetupRequest), async (c) => {
+    const db = c.get('db');
+    const env = c.get('env');
+    const shop = c.get('shop');
+    const { before, view } = await updatePaymentSetup(db, shop.id, c.req.valid('json'));
+    const after = view.paymentSetup;
+    if (before.evmAddress !== after.evmAddress || before.solanaAddress !== after.solanaAddress) {
+      const who = await describeCustomer(db, c.get('claims').sub);
+      const recipients = [...new Set([...shopNotificationChatIds(env, shop), ...env.ADMIN_TELEGRAM_IDS])];
+      await notifyUsers(db, env.BOT_TOKEN, recipients, (lang) =>
+        [
+          tr(lang, 'wallets.changed', { shop: shop.name, who }),
+          '',
+          tr(lang, 'wallets.evm', {
+            before: before.evmAddress ?? '—',
+            after: after.evmAddress ?? '—',
+          }),
+          tr(lang, 'wallets.solana', {
+            before: before.solanaAddress ?? '—',
+            after: after.solanaAddress ?? '—',
+          }),
+          '',
+          tr(lang, 'wallets.checkIt'),
+        ].join('\n'),
+      );
+    }
+    return c.json(view);
+  });
   // Shipping zones (flat cost per order) and the address encryption public key.
   app.put('/shop/shipping', zValidator('json', updateShippingRequest), async (c) =>
     c.json(await updateShippingZones(c.get('db'), c.get('shopId'), c.req.valid('json').zones)),

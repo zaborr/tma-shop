@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
   createOrderRequest,
+  paymentMethodsOf,
   requestOrderChangeRequest,
   submitPaymentRequest,
   type CreateOrderResponse,
@@ -26,7 +27,7 @@ import {
   notifyUsers,
 } from '../services/notifications.js';
 import { describeCustomer } from '../services/customers.js';
-import { expandWallets, paymentMethodLabel } from '../config/payment-methods.js';
+import { paymentMethodLabel } from '../config/payment-methods.js';
 import { shopNotificationChatIds } from '../services/shop.js';
 import { ApiError } from '../lib/errors.js';
 
@@ -90,7 +91,7 @@ export function orderRoutes(): Hono<AppBindings> {
       const db = c.get('db');
       const { methodId, txHash } = c.req.valid('json');
 
-      const method = expandWallets(c.get('shop').wallets).find((m) => m.id === methodId);
+      const method = paymentMethodsOf(c.get('shop').paymentSetup).find((m) => m.id === methodId);
       if (!method) throw ApiError.badRequest('unknown_method', 'Unknown payment method');
 
       const order = await submitCryptoPayment(

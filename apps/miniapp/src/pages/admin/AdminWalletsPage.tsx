@@ -1,35 +1,25 @@
 import { useState } from 'react';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
+import {
+  CHAINS,
+  EVM_ADDRESS_RE,
+  SOLANA_ADDRESS_RE,
+  paymentMethodsOf,
+  stableToken,
+  type ChainId,
+  type PaymentSetup,
+  type StableToken,
+} from '@tma-shop/shared';
 import { Input } from '../../components/Field.js';
-import type { WalletInput } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
-import { AdminOnly, ErrorBanner, TOKENS, useAdminActions } from './common.js';
+import { AdminOnly, ErrorBanner, useAdminActions } from './common.js';
 import { t, tn } from '../../i18n/index.js';
 
-interface Row {
-  key: number;
-  network: string;
-  tokens: string[];
-  address: string;
-}
-
-function toRow(wallet: WalletInput, key: number): Row {
-  return {
-    key,
-    network: wallet.network,
-    tokens: wallet.token
-      .split(/[/,|]/)
-      .map((part) => part.trim().toUpperCase())
-      .filter(Boolean),
-    address: wallet.address,
-  };
-}
-
-/** The crypto wallets customers of this shop pay into. */
+/** The receiving addresses and the networks/tokens the shop accepts. */
 export function AdminWalletsPage(): React.JSX.Element {
   return (
     <AdminOnly>
@@ -40,6 +30,7 @@ export function AdminWalletsPage(): React.JSX.Element {
 
 function AdminWallets(): React.JSX.Element {
   const [reloadKey, setReloadKey] = useState(0);
+  const [saved, setSaved] = useState(false);
   const view = useAsync(() => api.adminGetShop(), [reloadKey]);
 
   if (view.loading && !view.data) return <Loader />;
@@ -47,19 +38,25 @@ function AdminWallets(): React.JSX.Element {
   if (!view.data) return <Loader />;
 
   return (
-    <WalletsForm
+    <PaymentsForm
       key={reloadKey}
-      wallets={view.data.wallets}
-      onSaved={() => setReloadKey((k) => k + 1)}
+      setup={view.data.paymentSetup}
+      saved={saved}
+      onSaved={() => {
+        setSaved(true);
+        setReloadKey((k) => k + 1);
+      }}
     />
   );
 }
 
-function WalletsForm({
-  wallets,
+function PaymentsForm({
+  setup,
+  saved,
   onSaved,
 }: {
-  wallets: WalletInput[];
+  setup: PaymentSetup;
+  saved: boolean;
   onSaved: () => void;
 }): React.JSX.Element {
   const { reload } = useShop();
@@ -67,121 +64,114 @@ function WalletsForm({
     onSaved();
     reload();
   });
-  const [rows, setRows] = useState<Row[]>(() => wallets.map(toRow));
-  const [nextKey, setNextKey] = useState(wallets.length);
+  const [evm, setEvm] = useState(setup.evmAddress ?? '');
+  const [solana, setSolana] = useState(setup.solanaAddress ?? '');
+  const [accepted, setAccepted] = useState(setup.accepted);
   const [busy, setBusy] = useState(false);
 
-  const update = (key: number, patch: Partial<Row>): void =>
-    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-  const toggleToken = (row: Row, token: string): void =>
-    update(row.key, {
-      tokens: row.tokens.includes(token)
-        ? row.tokens.filter((other) => other !== token)
-        : [...row.tokens, token],
-    });
+  const evmValue = evm.trim();
+  const solanaValue = solana.trim();
+  const evmInvalid = evmValue !== '' && !EVM_ADDRESS_RE.test(evmValue);
+  const solanaInvalid = solanaValue !== '' && !SOLANA_ADDRESS_RE.test(solanaValue);
+  const next: PaymentSetup = {
+    evmAddress: evmValue && !evmInvalid ? evmValue : null,
+    solanaAddress: solanaValue && !solanaInvalid ? solanaValue : null,
+    // Only networks whose address is set.
+    accepted: accepted.filter((a) =>
+      CHAINS[a.chain].family === 'evm' ? evmValue !== '' : solanaValue !== '',
+    ),
+  };
+  const methods = paymentMethodsOf(next);
 
-  const invalid = rows.some(
-    (r) => !r.network.trim() || r.tokens.length === 0 || !r.address.trim(),
-  );
-  const methodCount = rows.reduce(
-    (n, r) => n + r.network.split(/[/,|]/).filter((x) => x.trim()).length * r.tokens.length,
-    0,
-  );
+  const isOn = (chain: ChainId, token: StableToken): boolean =>
+    accepted.some((a) => a.chain === chain && a.token === token);
+  const toggle = (chain: ChainId, token: StableToken): void =>
+    setAccepted((prev) =>
+      isOn(chain, token)
+        ? prev.filter((a) => !(a.chain === chain && a.token === token))
+        : [...prev, { chain, token }],
+    );
 
   const save = async (): Promise<void> => {
     setBusy(true);
-    await actions.run(() =>
-      api.adminUpdateWallets(
-        rows.map((r) => ({
-          network: r.network.trim(),
-          token: r.tokens.join('/'),
-          address: r.address.trim(),
-        })),
-      ),
-    );
+    await actions.run(() => api.adminUpdatePayments(next));
     setBusy(false);
   };
+
+  /** USDC / EURC toggles for one network. */
+  const tokenRow = (chain: ChainId, hasAddress: boolean): React.JSX.Element => (
+    <Cell
+      key={chain}
+      subtitle={hasAddress ? t('wallets.accept') : t('wallets.needAddress')}
+      after={
+        <div style={{ display: 'flex', gap: 8 }}>
+          {stableToken.options.map((token) => (
+            <Button
+              key={token}
+              size="s"
+              disabled={!hasAddress}
+              mode={hasAddress && isOn(chain, token) ? 'filled' : 'bezeled'}
+              onClick={() => toggle(chain, token)}
+            >
+              {token}
+            </Button>
+          ))}
+        </div>
+      }
+    >
+      {CHAINS[chain].name}
+    </Cell>
+  );
 
   return (
     <List>
       <ErrorBanner message={actions.error} />
+      <Section>
+        <Cell multiline>{t('wallets.intro')}</Cell>
+      </Section>
 
-      {rows.length === 0 && (
-        <Section>
-          <Cell multiline>
-            {t('wallets.empty')}
-          </Cell>
-        </Section>
-      )}
+      <Section header={t('wallets.evmTitle')} footer={t('wallets.evmFooter')}>
+        <Input
+          header={evmInvalid ? t('wallets.evmInvalid') : t('wallets.evmAddress')}
+          placeholder="0x…"
+          status={evmInvalid ? 'error' : 'default'}
+          value={evm}
+          onChange={(e) => setEvm(e.target.value)}
+        />
+        {tokenRow('base', evmValue !== '' && !evmInvalid)}
+        {tokenRow('ethereum', evmValue !== '' && !evmInvalid)}
+      </Section>
 
-      {rows.map((row, index) => (
-        <Section key={row.key} header={t('wallets.wallet', { n: index + 1 })}>
-          <Input
-            header={t('wallets.networks')}
-            placeholder="Base/Ethereum"
-            value={row.network}
-            onChange={(e) => update(row.key, { network: e.target.value })}
-          />
-          <Cell
-            subtitle={t('wallets.tokens')}
-            after={
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[...new Set([...TOKENS, ...row.tokens])].map((token) => (
-                  <Button
-                    key={token}
-                    size="s"
-                    mode={row.tokens.includes(token) ? 'filled' : 'bezeled'}
-                    onClick={() => toggleToken(row, token)}
-                  >
-                    {token}
-                  </Button>
-                ))}
-              </div>
-            }
-          >
-            {row.tokens.join(' / ') || t('productForm.none')}
-          </Cell>
-          <Input
-            header={t('wallets.address')}
-            placeholder={t('wallets.addressPlaceholder')}
-            value={row.address}
-            onChange={(e) => update(row.key, { address: e.target.value })}
-          />
-          <div style={{ padding: '0 16px 12px' }}>
-            <Button
-              size="s"
-              mode="plain"
-              onClick={() => setRows((prev) => prev.filter((r) => r.key !== row.key))}
-            >
-              {t('wallets.remove')}
-            </Button>
-          </div>
-        </Section>
-      ))}
+      <Section header={t('wallets.solanaTitle')} footer={t('wallets.solanaFooter')}>
+        <Input
+          header={solanaInvalid ? t('wallets.solanaInvalid') : t('wallets.solanaAddress')}
+          status={solanaInvalid ? 'error' : 'default'}
+          value={solana}
+          onChange={(e) => setSolana(e.target.value)}
+        />
+        {tokenRow('solana', solanaValue !== '' && !solanaInvalid)}
+      </Section>
 
       <Section
-        footer={t('wallets.footer', {
-          options: tn(methodCount, 'count.paymentOptions.one', 'count.paymentOptions.other'),
-        })}
+        footer={
+          methods.length > 0
+            ? t('wallets.summary', {
+                options: tn(methods.length, 'count.paymentOptions.one', 'count.paymentOptions.other'),
+              })
+            : t('wallets.none')
+        }
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
+        <div style={{ padding: 16 }}>
           <Button
             stretched
-            mode="bezeled"
-            onClick={() => {
-              setRows((prev) => [
-                ...prev,
-                { key: nextKey, network: '', tokens: ['USDC'], address: '' },
-              ]);
-              setNextKey((k) => k + 1);
-            }}
+            loading={busy}
+            disabled={evmInvalid || solanaInvalid}
+            onClick={() => void save()}
           >
-            {t('wallets.add')}
-          </Button>
-          <Button stretched loading={busy} disabled={invalid} onClick={() => void save()}>
             {t('wallets.save')}
           </Button>
         </div>
+        {saved && <Cell multiline>{t('wallets.saved')}</Cell>}
       </Section>
     </List>
   );

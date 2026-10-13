@@ -310,7 +310,13 @@ describeDb('API integration', () => {
 
     await db
       .update(shops)
-      .set({ wallets: [{ network: 'Base', token: 'USDC', address: '0xabc0000000000000000000000000000000000000' }] })
+      .set({
+        paymentSetup: {
+          evmAddress: '0xabc0000000000000000000000000000000000000',
+          solanaAddress: null,
+          accepted: [{ chain: 'base', token: 'USDC' }],
+        },
+      })
       .where(eq(shops.id, shopId));
     const config = (await (await app.request('/api/shop')).json()) as {
       paymentMethods: Array<{ id: string }>;

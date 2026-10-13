@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { currencyCode, id, isoDateTime, slug } from './common.js';
 import { telegramUserId } from './user.js';
+import { addressFor, paymentMethod, paymentSetup } from './payments.js';
 
 /**
  * A shop (store). One deployment hosts several shops; each has its own catalog,
@@ -55,34 +56,6 @@ export const shop = z.object({
 });
 export type Shop = z.infer<typeof shop>;
 
-/**
- * A wallet as the admin enters it. Several networks and/or tokens that share
- * one address can be joined with "/" (`Ethereum/Base`, `USDC/EURC`); the shop
- * expands them into one payment method per combination.
- */
-export const walletInput = z.object({
-  network: z.string().trim().min(1).max(128),
-  token: z.string().trim().min(1).max(64),
-  address: z.string().trim().min(1).max(128),
-});
-export type WalletInput = z.infer<typeof walletInput>;
-
-/**
- * A crypto wallet the customer can pay into (one network + one token), derived
- * from the shop's wallets. Payments are verified manually.
- */
-export const paymentMethod = z.object({
-  /** Stable identifier, e.g. `usdc-base`. */
-  id: z.string().min(1).max(64),
-  /** Network name shown to the customer, e.g. `Base`, `Solana`, `Polygon`. */
-  network: z.string().min(1).max(64),
-  /** Token symbol, e.g. `USDC` or `EURC`. */
-  token: z.string().min(1).max(16),
-  /** Receiving wallet address on that network. */
-  address: z.string().min(1).max(128),
-});
-export type PaymentMethod = z.infer<typeof paymentMethod>;
-
 export const shopConfig = shop
   .pick({
     id: true,
@@ -102,7 +75,7 @@ export const shopConfig = shop
     addressKeyFingerprint: true,
   })
   .extend({
-    /** Crypto wallets for manual-verification checkout (empty when not configured). */
+    /** Ways to pay in crypto (empty when the shop set none). */
     paymentMethods: z.array(paymentMethod),
     /** Whether the current user can manage this shop (shop admin or super-admin). */
     canManage: z.boolean(),
@@ -119,7 +92,7 @@ export type ShopSummary = z.infer<typeof shopSummary>;
 export const shopAdminView = shopConfig.extend({
   sortOrder: z.number().int(),
   adminIds: z.array(telegramUserId),
-  wallets: z.array(walletInput),
+  paymentSetup: paymentSetup,
 });
 export type ShopAdminView = z.infer<typeof shopAdminView>;
 
@@ -168,10 +141,11 @@ export function payBefore(
   return new Date(Date.parse(order.updatedAt) + autoCancelHours * 60 * 60 * 1000);
 }
 
-export const updateWalletsRequest = z.object({
-  wallets: z.array(walletInput).max(50),
-});
-export type UpdateWalletsRequest = z.infer<typeof updateWalletsRequest>;
+/** Replaces the shop's payment setup; each accepted network needs its address. */
+export const updatePaymentSetupRequest = paymentSetup.refine(
+  (setup) => setup.accepted.every((a) => addressFor(setup, a.chain) !== null),
+  { message: 'Each accepted network needs its receiving address' },
+);
 
 /** What the customer types; encrypted on their device before it is sent. */
 export interface DeliveryAddress {

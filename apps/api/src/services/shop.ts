@@ -1,4 +1,4 @@
-import { and, asc, eq, or, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
 import { createHash, createPublicKey, randomUUID } from 'node:crypto';
 import type {
   PlatformShopInput,
@@ -7,13 +7,14 @@ import type {
   ShopProfileInput,
   ShopSummary,
   UpdateShippingRequest,
-  WalletInput,
+  PaymentSetup,
 } from '@tma-shop/shared';
+import { EMPTY_PAYMENT_SETUP } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import type { Env } from '../config/env.js';
 import { carts, categories, orders, products, shops } from '../db/schema.js';
 import { toShopAdminDTO, toShopConfigDTO, toShopSummaryDTO } from '../db/mappers.js';
-import { expandWallets } from '../config/payment-methods.js';
+import { legacyToSetup } from '../config/payment-methods.js';
 import { ApiError } from '../lib/errors.js';
 
 export type ShopRow = typeof shops.$inferSelect;
@@ -120,23 +121,26 @@ export async function updateShopProfile(
   return toShopAdminDTO(await updateShop(db, shopId, input));
 }
 
-/** Replaces the shop's wallets. Rejects entries that expand to nothing. */
-export async function updateShopWallets(
+/**
+ * Replaces the shop's receiving addresses and accepted networks. Returns the
+ * shop before and after, so callers can warn admins when an address changed.
+ */
+export async function updatePaymentSetup(
   db: Database,
   shopId: string,
-  wallets: WalletInput[],
-): Promise<ShopAdminView> {
-  const cleaned = wallets.map((w) => ({
-    network: w.network.trim(),
-    token: w.token.trim().toUpperCase(),
-    address: w.address.trim(),
-  }));
-  if (cleaned.length > 0 && expandWallets(cleaned).length === 0) {
-    throw ApiError.badRequest('invalid_wallets', 'Each wallet needs a network and a token');
-  }
-  return toShopAdminDTO(
-    await updateShop(db, shopId, { wallets: cleaned, walletsInitialized: true }),
-  );
+  setup: PaymentSetup,
+): Promise<{ before: PaymentSetup; view: ShopAdminView }> {
+  const current = await db.query.shops.findFirst({ where: eq(shops.id, shopId) });
+  if (!current) throw ApiError.notFound('Shop not found');
+  const cleaned: PaymentSetup = {
+    evmAddress: setup.evmAddress?.trim() || null,
+    solanaAddress: setup.solanaAddress?.trim() || null,
+    accepted: setup.accepted.filter(
+      (a, i, all) => all.findIndex((b) => b.chain === a.chain && b.token === a.token) === i,
+    ),
+  };
+  const row = await updateShop(db, shopId, { paymentSetup: cleaned, walletsInitialized: true });
+  return { before: current.paymentSetup ?? EMPTY_PAYMENT_SETUP, view: toShopAdminDTO(row) };
 }
 
 /** Replaces the shop's shipping zones; zones keep their id, new ones get one. */
@@ -308,21 +312,22 @@ export async function deleteShopWithEverything(
 }
 
 /**
- * One-time migration of the legacy `PAYMENT_METHODS` env var: copies those
- * wallets into the first shop, unless its wallets were already set up.
+ * One-time conversion of the old free-text wallets into the payment setup, for
+ * shops that have not got one yet. Networks outside the catalog are dropped
+ * (and logged).
  */
-export async function importLegacyWallets(db: Database, env: Env): Promise<void> {
-  if (env.PAYMENT_METHODS.length === 0) return;
-  const shop = env.SHOP_ID
-    ? await db.query.shops.findFirst({ where: eq(shops.id, env.SHOP_ID) })
-    : await db.query.shops.findFirst({ orderBy: asc(shops.createdAt) });
-  if (!shop || shop.walletsInitialized) return;
-  await db
-    .update(shops)
-    .set({ wallets: env.PAYMENT_METHODS, walletsInitialized: true })
-    .where(and(eq(shops.id, shop.id), eq(shops.walletsInitialized, false)));
-  console.log(
-    `Imported ${env.PAYMENT_METHODS.length} wallet(s) from PAYMENT_METHODS into shop "${shop.name}". ` +
-      'Manage them from the shop admin from now on.',
-  );
+export async function convertLegacyWallets(db: Database): Promise<void> {
+  const pending = await db.select().from(shops).where(isNull(shops.paymentSetup));
+  for (const shop of pending) {
+    if (shop.wallets.length === 0) continue;
+    const { setup, dropped } = legacyToSetup(shop.wallets);
+    await db
+      .update(shops)
+      .set({ paymentSetup: setup })
+      .where(and(eq(shops.id, shop.id), isNull(shops.paymentSetup)));
+    console.log(
+      `Converted the wallets of shop "${shop.name}": ${setup.accepted.length} payment option(s)` +
+        (dropped.length > 0 ? `; dropped (not in the catalog): ${dropped.join(', ')}` : ''),
+    );
+  }
 }

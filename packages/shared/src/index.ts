@@ -7,3 +7,4 @@ export * from './cart.js';
 export * from './order.js';
 export * from './api.js';
 export * from './i18n.js';
+export * from './payments.js';
