@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
-import type { Order } from '@tma-shop/shared';
+import { Button, Cell, Input, List, Section, Textarea } from '@telegram-apps/telegram-ui';
+import { ADMIN_STATUS_CHANGES, type Order } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { formatPrice } from '../../lib/format.js';
@@ -18,6 +18,7 @@ import {
 } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
 import { AddressSection } from './AddressSection.js';
+import { TrackingText } from '../../components/TrackingText.js';
 
 const breakAll: React.CSSProperties = { wordBreak: 'break-all', whiteSpace: 'normal' };
 
@@ -67,6 +68,16 @@ function AdminOrder(): React.JSX.Element {
           Customer
         </Cell>
         <Cell after={String(o.userId)}>Telegram id</Cell>
+        {o.trackingNumber && (
+          <Cell subtitle="Tracking" multiline>
+            <TrackingText value={o.trackingNumber} />
+          </Cell>
+        )}
+        {o.statusNote && (
+          <Cell subtitle="Last note to the customer" multiline>
+            {o.statusNote}
+          </Cell>
+        )}
       </Section>
 
       <Section header={`Items · ${o.items.reduce((n, i) => n + i.quantity, 0)}`}>
@@ -220,34 +231,98 @@ function ActionsSection({
   onDeleted: () => void;
 }): React.JSX.Element {
   const money = (amount: number): string => formatPrice(amount, order.currency);
-  const { twoTap, tapLabel, run } = actions;
+  const { twoTap, tapLabel, run, errorCode } = actions;
   const id = order.id;
+  const [note, setNote] = useState('');
+  const [tracking, setTracking] = useState(order.trackingNumber ?? '');
+  const next = ADMIN_STATUS_CHANGES[order.status];
+
+  /** Changes the status; the bot tells the customer, with the note if there is one. */
+  const setStatus = async (
+    status: Order['status'],
+    more: { trackingNumber?: string; force?: boolean } = {},
+  ): Promise<void> => {
+    const text = note.trim();
+    await api.adminSetOrderStatus(id, status, { ...(text ? { note: text } : {}), ...more });
+    setNote('');
+  };
+  const trackingInput = (): { trackingNumber?: string } =>
+    tracking.trim() ? { trackingNumber: tracking.trim() } : {};
 
   return (
-    <Section header="Actions">
+    <Section
+      header="Actions"
+      footer={
+        next.length > 0
+          ? 'When the status changes, the bot sends the customer a message (with your note, if you write one).'
+          : undefined
+      }
+    >
+      {next.length > 0 && (
+        <Textarea
+          header="Note to the customer (optional)"
+          placeholder="e.g. It will arrive on Friday"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+      )}
+      {next.includes('shipped') && (
+        <Input
+          header="Tracking number or link (optional)"
+          value={tracking}
+          onChange={(e) => setTracking(e.target.value)}
+        />
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
         {order.status === 'awaiting_payment' && (
-          <Button
-            stretched
-            mode="filled"
-            onClick={() => void twoTap(`paid:${id}`, () => api.adminSetOrderStatus(id, 'paid'))}
-          >
-            {tapLabel(
-              `paid:${id}`,
-              `✅ Mark paid · ${money(order.amountSubmitted || order.amountDue)}`,
+          <>
+            <Button
+              stretched
+              mode="filled"
+              onClick={() => void twoTap(`paid:${id}`, () => setStatus('paid'))}
+            >
+              {tapLabel(
+                `paid:${id}`,
+                `✅ Mark paid · ${money(order.amountSubmitted || order.amountDue)}`,
+              )}
+            </Button>
+            {errorCode === 'stock_short' && (
+              <Button
+                stretched
+                mode="bezeled"
+                onClick={() => void run(() => setStatus('paid', { force: true }))}
+              >
+                Confirm anyway (stock will stay at 0)
+              </Button>
             )}
-          </Button>
+            <Button
+              stretched
+              mode="bezeled"
+              onClick={() => void twoTap(`reject:${id}`, () => setStatus('pending'))}
+            >
+              {tapLabel(`reject:${id}`, 'Reject payment (customer sends it again)')}
+            </Button>
+          </>
         )}
         {order.status === 'paid' && (
           <Button
             stretched
-            mode="bezeled"
-            onClick={() => void run(() => api.adminSetOrderStatus(id, 'fulfilled'))}
+            mode="filled"
+            onClick={() => void run(() => setStatus('shipped', trackingInput()))}
           >
-            📦 Mark fulfilled
+            🚚 Mark shipped
           </Button>
         )}
-        {order.amountDue < 0 && order.status !== 'cancelled' && (
+        {(order.status === 'paid' || order.status === 'shipped') && (
+          <Button
+            stretched
+            mode="bezeled"
+            onClick={() => void twoTap(`delivered:${id}`, () => setStatus('fulfilled'))}
+          >
+            {tapLabel(`delivered:${id}`, '📦 Mark delivered')}
+          </Button>
+        )}
+        {order.amountDue < 0 && (
           <Button
             stretched
             mode="bezeled"
@@ -256,15 +331,18 @@ function ActionsSection({
             {tapLabel(`refund:${id}`, `↩️ Mark refunded · ${money(-order.amountDue)}`)}
           </Button>
         )}
-        {(order.status === 'pending' || order.status === 'awaiting_payment') && (
+        {next.includes('cancelled') && (
           <Button
             stretched
             mode="plain"
-            onClick={() =>
-              void twoTap(`cancel:${id}`, () => api.adminSetOrderStatus(id, 'cancelled'))
-            }
+            onClick={() => void twoTap(`cancel:${id}`, () => setStatus('cancelled'))}
           >
-            {tapLabel(`cancel:${id}`, 'Cancel order')}
+            {tapLabel(
+              `cancel:${id}`,
+              order.amountPaid > 0
+                ? `Cancel order (refund ${money(order.amountPaid)})`
+                : 'Cancel order',
+            )}
           </Button>
         )}
         <Button

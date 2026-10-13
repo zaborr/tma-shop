@@ -5,11 +5,31 @@ import { telegramUserId } from './user.js';
 export const orderStatus = z.enum([
   'pending', // created, not yet paid
   'awaiting_payment', // Stars invoice issued, or crypto tx submitted and waiting for manual review
-  'paid', // payment confirmed
+  'paid', // payment confirmed, being prepared
   'cancelled',
-  'fulfilled',
+  'shipped', // sent to the customer
+  'fulfilled', // delivered / completed
 ]);
 export type OrderStatus = z.infer<typeof orderStatus>;
+
+/**
+ * Status changes an admin can make. `awaiting_payment → pending` rejects the
+ * submitted payment; cancelling a paid order returns its stock and leaves the
+ * money paid as a refund owed.
+ */
+export const ADMIN_STATUS_CHANGES: Record<OrderStatus, readonly OrderStatus[]> = {
+  pending: ['paid', 'cancelled'],
+  awaiting_payment: ['paid', 'pending', 'cancelled'],
+  paid: ['shipped', 'fulfilled', 'cancelled'],
+  shipped: ['fulfilled'],
+  fulfilled: [],
+  cancelled: [],
+};
+
+/** Orders counted as sales: payment confirmed, whether shipped or delivered. */
+export function isSaleStatus(status: OrderStatus): boolean {
+  return status === 'paid' || status === 'shipped' || status === 'fulfilled';
+}
 
 /** Line item snapshot — title and price are frozen at order time. */
 export const orderItem = z.object({
@@ -76,9 +96,16 @@ export const order = z.object({
   paymentTxUrl: z.string().nullable(),
   /** Customer's Telegram username (without @), given at checkout for contact. */
   contactUsername: z.string().nullable(),
+  /** Shipment tracking number or link, set when the order is shipped. */
+  trackingNumber: z.string().nullable(),
+  /** Last message from the shop to the customer about this order. */
+  statusNote: z.string().nullable(),
   /** Confirmed money received, net of refunds. */
   amountPaid: moneyAmount,
-  /** `total - amountPaid`: >0 still to pay, <0 to refund to the customer. */
+  /**
+   * `total - amountPaid` (for a cancelled order, `-amountPaid`): >0 still to
+   * pay, <0 to refund to the customer.
+   */
   amountDue: z.number().int(),
   /** Amount covered by the transaction currently awaiting verification. */
   amountSubmitted: moneyAmount,

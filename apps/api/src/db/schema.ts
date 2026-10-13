@@ -27,6 +27,7 @@ export const orderStatusEnum = pgEnum('order_status', [
   'awaiting_payment',
   'paid',
   'cancelled',
+  'shipped',
   'fulfilled',
 ]);
 
@@ -192,6 +193,10 @@ export const orders = pgTable('orders', {
   paymentTxHash: text('payment_tx_hash'),
   /** Customer's Telegram username (without @) given at checkout. */
   contactUsername: text('contact_username'),
+  /** Shipment tracking number or link, set when the order is shipped. */
+  trackingNumber: text('tracking_number'),
+  /** Last message from the shop to the customer about this order. */
+  statusNote: text('status_note'),
   /** Confirmed money received, net of refunds (minor units of `currency`). */
   amountPaid: integer('amount_paid').notNull().default(0),
   /** Amount covered by the transaction currently awaiting verification. */

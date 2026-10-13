@@ -4,12 +4,12 @@ import { z } from 'zod';
 import { inArray } from 'drizzle-orm';
 import {
   exportRequest,
-  orderStatus,
   productInput,
   shopProfileInput,
   slug,
   updateAddressKeyRequest,
   updateOrderFeeRequest,
+  updateOrderStatusRequest,
   updateShippingRequest,
   updateWalletsRequest,
 } from '@tma-shop/shared';
@@ -26,15 +26,18 @@ import {
 } from '../services/admin.js';
 import {
   approveOrderChange,
+  changeOrderStatus,
   clearOrderChange,
   deleteOrder,
   getOrder,
   listAllOrders,
-  markOrderPaid,
   recordRefund,
-  setOrderStatus,
 } from '../services/orders.js';
-import { buildChangeDecisionMessage, notifyChats } from '../services/notifications.js';
+import {
+  buildChangeDecisionMessage,
+  buildStatusMessage,
+  notifyChats,
+} from '../services/notifications.js';
 import {
   getShopAdminView,
   updateAddressKey,
@@ -54,7 +57,6 @@ const categoryInput = z.object({
   title: z.string().min(1).max(128),
   sortOrder: z.number().int().default(0),
 });
-const statusInput = z.object({ status: orderStatus });
 
 export function adminRoutes(): Hono<AppBindings> {
   const app = new Hono<AppBindings>();
@@ -137,22 +139,24 @@ export function adminRoutes(): Hono<AppBindings> {
   app.patch(
     '/orders/:id',
     zValidator('param', idParam),
-    zValidator('json', statusInput),
+    zValidator('json', updateOrderStatusRequest),
     async (c) => {
-      const db = c.get('db');
-      const shopId = c.get('shopId');
-      const orderId = c.req.valid('param').id;
-      const { status } = c.req.valid('json');
-
-      if (status === 'paid') {
-        // Manual confirmation of a crypto payment: same path as a Stars payment,
-        // so tracked stock is decremented exactly once.
-        const order = await getOrder(db, shopId, orderId);
-        if (!order) throw ApiError.notFound('Order not found');
-        return c.json(await markOrderPaid(db, orderId, order.paymentTxHash ?? 'manual'));
+      const shop = c.get('shop');
+      const { order, previous } = await changeOrderStatus(
+        c.get('db'),
+        shop.id,
+        c.req.valid('param').id,
+        c.req.valid('json'),
+      );
+      // The customer hears about it from the bot (best effort).
+      if (order.status !== previous) {
+        await notifyChats(
+          c.get('env').BOT_TOKEN,
+          [order.userId],
+          buildStatusMessage(shop.name, order, previous),
+        );
       }
-
-      return c.json(await setOrderStatus(db, shopId, orderId, status));
+      return c.json(order);
     },
   );
 

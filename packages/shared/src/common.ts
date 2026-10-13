@@ -28,7 +28,7 @@ export const isoDateTime = z.iso.datetime();
 
 export const paginationQuery = z.object({
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
+  limit: z.coerce.number().int().positive().max(150).default(20),
 });
 export type PaginationQuery = z.infer<typeof paginationQuery>;
 

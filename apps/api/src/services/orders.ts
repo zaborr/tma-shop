@@ -1,7 +1,9 @@
 import { and, desc, eq, inArray, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
+  ADMIN_STATUS_CHANGES,
   shippingCost,
   type Order,
+  type OrderStatus,
   type OrderChangeRequest,
   type PaymentLogEntry,
 } from '@tma-shop/shared';
@@ -287,6 +289,12 @@ export async function markOrderPaid(
   db: Database,
   orderId: string,
   paymentChargeId: string,
+  options: {
+    /** Refuse (409 `stock_short`) when tracked stock no longer covers the items. */
+    checkStock?: boolean;
+    /** Message from the shop to the customer. */
+    note?: string | null;
+  } = {},
 ): Promise<Order> {
   return db.transaction(async (tx) => {
     const order = await lockOrder(tx, eq(orders.id, orderId));
@@ -295,6 +303,15 @@ export async function markOrderPaid(
     const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
     if (order.status !== 'pending' && order.status !== 'awaiting_payment') {
       return toOrderDTO(order, items);
+    }
+    if (options.checkStock && !order.stockApplied) {
+      const short = await stockShortages(tx, items);
+      if (short.length > 0) {
+        throw ApiError.conflict(
+          'stock_short',
+          `Not enough stock for this order: ${short.join('; ')}. Confirm anyway, or reject the payment.`,
+        );
+      }
     }
 
     const received =
@@ -317,6 +334,7 @@ export async function markOrderPaid(
         paymentChargeId,
         paymentLog: [...order.paymentLog, entry],
         stockApplied: true,
+        statusNote: options.note ?? null,
         updatedAt: new Date(),
       })
       .where(eq(orders.id, order.id))
@@ -346,6 +364,132 @@ export async function markOrderPaid(
 
     return toOrderDTO(updated, items);
   });
+}
+
+/** Items whose tracked stock is below what the order needs, as readable lines. */
+async function stockShortages(tx: Tx, items: OrderItemRow[]): Promise<string[]> {
+  const needed = new Map<string, { item: OrderItemRow; quantity: number }>();
+  for (const item of items) {
+    const key = lineKey(item.productId, item.variantId);
+    const prev = needed.get(key);
+    needed.set(key, { item, quantity: (prev?.quantity ?? 0) + item.quantity });
+  }
+  const variantIds = items.flatMap((i) => (i.variantId ? [i.variantId] : []));
+  const productIds = items.map((i) => i.productId);
+  const variantRows =
+    variantIds.length > 0
+      ? await tx.select().from(productVariants).where(inArray(productVariants.id, variantIds))
+      : [];
+  const productRows = await tx.select().from(products).where(inArray(products.id, productIds));
+
+  const short: string[] = [];
+  for (const { item, quantity } of needed.values()) {
+    const stock = item.variantId
+      ? variantRows.find((v) => v.id === item.variantId)?.stock
+      : productRows.find((p) => p.id === item.productId)?.stock;
+    if (stock === null || stock === undefined || stock >= quantity) continue;
+    const name = item.variantLabel ? `${item.title} (${item.variantLabel})` : item.title;
+    short.push(`${name}: ${stock} left, order needs ${quantity}`);
+  }
+  return short;
+}
+
+/** Puts an order's items back into tracked stock (when it is cancelled). */
+async function restoreStock(tx: Tx, items: OrderItemRow[]): Promise<void> {
+  for (const item of items) {
+    if (item.variantId) {
+      await tx
+        .update(productVariants)
+        .set({ stock: sql`${productVariants.stock} + ${item.quantity}` })
+        .where(
+          and(eq(productVariants.id, item.variantId), sql`${productVariants.stock} IS NOT NULL`),
+        );
+    } else {
+      await tx
+        .update(products)
+        .set({ stock: sql`${products.stock} + ${item.quantity}` })
+        .where(and(eq(products.id, item.productId), sql`${products.stock} IS NOT NULL`));
+    }
+  }
+}
+
+export interface StatusChange {
+  status: OrderStatus;
+  note?: string | undefined;
+  trackingNumber?: string | undefined;
+  force?: boolean | undefined;
+}
+
+/**
+ * An admin moves an order to another status (see `ADMIN_STATUS_CHANGES`):
+ *  - `paid`: confirms the payment (checks stock unless `force`);
+ *  - `pending` from `awaiting_payment`: rejects the submitted payment;
+ *  - `shipped`: with an optional tracking number;
+ *  - `cancelled`: returns held stock; anything paid becomes a refund owed.
+ * Returns the order and the status it had before.
+ */
+export async function changeOrderStatus(
+  db: Database,
+  shopId: string,
+  orderId: string,
+  change: StatusChange,
+): Promise<{ order: Order; previous: OrderStatus }> {
+  const where = and(eq(orders.shopId, shopId), eq(orders.id, orderId));
+  const row = await db.query.orders.findFirst({ where });
+  if (!row) throw ApiError.notFound('Order not found');
+  const previous = row.status;
+  if (!ADMIN_STATUS_CHANGES[previous].includes(change.status)) {
+    throw ApiError.conflict(
+      'bad_status_change',
+      `An order that is ${previous} cannot be set to ${change.status}`,
+    );
+  }
+  const note = change.note?.trim() || null;
+
+  if (change.status === 'paid') {
+    const order = await markOrderPaid(db, orderId, row.paymentTxHash ?? 'manual', {
+      checkStock: !change.force,
+      note,
+    });
+    return { order, previous };
+  }
+
+  const order = await db.transaction(async (tx) => {
+    const locked = await lockOrder(tx, where);
+    if (!locked) throw ApiError.notFound('Order not found');
+    if (locked.status !== previous) {
+      throw ApiError.conflict('order_changed', 'The order changed meanwhile. Reload it.');
+    }
+    const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, locked.id));
+
+    const set: Partial<typeof orders.$inferInsert> = {
+      status: change.status,
+      statusNote: note,
+      updatedAt: new Date(),
+    };
+    if (change.status === 'pending') {
+      // Payment rejected: the customer can send a (correct) transaction again.
+      set.paymentTxHash = null;
+      set.paymentNetwork = null;
+      set.amountSubmitted = 0;
+    }
+    if (change.status === 'shipped') {
+      set.trackingNumber = change.trackingNumber?.trim() || null;
+    }
+    if (change.status === 'cancelled') {
+      set.changeRequest = null;
+      set.amountSubmitted = 0;
+      if (locked.stockApplied) {
+        await restoreStock(tx, items);
+        set.stockApplied = false;
+      }
+    }
+
+    const [updated] = await tx.update(orders).set(set).where(eq(orders.id, locked.id)).returning();
+    if (!updated) throw new Error('Failed to update order');
+    return toOrderDTO(updated, items);
+  });
+  return { order, previous };
 }
 
 /**
@@ -669,7 +813,9 @@ export async function recordRefund(db: Database, shopId: string, orderId: string
   return db.transaction(async (tx) => {
     const order = await lockOrder(tx, and(eq(orders.shopId, shopId), eq(orders.id, orderId)));
     if (!order) throw ApiError.notFound('Order not found');
-    const refund = order.amountPaid - order.total;
+    // A cancelled order keeps nothing: all that was paid goes back.
+    const kept = order.status === 'cancelled' ? 0 : order.total;
+    const refund = order.amountPaid - kept;
     if (refund <= 0) throw ApiError.conflict('nothing_to_refund', 'Nothing is owed to the customer');
 
     const entry: PaymentLogEntry = {
@@ -682,7 +828,7 @@ export async function recordRefund(db: Database, shopId: string, orderId: string
     const [updated] = await tx
       .update(orders)
       .set({
-        amountPaid: order.total,
+        amountPaid: kept,
         paymentLog: [...order.paymentLog, entry],
         updatedAt: new Date(),
       })

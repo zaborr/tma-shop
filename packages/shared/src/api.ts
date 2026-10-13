@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { id } from './common.js';
 import { sessionUser } from './user.js';
 import { cartItemInput } from './cart.js';
+import { orderStatus } from './order.js';
 
 /** Client posts the raw Telegram `initData` query string for server validation. */
 export const authRequest = z.object({
@@ -67,8 +68,31 @@ export const updateOrderFeeRequest = z.object({
 });
 export type UpdateOrderFeeRequest = z.infer<typeof updateOrderFeeRequest>;
 
+/**
+ * Admin moves an order to another status. The customer gets a message from the
+ * bot, with the optional note.
+ */
+export const updateOrderStatusRequest = z.object({
+  status: orderStatus,
+  /** Message to the customer, added to the bot's notification. */
+  note: z.string().trim().max(500).optional(),
+  /** Tracking number or link, when shipping. */
+  trackingNumber: z.string().trim().max(200).optional(),
+  /** Confirm a payment even though tracked stock no longer covers the order. */
+  force: z.boolean().optional(),
+});
+export type UpdateOrderStatusRequest = z.infer<typeof updateOrderStatusRequest>;
+
 /** Which orders an export includes. */
-export const exportScope = z.enum(['paid', 'toFulfil', 'fulfilled', 'unpaid', 'cancelled', 'all']);
+export const exportScope = z.enum([
+  'paid',
+  'toFulfil',
+  'shipped',
+  'fulfilled',
+  'unpaid',
+  'cancelled',
+  'all',
+]);
 export type ExportScope = z.infer<typeof exportScope>;
 
 /** Admin asks the bot to send a report of the shop's orders to their chat. */

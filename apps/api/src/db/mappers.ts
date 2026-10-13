@@ -163,8 +163,11 @@ export function toOrderDTO(row: OrderRow, items: OrderItemRow[]): Order {
     paymentTxHash: row.paymentTxHash,
     paymentTxUrl: explorerTxUrl(row.paymentNetwork, row.paymentTxHash),
     contactUsername: row.contactUsername,
+    trackingNumber: row.trackingNumber,
+    statusNote: row.statusNote,
     amountPaid: row.amountPaid,
-    amountDue: row.total - row.amountPaid,
+    // A cancelled order owes nothing; whatever was paid goes back.
+    amountDue: (row.status === 'cancelled' ? 0 : row.total) - row.amountPaid,
     amountSubmitted: row.amountSubmitted,
     // Requests saved before variants existed lack the variant fields.
     changeRequest: row.changeRequest
