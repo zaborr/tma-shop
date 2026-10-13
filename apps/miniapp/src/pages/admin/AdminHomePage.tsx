@@ -49,6 +49,12 @@ function AdminHome(): React.JSX.Element {
         >
           📊 Sales summary
         </Cell>
+        <Cell
+          onClick={() => navigate(to('/admin/export'))}
+          subtitle="Excel / CSV to your chat · shipping list"
+        >
+          📤 Export
+        </Cell>
       </Section>
 
       <Section header="Catalog">

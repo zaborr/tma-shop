@@ -67,6 +67,29 @@ export const updateOrderFeeRequest = z.object({
 });
 export type UpdateOrderFeeRequest = z.infer<typeof updateOrderFeeRequest>;
 
+/** Which orders an export includes. */
+export const exportScope = z.enum(['paid', 'toFulfil', 'fulfilled', 'unpaid', 'cancelled', 'all']);
+export type ExportScope = z.infer<typeof exportScope>;
+
+/** Admin asks the bot to send a report of the shop's orders to their chat. */
+export const exportRequest = z.object({
+  format: z.enum(['xlsx', 'csv-orders', 'csv-lines']),
+  scope: exportScope,
+  /** Orders created at or after this instant (ISO). */
+  from: z.iso.datetime().optional(),
+  /** Orders created before this instant (ISO). */
+  to: z.iso.datetime().optional(),
+  /** IANA time zone for dates in the file, e.g. Europe/Madrid. */
+  timeZone: z.string().max(64).optional(),
+});
+export type ExportRequest = z.infer<typeof exportRequest>;
+
+export const exportResponse = z.object({
+  fileName: z.string(),
+  orders: z.number().int().nonnegative(),
+});
+export type ExportResponse = z.infer<typeof exportResponse>;
+
 /** Customer asks to change a paid order: the complete new list of lines. */
 export const requestOrderChangeRequest = z.object({
   items: z

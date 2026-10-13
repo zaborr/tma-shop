@@ -155,7 +155,7 @@ function ShopForm({ shop }: { shop: ShopAdminView | null }): React.JSX.Element {
           {isVisible ? 'Customers see it' : '🙈 Only admins see it'}
         </Cell>
         <Input
-          header="Position in the list (lower first)"
+          header="Order in the shop list (1 = first)"
           type="text"
           inputMode="numeric"
           status={orderInvalid ? 'error' : 'default'}

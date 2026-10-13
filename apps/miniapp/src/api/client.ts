@@ -4,6 +4,8 @@ import type {
   CatalogQuery,
   Category,
   CreateOrderResponse,
+  ExportRequest,
+  ExportResponse,
   InvoiceResponse,
   Order,
   PlatformShopInput,
@@ -292,6 +294,14 @@ export class ApiClient {
   /** Deletes a category; its products stay, without a category. */
   adminDeleteCategory(categoryId: string): Promise<void> {
     return this.request<void>(`/admin/categories/${categoryId}`, { method: 'DELETE' });
+  }
+
+  /** The bot sends the report file to the admin's own Telegram chat. */
+  adminExport(request: ExportRequest): Promise<ExportResponse> {
+    return this.request<ExportResponse>('/admin/export', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
   }
 
   adminGetOrder(orderId: string): Promise<Order> {
