@@ -12,9 +12,10 @@ import { useShopPath } from '../providers/ShopProvider.js';
 const STATUS_META: Record<OrderStatus, { label: string; type: 'number' | 'dot' }> = {
   pending: { label: 'Awaiting payment', type: 'dot' },
   awaiting_payment: { label: 'Verifying payment', type: 'dot' },
-  paid: { label: 'Paid', type: 'dot' },
+  paid: { label: 'Paid · preparing', type: 'dot' },
   cancelled: { label: 'Cancelled', type: 'dot' },
-  fulfilled: { label: 'Fulfilled', type: 'dot' },
+  shipped: { label: 'Shipped', type: 'dot' },
+  fulfilled: { label: 'Delivered', type: 'dot' },
 };
 
 /** Customers can delete orders with nothing paid or under verification. */

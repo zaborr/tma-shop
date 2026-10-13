@@ -11,6 +11,7 @@ import { activeVariants, hasVariants, itemKey, itemName } from '../lib/variants.
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { useShopPath } from '../providers/ShopProvider.js';
+import { TrackingText } from '../components/TrackingText.js';
 
 const breakAll: React.CSSProperties = { wordBreak: 'break-all', whiteSpace: 'normal' };
 const errorStyle: React.CSSProperties = { color: 'var(--tgui--destructive_text_color)' };
@@ -185,6 +186,20 @@ function DoneSection({
 }
 
 function StatusSection({ order }: { order: Order }): React.JSX.Element {
+  return (
+    <>
+      <StatusDetail order={order} />
+      {order.statusNote && (
+        <Section header="Message from the shop">
+          <Cell multiline>{order.statusNote}</Cell>
+        </Section>
+      )}
+    </>
+  );
+}
+
+function StatusDetail({ order }: { order: Order }): React.JSX.Element {
+  const money = (amount: number): string => formatPrice(amount, order.currency);
   switch (order.status) {
     case 'awaiting_payment':
       return (
@@ -214,22 +229,42 @@ function StatusSection({ order }: { order: Order }): React.JSX.Element {
           </Cell>
         </Section>
       );
+    case 'shipped':
+      return (
+        <Section>
+          <Cell multiline>🚚 Your order is on its way</Cell>
+          {order.trackingNumber && (
+            <Cell subtitle="Tracking" multiline>
+              <TrackingText value={order.trackingNumber} />
+            </Cell>
+          )}
+        </Section>
+      );
     case 'fulfilled':
       return (
         <Section>
-          <Cell>📦 Order fulfilled</Cell>
+          <Cell>📦 Order delivered</Cell>
+          {order.trackingNumber && (
+            <Cell subtitle="Tracking" multiline>
+              <TrackingText value={order.trackingNumber} />
+            </Cell>
+          )}
         </Section>
       );
     case 'cancelled':
       return (
         <Section>
-          <Cell>❌ Order cancelled</Cell>
+          <Cell multiline>
+            {order.amountDue < 0
+              ? `❌ Order cancelled — the shop will refund you ${money(-order.amountDue)}`
+              : '❌ Order cancelled'}
+          </Cell>
         </Section>
       );
     case 'pending':
       return order.amountPaid > 0 ? (
         <Section>
-          <Cell multiline>✏️ Your change was approved — please pay the difference below</Cell>
+          <Cell multiline>Part of this order is paid — please pay the rest below</Cell>
         </Section>
       ) : (
         <></>
@@ -459,7 +494,7 @@ function ChangeEditor({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const catalog = useAsync(() => api.getProducts({ limit: 100 }), []);
+  const catalog = useAsync(() => api.getProducts({ limit: 150 }), []);
 
   const setQty = (key: string, quantity: number): void =>
     setLines((prev) =>

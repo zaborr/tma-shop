@@ -26,6 +26,8 @@ const baseOrder: Order = {
   paymentTxHash: null,
   paymentTxUrl: null,
   contactUsername: null,
+  trackingNumber: null,
+  statusNote: null,
   amountPaid: 0,
   amountDue: 125,
   amountSubmitted: 0,

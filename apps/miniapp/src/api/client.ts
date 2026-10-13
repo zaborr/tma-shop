@@ -348,10 +348,15 @@ export class ApiClient {
     });
   }
 
-  adminSetOrderStatus(orderId: string, status: Order['status']): Promise<Order> {
+  /** Moves an order to another status; the bot tells the customer (with the note, if any). */
+  adminSetOrderStatus(
+    orderId: string,
+    status: Order['status'],
+    extra: { note?: string; trackingNumber?: string; force?: boolean } = {},
+  ): Promise<Order> {
     return this.request<Order>(`/admin/orders/${orderId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...extra }),
     });
   }
 

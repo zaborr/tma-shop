@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Cell, Section } from '@telegram-apps/telegram-ui';
-import type { Order, OrderStatus, Product, ProductInput } from '@tma-shop/shared';
+import { isSaleStatus, type Order, type OrderStatus, type Product, type ProductInput } from '@tma-shop/shared';
 import { ApiClientError } from '../../api/client.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { ErrorView } from '../../components/ErrorView.js';
@@ -13,22 +13,23 @@ export type Token = (typeof TOKENS)[number];
 export const STATUS_LABEL: Record<OrderStatus, string> = {
   pending: 'Not paid yet',
   awaiting_payment: '🔎 Verify payment',
-  paid: 'Paid',
+  paid: 'Paid · to ship',
   cancelled: 'Cancelled',
-  fulfilled: 'Fulfilled',
+  shipped: 'Shipped',
+  fulfilled: 'Delivered',
 };
 
 /** Status shown to the admin, including change requests and pending refunds. */
 export function statusLabel(order: Order): string {
   if (order.changeRequest) return '✏️ Change requested';
   if (order.status === 'pending' && order.amountPaid > 0) return 'Difference not paid yet';
-  if (order.status === 'paid' && order.amountDue < 0) return '↩️ Refund owed';
+  if (order.amountDue < 0) return '↩️ Refund owed';
   return STATUS_LABEL[order.status];
 }
 
-/** Orders counted as sales: payment confirmed (fulfilled included). */
+/** Orders counted as sales: payment confirmed (shipped and delivered included). */
 export function isSale(order: Order): boolean {
-  return order.status === 'paid' || order.status === 'fulfilled';
+  return isSaleStatus(order.status);
 }
 
 /** Orders that need the admin to do something. */
@@ -36,7 +37,7 @@ export function needsAttention(order: Order): boolean {
   return (
     order.status === 'awaiting_payment' ||
     order.changeRequest !== null ||
-    (order.status === 'paid' && order.amountDue < 0)
+    order.amountDue < 0
   );
 }
 
@@ -92,6 +93,8 @@ export interface AdminActions {
   /** Button text, swapped for the confirmation prompt once armed. */
   tapLabel: (key: string, text: string, confirmText?: string) => string;
   error: string | null;
+  /** API error code of the last failed action, e.g. `stock_short`. */
+  errorCode: string | null;
 }
 
 /**
@@ -101,14 +104,17 @@ export interface AdminActions {
 export function useAdminActions(onDone: () => void): AdminActions {
   const [armed, setArmed] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
 
   const run = async (action: () => Promise<unknown>): Promise<void> => {
     setError(null);
+    setErrorCode(null);
     try {
       await action();
       onDone();
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : 'Something went wrong');
+      setErrorCode(err instanceof ApiClientError ? err.code : null);
     }
   };
 
@@ -124,7 +130,7 @@ export function useAdminActions(onDone: () => void): AdminActions {
   const tapLabel = (key: string, text: string, confirmText = 'Tap again to confirm'): string =>
     armed === key ? confirmText : text;
 
-  return { run, twoTap, tapLabel, error };
+  return { run, twoTap, tapLabel, error, errorCode };
 }
 
 export function ErrorBanner({ message }: { message: string | null }): React.JSX.Element | null {

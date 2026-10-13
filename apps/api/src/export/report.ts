@@ -1,4 +1,4 @@
-import type { ExportRequest, ExportScope, Order } from '@tma-shop/shared';
+import { isSaleStatus, type ExportRequest, type ExportScope, type Order } from '@tma-shop/shared';
 import { buildCsv, buildXlsx, type CellValue, type Sheet } from './xlsx.js';
 
 export interface CustomerInfo {
@@ -24,9 +24,10 @@ export interface ReportFile {
 }
 
 const SCOPE_LABEL: Record<ExportScope, string> = {
-  paid: 'Paid (incl. fulfilled)',
-  toFulfil: 'Paid, not fulfilled yet',
-  fulfilled: 'Fulfilled',
+  paid: 'Paid (incl. shipped and delivered)',
+  toFulfil: 'Paid, not shipped yet',
+  shipped: 'Shipped',
+  fulfilled: 'Delivered',
   unpaid: 'Not paid / verifying',
   cancelled: 'Cancelled',
   all: 'All orders',
@@ -36,16 +37,19 @@ const STATUS_LABEL: Record<Order['status'], string> = {
   pending: 'Not paid',
   awaiting_payment: 'Verifying payment',
   paid: 'Paid',
-  fulfilled: 'Fulfilled',
+  shipped: 'Shipped',
+  fulfilled: 'Delivered',
   cancelled: 'Cancelled',
 };
 
 export function matchesScope(order: Order, scope: ExportScope): boolean {
   switch (scope) {
     case 'paid':
-      return order.status === 'paid' || order.status === 'fulfilled';
+      return isSaleStatus(order.status);
     case 'toFulfil':
       return order.status === 'paid';
+    case 'shipped':
+      return order.status === 'shipped';
     case 'fulfilled':
       return order.status === 'fulfilled';
     case 'unpaid':
@@ -81,7 +85,7 @@ function itemName(item: Order['items'][number]): string {
 function notes(order: Order): string {
   const parts: string[] = [];
   if (order.changeRequest) parts.push('Change requested');
-  if (order.amountDue < 0 && order.status !== 'cancelled') parts.push('Refund owed');
+  if (order.amountDue < 0) parts.push('Refund owed');
   if (order.amountDue > 0 && order.amountPaid > 0) parts.push('Difference due');
   return parts.join('; ');
 }
@@ -105,6 +109,7 @@ function ordersSheet(input: ReportInput, orders: readonly Order[]): Sheet {
     'Balance (+due / −refund)',
     'Payment method',
     'Transaction',
+    'Tracking',
     'Notes',
     'Items',
   ];
@@ -134,6 +139,7 @@ function ordersSheet(input: ReportInput, orders: readonly Order[]): Sheet {
           ? { link: o.paymentTxUrl, text: o.paymentTxHash }
           : o.paymentTxHash
         : '',
+      o.trackingNumber ?? '',
       notes(o),
       o.items.map((i) => `${i.quantity}× ${itemName(i)}`).join(', '),
     ];
@@ -141,7 +147,7 @@ function ordersSheet(input: ReportInput, orders: readonly Order[]): Sheet {
   return {
     name: 'Orders',
     rows: [header, ...rows],
-    widths: [11, 17, 17, 20, 18, 13, 16, 9, 7, 11, 11, 10, 11, 11, 14, 16, 30, 18, 50],
+    widths: [11, 17, 17, 20, 18, 13, 16, 9, 7, 11, 11, 10, 11, 11, 14, 16, 30, 18, 18, 50],
   };
 }
 

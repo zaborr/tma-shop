@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import type { Order } from '@tma-shop/shared';
+import { isSaleStatus, type Order } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { orders, shops } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
@@ -43,7 +43,7 @@ export async function createStarsInvoice(
 ): Promise<string> {
   const order = await getOrder(db, shopId, orderId, userId);
   if (!order) throw ApiError.notFound('Order not found');
-  if (order.status === 'paid' || order.status === 'fulfilled') {
+  if (isSaleStatus(order.status)) {
     throw ApiError.conflict('already_paid', 'Order is already paid');
   }
 
@@ -75,9 +75,8 @@ export async function handlePaymentUpdate(
     const payable =
       order !== undefined &&
       order.total === query.total_amount &&
-      order.status !== 'paid' &&
       order.status !== 'cancelled' &&
-      order.status !== 'fulfilled';
+      !isSaleStatus(order.status);
     await telegram.answerPreCheckoutQuery(
       query.id,
       payable,

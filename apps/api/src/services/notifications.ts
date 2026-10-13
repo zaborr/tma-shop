@@ -1,4 +1,4 @@
-import type { Order } from '@tma-shop/shared';
+import type { Order, OrderStatus } from '@tma-shop/shared';
 import { TelegramApi } from '../telegram/api.js';
 
 function money(amount: number, currency: string): string {
@@ -73,6 +73,60 @@ export function buildChangeDecisionMessage(order: Order, approved: boolean): str
   } else if (order.amountDue < 0) {
     lines.push(`The shop will refund you ${money(-order.amountDue, order.currency)}.`);
   }
+  return lines.join('\n');
+}
+
+/**
+ * Tells the customer their order moved to another status, with the shop's
+ * note if the admin wrote one. Empty when there is nothing to say.
+ */
+export function buildStatusMessage(
+  shopName: string,
+  order: Order,
+  previous: OrderStatus,
+): string {
+  const ref = `${shopName} · order #${order.id.slice(0, 8)}`;
+  const lines: string[] = [];
+  switch (order.status) {
+    case 'paid':
+      lines.push(`Payment confirmed for ${ref}. The shop is preparing your order.`);
+      if (order.amountDue < 0) {
+        lines.push(`The shop will refund you ${money(-order.amountDue, order.currency)}.`);
+      }
+      break;
+    case 'pending':
+      // A rejected payment clears the transaction; a partial one keeps it.
+      if (previous === 'awaiting_payment' && order.paymentTxHash === null) {
+        lines.push(
+          `We could not verify your payment for ${ref}.`,
+          'Check the transaction and send it again from My orders in the shop.',
+        );
+      } else {
+        // Partial payment confirmed: part of the total is still due.
+        lines.push(
+          `We received your payment for ${ref}.`,
+          `Still to pay: ${money(order.amountDue, order.currency)}. Open My orders in the shop to pay it.`,
+        );
+      }
+      break;
+    case 'shipped':
+      lines.push(`Your order ${ref} has been shipped.`);
+      if (order.trackingNumber) lines.push(`Tracking: ${order.trackingNumber}`);
+      break;
+    case 'fulfilled':
+      lines.push(`Your order ${ref} has been delivered. Thank you!`);
+      break;
+    case 'cancelled':
+      lines.push(`Your order ${ref} was cancelled.`);
+      if (order.amountDue < 0) {
+        lines.push(`The shop will refund you ${money(-order.amountDue, order.currency)}.`);
+      }
+      break;
+    case 'awaiting_payment':
+      break;
+  }
+  if (lines.length === 0) return '';
+  if (order.statusNote) lines.push('', `Message from the shop: ${order.statusNote}`);
   return lines.join('\n');
 }
 

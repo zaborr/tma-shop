@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
-import type { Order } from '@tma-shop/shared';
+import { isSaleStatus, type Order } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { copyText } from '../../lib/clipboard.js';
@@ -12,15 +12,13 @@ import { ErrorView } from '../../components/ErrorView.js';
 import { AdminOnly, formatDate, itemsSummary, statusLabel } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
 
-type Scope = 'all' | 'toFulfil' | 'fulfilled';
+type Scope = 'all' | 'toFulfil' | 'shipped' | 'fulfilled';
 
 const SCOPES: Record<Scope, { label: string; match: (order: Order) => boolean }> = {
-  all: {
-    label: 'All paid',
-    match: (o) => o.status === 'paid' || o.status === 'fulfilled',
-  },
-  toFulfil: { label: 'To fulfil', match: (o) => o.status === 'paid' },
-  fulfilled: { label: 'Fulfilled', match: (o) => o.status === 'fulfilled' },
+  all: { label: 'All paid', match: (o) => isSaleStatus(o.status) },
+  toFulfil: { label: 'To ship', match: (o) => o.status === 'paid' },
+  shipped: { label: 'Shipped', match: (o) => o.status === 'shipped' },
+  fulfilled: { label: 'Delivered', match: (o) => o.status === 'fulfilled' },
 };
 
 interface ProductTotal {

@@ -29,6 +29,8 @@ function order(partial: Partial<Order> & Pick<Order, 'id' | 'status' | 'createdA
     paymentTxHash: null,
     paymentTxUrl: null,
     contactUsername: 'ana_test',
+    trackingNumber: null,
+    statusNote: null,
     amountPaid: 0,
     amountDue: 1800,
     amountSubmitted: 0,

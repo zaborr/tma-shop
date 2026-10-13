@@ -192,6 +192,60 @@ describeDb('API integration', () => {
     expect(res.status).toBe(401);
   });
 
+  it('moves orders through admin statuses and returns stock on cancel', async () => {
+    const token = await authToken(CUSTOMER_ID, 'Alice');
+    const auth = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const admin = await authToken(ADMIN_ID, 'Ivan');
+    const adminAuth = { Authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
+    const stock = async (): Promise<number> => {
+      const res = await app.request(`/api/products/${productId}`);
+      return ((await res.json()) as { stock: number }).stock;
+    };
+    const setStatus = (orderId: string, body: Record<string, unknown>): Promise<Response> =>
+      Promise.resolve(
+        app.request(`/api/admin/orders/${orderId}`, {
+          method: 'PATCH',
+          headers: adminAuth,
+          body: JSON.stringify(body),
+        }),
+      );
+
+    await app.request('/api/cart/items', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ productId, quantity: 1 }),
+    });
+    const create = await app.request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@test_user' }),
+    });
+    const { orderId } = (await create.json()) as { orderId: string };
+    const before = await stock();
+
+    // An unpaid order cannot be shipped.
+    expect((await setStatus(orderId, { status: 'shipped' })).status).toBe(409);
+
+    // Manual confirmation takes the stock.
+    const paid = await setStatus(orderId, { status: 'paid' });
+    expect(paid.status).toBe(200);
+    expect(((await paid.json()) as { status: string }).status).toBe('paid');
+    expect(await stock()).toBe(before - 1);
+
+    // Cancelling a paid order gives the stock back and owes the money.
+    const cancelled = await setStatus(orderId, { status: 'cancelled', note: 'Sold out' });
+    expect(cancelled.status).toBe(200);
+    const body = (await cancelled.json()) as {
+      status: string;
+      amountDue: number;
+      statusNote: string | null;
+    };
+    expect(body.status).toBe('cancelled');
+    expect(body.amountDue).toBe(-150);
+    expect(body.statusNote).toBe('Sold out');
+    expect(await stock()).toBe(before);
+  });
+
   it('enforces admin-only routes', async () => {
     const customer = await authToken(CUSTOMER_ID, 'Alice');
     const denied = await app.request('/api/admin/orders', {

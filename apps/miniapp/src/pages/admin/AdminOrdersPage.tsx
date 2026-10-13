@@ -11,14 +11,15 @@ import { ErrorView } from '../../components/ErrorView.js';
 import { AdminOnly, formatDate, itemsSummary, needsAttention, statusLabel } from './common.js';
 import { useShopPath } from '../../providers/ShopProvider.js';
 
-type FilterKey = 'all' | 'attention' | 'unpaid' | 'paid' | 'fulfilled' | 'cancelled';
+type FilterKey = 'all' | 'attention' | 'unpaid' | 'paid' | 'shipped' | 'fulfilled' | 'cancelled';
 
 const FILTERS: Record<FilterKey, { label: string; match: (order: Order) => boolean }> = {
   all: { label: 'All', match: () => true },
   attention: { label: '🔔 To review', match: needsAttention },
   unpaid: { label: 'Not paid', match: (o) => o.status === 'pending' },
-  paid: { label: 'Paid', match: (o) => o.status === 'paid' },
-  fulfilled: { label: 'Fulfilled', match: (o) => o.status === 'fulfilled' },
+  paid: { label: 'To ship', match: (o) => o.status === 'paid' },
+  shipped: { label: 'Shipped', match: (o) => o.status === 'shipped' },
+  fulfilled: { label: 'Delivered', match: (o) => o.status === 'fulfilled' },
   cancelled: { label: 'Cancelled', match: (o) => o.status === 'cancelled' },
 };
 

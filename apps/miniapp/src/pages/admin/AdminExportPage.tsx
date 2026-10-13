@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
-import type { ExportRequest, ExportScope, Order } from '@tma-shop/shared';
+import { isSaleStatus, type ExportRequest, type ExportScope, type Order } from '@tma-shop/shared';
 import { api, ApiClientError } from '../../api/client.js';
 import { decryptAddress, loadPrivateKey } from '../../lib/addressCrypto.js';
 import { shareOrDownload, toCsv } from '../../lib/download.js';
@@ -11,8 +11,9 @@ import { AdminOnly, ErrorBanner } from './common.js';
 
 const SCOPES: Array<{ key: ExportScope; label: string }> = [
   { key: 'paid', label: 'Paid' },
-  { key: 'toFulfil', label: 'To fulfil' },
-  { key: 'fulfilled', label: 'Fulfilled' },
+  { key: 'toFulfil', label: 'To ship' },
+  { key: 'shipped', label: 'Shipped' },
+  { key: 'fulfilled', label: 'Delivered' },
   { key: 'unpaid', label: 'Not paid' },
   { key: 'all', label: 'All' },
 ];
@@ -39,9 +40,11 @@ function periodRange(period: Period): { from?: string; to?: string } {
 function inScope(order: Order, scope: ExportScope): boolean {
   switch (scope) {
     case 'paid':
-      return order.status === 'paid' || order.status === 'fulfilled';
+      return isSaleStatus(order.status);
     case 'toFulfil':
       return order.status === 'paid';
+    case 'shipped':
+      return order.status === 'shipped';
     case 'fulfilled':
       return order.status === 'fulfilled';
     case 'unpaid':
