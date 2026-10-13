@@ -54,6 +54,29 @@ export class TelegramApi {
     });
   }
 
+  /** Sends a file to a chat. The user must have started the bot first. */
+  async sendDocument(
+    chatId: number,
+    fileName: string,
+    data: Buffer,
+    contentType: string,
+    caption?: string,
+  ): Promise<unknown> {
+    const form = new FormData();
+    form.append('chat_id', String(chatId));
+    if (caption) form.append('caption', caption.slice(0, 1024));
+    form.append('document', new Blob([new Uint8Array(data)], { type: contentType }), fileName);
+    const res = await this.fetchImpl(`${this.baseUrl}/bot${this.botToken}/sendDocument`, {
+      method: 'POST',
+      body: form,
+    });
+    const body = (await res.json()) as TelegramResponse<unknown>;
+    if (!body.ok) {
+      throw new Error(`Telegram sendDocument failed: ${body.description ?? res.statusText}`);
+    }
+    return body.result;
+  }
+
   /** Sends a plain-text message. The user must have started the bot first. */
   sendMessage(chatId: number, text: string): Promise<unknown> {
     return this.call<unknown>('sendMessage', {

@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { inArray } from 'drizzle-orm';
 import {
+  exportRequest,
   orderStatus,
   productInput,
   shopProfileInput,
@@ -42,6 +44,9 @@ import {
   updateShopWallets,
 } from '../services/shop.js';
 import { ApiError } from '../lib/errors.js';
+import { users } from '../db/schema.js';
+import { buildReport } from '../export/report.js';
+import { TelegramApi } from '../telegram/api.js';
 
 const idParam = z.object({ id: z.uuid() });
 const categoryInput = z.object({
@@ -150,6 +155,53 @@ export function adminRoutes(): Hono<AppBindings> {
       return c.json(await setOrderStatus(db, shopId, orderId, status));
     },
   );
+
+  // Reports: the bot sends the file (Excel or CSV) to the admin's own chat.
+  app.post('/export', zValidator('json', exportRequest), async (c) => {
+    const db = c.get('db');
+    const shop = c.get('shop');
+    const { sub } = c.get('claims');
+    const request = c.req.valid('json');
+
+    const orders = await listAllOrders(db, shop.id);
+    const ids = [...new Set(orders.map((o) => o.userId))];
+    const people =
+      ids.length > 0 ? await db.select().from(users).where(inArray(users.telegramId, ids)) : [];
+    const customers = new Map(
+      people.map((u) => [
+        u.telegramId,
+        { name: [u.firstName, u.lastName].filter(Boolean).join(' '), username: u.username },
+      ]),
+    );
+
+    const file = buildReport({
+      shopName: shop.name,
+      shopSlug: shop.slug,
+      feeLabel: shop.orderFeeLabel,
+      orders,
+      customers,
+      request,
+    });
+    if (file.orderCount === 0) {
+      throw ApiError.badRequest('nothing_to_export', 'No orders match these filters');
+    }
+    try {
+      await new TelegramApi(c.get('env').BOT_TOKEN).sendDocument(
+        sub,
+        file.fileName,
+        file.data,
+        file.contentType,
+        `📊 ${shop.name} — ${file.orderCount} order${file.orderCount === 1 ? '' : 's'}`,
+      );
+    } catch (error) {
+      console.error('Export could not be sent:', error);
+      throw ApiError.conflict(
+        'send_failed',
+        'The bot could not send you the file. Open your chat with the bot, press Start, and try again.',
+      );
+    }
+    return c.json({ fileName: file.fileName, orders: file.orderCount });
+  });
 
   // Customer change requests: approve (apply + tell them what to pay) or reject.
   app.post('/orders/:id/change/approve', zValidator('param', idParam), async (c) => {
