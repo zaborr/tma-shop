@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Section, Text, Title } from '@telegram-apps/telegram-ui';
-import type { Product } from '@tma-shop/shared';
+import { unitPriceFor, type Product } from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useCart } from '../providers/CartProvider.js';
@@ -49,6 +49,17 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
   const outOfStock = withVariants
     ? isSoldOut(product) || (variant !== null && variant.stock !== null && variant.stock <= 0)
     : product.stock !== null && product.stock <= 0;
+  // How many to add: at most what is in stock (999 = the cart's limit).
+  const [quantity, setQuantity] = useState(1);
+  const maxQuantity = Math.max(1, Math.min(999, stock ?? 999));
+  const qty = Math.min(quantity, maxQuantity);
+  const unitPrice = unitPriceFor(
+    product.price,
+    variant?.priceOverride ?? null,
+    product.priceTiers,
+    qty,
+  );
+
   const { min, max } = priceRange(product);
   const priceText = variant
     ? formatPrice(variant.price, product.currency)
@@ -64,17 +75,26 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
     setAdding(true);
     setAddError(null);
     try {
-      await add(product.id, variant?.id ?? null, 1);
+      await add(product.id, variant?.id ?? null, qty);
       navigate(to('/cart'));
     } catch (err) {
       setAddError(err instanceof ApiClientError ? err.message : t('product.addFailed'));
     } finally {
       setAdding(false);
     }
-  }, [product.id, withVariants, variant, add, navigate, to]);
+  }, [product.id, withVariants, variant, qty, add, navigate, to]);
 
   useMainButton({
-    text: outOfStock ? t('product.outOfStock') : missing ? t('product.chooseOption') : t('product.addToCart'),
+    text: outOfStock
+      ? t('product.outOfStock')
+      : missing
+        ? t('product.chooseOption')
+        : qty > 1
+          ? t('product.addManyToCart', {
+              count: qty,
+              total: formatPrice(unitPrice * qty, product.currency),
+            })
+          : t('product.addToCart'),
     visible: true,
     enabled: !outOfStock && !missing,
     loading: adding,
@@ -136,6 +156,44 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
                   : t('product.unitsRange', { from: tier.from, to: tier.to })}
             </Cell>
           ))}
+        </Section>
+      )}
+
+      {!outOfStock && (
+        <Section header={t('product.quantity')}>
+          <Cell
+            subtitle={
+              missing
+                ? t('product.chooseOption')
+                : `${qty} × ${formatPrice(unitPrice, product.currency)} = ${formatPrice(
+                    unitPrice * qty,
+                    product.currency,
+                  )}`
+            }
+            after={
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <Button
+                  size="s"
+                  mode="bezeled"
+                  disabled={qty <= 1}
+                  onClick={() => setQuantity(Math.max(1, qty - 1))}
+                >
+                  −
+                </Button>
+                <span style={{ minWidth: 24, textAlign: 'center' }}>{qty}</span>
+                <Button
+                  size="s"
+                  mode="bezeled"
+                  disabled={qty >= maxQuantity}
+                  onClick={() => setQuantity(Math.min(maxQuantity, qty + 1))}
+                >
+                  +
+                </Button>
+              </div>
+            }
+          >
+            {t('product.howMany')}
+          </Cell>
         </Section>
       )}
 
