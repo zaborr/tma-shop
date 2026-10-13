@@ -281,6 +281,7 @@ export const es: Record<MessageKey, string> = {
   'key.title': 'Clave de direcciones',
   'key.useHere': 'Usar tu clave privada en este dispositivo',
   'key.useHereFooter': 'Pega la clave privada que guardaste para leer aquí las direcciones (p. ej. en un móvil nuevo).',
+  'language.title': 'Idioma',
   'order.amount': 'Importe',
   'order.backToShop': 'Volver a la tienda',
   'order.cancelled': '❌ Pedido cancelado',

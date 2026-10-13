@@ -447,6 +447,32 @@ describeDb('API integration', () => {
     expect(await db.select().from(orders).where(eq(orders.id, order!.id))).toHaveLength(0);
   });
 
+  it('saves the language chosen in the app', async () => {
+    const token = await authToken(CUSTOMER_ID, 'Alice');
+    const res = await app.request('/api/me/language', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ language: 'es' }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ language: 'es', preferredLanguage: 'es' });
+
+    const again = await app.request('/api/auth', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ initData: signInitData(CUSTOMER_ID, 'Alice') }),
+    });
+    expect(((await again.json()) as { user: { language: string } }).user.language).toBe('es');
+
+    // Spanish errors once the app asks for them.
+    const missing = await app.request('/api/orders/00000000-0000-4000-8000-000000000000', {
+      headers: { Authorization: `Bearer ${token}`, 'X-Lang': 'es' },
+    });
+    expect(((await missing.json()) as { error: { message: string } }).error.message).toBe(
+      'Pedido no encontrado',
+    );
+  });
+
   it('enforces admin-only routes', async () => {
     const customer = await authToken(CUSTOMER_ID, 'Alice');
     const denied = await app.request('/api/admin/orders', {

@@ -9,6 +9,7 @@ import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { t } from '../i18n/index.js';
+import { LanguagePicker } from '../components/LanguagePicker.js';
 
 let startParamUsed = false;
 
@@ -69,6 +70,8 @@ export function ShopsPage(): React.JSX.Element {
           ))}
         </Section>
       )}
+
+      <LanguagePicker />
 
       {isSuperAdmin && (
         <Section header={t('shops.platform')}>

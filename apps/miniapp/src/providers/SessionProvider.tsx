@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { retrieveRawInitData } from '@telegram-apps/sdk-react';
 import type { SessionUser } from '@tma-shop/shared';
 import { api } from '../api/client.js';
-import { t } from '../i18n/index.js';
+import { setLang, t } from '../i18n/index.js';
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -30,6 +30,8 @@ export function SessionProvider({ children }: { children: ReactNode }): React.JS
         const session = await api.auth(initDataRaw);
         if (cancelled) return;
         api.setToken(session.token);
+        // The language saved for this user (chosen in the app, else Telegram's).
+        setLang(session.user.language, session.user.preferredLanguage);
         // Sessions last an hour; renew silently with the same launch data.
         api.setReauth(async () => (await api.auth(initDataRaw)).token);
         setUser(session.user);

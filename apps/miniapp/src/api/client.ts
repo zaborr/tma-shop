@@ -14,6 +14,7 @@ import type {
   RetentionReport,
   RetentionSettings,
   RetentionStatus,
+  SessionUser,
   ShopAdminView,
   ShopConfig,
   ShopProfileInput,
@@ -122,6 +123,14 @@ export class ApiClient {
     return this.request<AuthResponse>('/auth', {
       method: 'POST',
       body: JSON.stringify({ initData }),
+    });
+  }
+
+  /** Saves the app language for this user (null = follow Telegram). */
+  setLanguage(language: 'en' | 'es' | null): Promise<SessionUser> {
+    return this.request<SessionUser>('/me/language', {
+      method: 'PUT',
+      body: JSON.stringify({ language }),
     });
   }
 

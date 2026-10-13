@@ -279,6 +279,7 @@ export const en = {
   'key.title': 'Address key',
   'key.useHere': 'Use your private key on this device',
   'key.useHereFooter': 'Paste the private key you saved to read addresses here (e.g. on a new phone).',
+  'language.title': 'Language',
   'order.amount': 'Amount',
   'order.backToShop': 'Back to shop',
   'order.cancelled': '❌ Order cancelled',

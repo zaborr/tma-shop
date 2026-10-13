@@ -32,7 +32,7 @@ export function webhookRoutes(): Hono<AppBindings> {
     const update = (await c.req.json()) as TelegramUpdate;
     try {
       await handlePaymentUpdate(c.get('db'), env.BOT_TOKEN, update);
-      await handleBotMessage(env, update);
+      await handleBotMessage(env, update, undefined, c.get('db'));
     } catch (error) {
       // Log and still acknowledge: a 5xx makes Telegram retry the same update.
       console.error('Webhook handling error:', error);

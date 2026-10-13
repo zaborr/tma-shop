@@ -11,6 +11,7 @@ import { ProductCard } from '../components/ProductCard.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { useShop, useShopPath } from '../providers/ShopProvider.js';
 import { t } from '../i18n/index.js';
+import { LanguagePicker } from '../components/LanguagePicker.js';
 
 export function CatalogPage(): React.JSX.Element {
   const navigate = useNavigate();
@@ -87,6 +88,8 @@ export function CatalogPage(): React.JSX.Element {
           )}
         </Section>
       )}
+
+      <LanguagePicker />
     </List>
   );
 }

@@ -99,6 +99,13 @@
       "when": 1791960000000,
       "tag": "0013_auto_cancel",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791970000000,
+      "tag": "0014_preferred_lang",
+      "breakpoints": true
     }
   ]
 }

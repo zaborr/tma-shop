@@ -48,3 +48,18 @@ export async function upsertUser(
 export async function getUser(db: Database, telegramId: number): Promise<UserRow | undefined> {
   return db.query.users.findFirst({ where: eq(users.telegramId, telegramId) });
 }
+
+/** Saves the language chosen in the app (null = follow Telegram again). */
+export async function setPreferredLanguage(
+  db: Database,
+  telegramId: number,
+  language: 'en' | 'es' | null,
+): Promise<UserRow> {
+  const [row] = await db
+    .update(users)
+    .set({ preferredLang: language })
+    .where(eq(users.telegramId, telegramId))
+    .returning();
+  if (!row) throw new Error('User not found');
+  return row;
+}
