@@ -14,6 +14,10 @@ export type OrderStatus = z.infer<typeof orderStatus>;
 /** Line item snapshot — title and price are frozen at order time. */
 export const orderItem = z.object({
   productId: id,
+  /** Chosen variant, if the product has variants. */
+  variantId: id.nullable(),
+  /** Snapshot of the variant label, e.g. "Red / M". */
+  variantLabel: z.string().nullable(),
   title: z.string().min(1).max(256),
   unitPrice: moneyAmount,
   quantity: z.number().int().positive(),

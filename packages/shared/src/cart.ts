@@ -1,16 +1,23 @@
 import { z } from 'zod';
 import { currencyCode, id, moneyAmount } from './common.js';
-import { product } from './catalog.js';
+import { product, productVariant } from './catalog.js';
 
 export const cartItemInput = z.object({
   productId: id,
+  /** Required for products with variants. */
+  variantId: id.nullable().optional(),
   quantity: z.number().int().positive().max(999),
 });
 export type CartItemInput = z.infer<typeof cartItemInput>;
 
 /** A cart line resolved against the current catalog, with computed subtotal. */
 export const cartLine = z.object({
+  /** Cart line id (use it to change the quantity or remove the line). */
+  id,
   product,
+  variant: productVariant.nullable(),
+  /** Unit price for this line at its current quantity. */
+  unitPrice: moneyAmount,
   quantity: z.number().int().positive(),
   subtotal: moneyAmount,
 });

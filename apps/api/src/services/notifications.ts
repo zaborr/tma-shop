@@ -41,7 +41,10 @@ export function buildChangeRequestMessage(order: Order, customer: string): strin
     contactLine(order),
     '',
     'New items:',
-    ...change.items.map((item) => `• ${item.quantity}× ${item.title}`),
+    ...change.items.map(
+      (item) =>
+        `• ${item.quantity}× ${item.title}${item.variantLabel ? ` (${item.variantLabel})` : ''}`,
+    ),
     '',
     `Total: ${money(order.total, order.currency)} → ${money(change.total, order.currency)}`,
     diff > 0

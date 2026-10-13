@@ -140,22 +140,24 @@ export class ApiClient {
     return this.request<Cart>('/cart');
   }
 
-  addToCart(productId: string, quantity: number): Promise<Cart> {
+  /** `variantId` is required for products with options. */
+  addToCart(productId: string, variantId: string | null, quantity: number): Promise<Cart> {
     return this.request<Cart>('/cart/items', {
       method: 'POST',
-      body: JSON.stringify({ productId, quantity }),
+      body: JSON.stringify({ productId, variantId, quantity }),
     });
   }
 
-  setCartItem(productId: string, quantity: number): Promise<Cart> {
-    return this.request<Cart>(`/cart/items/${productId}`, {
+  /** `lineId` is the cart line's `id`. */
+  setCartItem(lineId: string, quantity: number): Promise<Cart> {
+    return this.request<Cart>(`/cart/items/${lineId}`, {
       method: 'PATCH',
       body: JSON.stringify({ quantity }),
     });
   }
 
-  removeCartItem(productId: string): Promise<Cart> {
-    return this.request<Cart>(`/cart/items/${productId}`, { method: 'DELETE' });
+  removeCartItem(lineId: string): Promise<Cart> {
+    return this.request<Cart>(`/cart/items/${lineId}`, { method: 'DELETE' });
   }
 
   // --- orders & payment ---
@@ -195,7 +197,7 @@ export class ApiClient {
   /** Asks the shop to change a paid order to these lines (needs admin approval). */
   requestOrderChange(
     orderId: string,
-    items: Array<{ productId: string; quantity: number }>,
+    items: Array<{ productId: string; variantId: string | null; quantity: number }>,
   ): Promise<Order> {
     return this.request<Order>(`/orders/${orderId}/change`, {
       method: 'POST',

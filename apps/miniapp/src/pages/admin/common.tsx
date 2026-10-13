@@ -4,6 +4,7 @@ import type { Order, OrderStatus, Product, ProductInput } from '@tma-shop/shared
 import { ApiClientError } from '../../api/client.js';
 import { useShop } from '../../providers/ShopProvider.js';
 import { ErrorView } from '../../components/ErrorView.js';
+import { itemName } from '../../lib/variants.js';
 
 /** Tokens a product can be priced in. Prices are stored in cents (1290 = 12.90). */
 export const TOKENS = ['USDC', 'EURC'] as const;
@@ -55,12 +56,19 @@ export function toInput(product: Product, isActive: boolean): ProductInput {
     imageUrl: product.imageUrl,
     stock: product.stock,
     isActive,
+    options: product.options,
+    variants: product.variants.map((v) => ({
+      values: v.values,
+      price: v.priceOverride,
+      stock: v.stock,
+      isActive: v.isActive,
+    })),
   };
 }
 
 /** One line per order: "2× Sencha, 1× Gaiwan". */
 export function itemsSummary(order: Order): string {
-  return order.items.map((item) => `${item.quantity}× ${item.title}`).join(', ');
+  return order.items.map((item) => `${item.quantity}× ${itemName(item)}`).join(', ');
 }
 
 export function formatDate(iso: string): string {

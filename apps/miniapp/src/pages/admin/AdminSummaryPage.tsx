@@ -6,6 +6,7 @@ import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { copyText } from '../../lib/clipboard.js';
 import { formatPrice } from '../../lib/format.js';
+import { itemKey, itemName } from '../../lib/variants.js';
 import { Loader } from '../../components/Loader.js';
 import { ErrorView } from '../../components/ErrorView.js';
 import { AdminOnly, formatDate, itemsSummary, statusLabel } from './common.js';
@@ -23,6 +24,7 @@ const SCOPES: Record<Scope, { label: string; match: (order: Order) => boolean }>
 };
 
 interface ProductTotal {
+  key: string;
   productId: string;
   title: string;
   currency: string;
@@ -57,10 +59,11 @@ function summarize(orders: Order[]): { products: ProductTotal[]; currencies: Cur
     cur.fees += order.fee;
 
     for (const item of order.items) {
-      const key = `${item.productId}:${order.currency}`;
+      const key = `${itemKey(item)}:${order.currency}`;
       const row = products.get(key) ?? {
+        key,
         productId: item.productId,
-        title: item.title,
+        title: itemName(item),
         currency: order.currency,
         quantity: 0,
         revenue: 0,
@@ -177,7 +180,7 @@ function AdminSummary(): React.JSX.Element {
         <Section header="Products sold">
           {products.map((p) => (
             <Cell
-              key={`${p.productId}:${p.currency}`}
+              key={p.key}
               subtitle={`in ${p.orders} ${p.orders === 1 ? 'order' : 'orders'}`}
               after={formatPrice(p.revenue, p.currency)}
               multiline

@@ -11,7 +11,12 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import type { OrderChangeRequest, PaymentLogEntry, WalletInput } from '@tma-shop/shared';
+import type {
+  OrderChangeRequest,
+  PaymentLogEntry,
+  ProductOption,
+  WalletInput,
+} from '@tma-shop/shared';
 
 export const userRoleEnum = pgEnum('user_role', ['customer', 'admin']);
 
@@ -77,13 +82,31 @@ export const products = pgTable(
     price: integer('price').notNull(),
     currency: text('currency').notNull(),
     imageUrl: text('image_url'),
-    /** NULL means the product is not stock-tracked. */
+    /** NULL means the product is not stock-tracked. Unused when it has variants. */
     stock: integer('stock'),
     isActive: boolean('is_active').notNull().default(true),
+    /** Option groups (Color, Size…); empty for a product without variants. */
+    options: jsonb('options').$type<ProductOption[]>().notNull().default([]),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [unique('products_shop_slug_unique').on(table.shopId, table.slug)],
 );
+
+/** One combination of a product's option values, with optional own price and stock. */
+export const productVariants = pgTable('product_variants', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  productId: uuid('product_id')
+    .notNull()
+    .references(() => products.id, { onDelete: 'cascade' }),
+  /** One value per option, in the product's option order. */
+  optionValues: jsonb('option_values').$type<string[]>().notNull(),
+  /** Own price; NULL = the product's price. */
+  price: integer('price'),
+  /** NULL = not stock-tracked. */
+  stock: integer('stock'),
+  isActive: boolean('is_active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
 
 export const users = pgTable('users', {
   telegramId: bigint('telegram_id', { mode: 'number' }).primaryKey(),
@@ -123,9 +146,14 @@ export const cartItems = pgTable(
     productId: uuid('product_id')
       .notNull()
       .references(() => products.id, { onDelete: 'cascade' }),
+    variantId: uuid('variant_id').references(() => productVariants.id, { onDelete: 'cascade' }),
     quantity: integer('quantity').notNull(),
   },
-  (table) => [unique('cart_items_cart_product_unique').on(table.cartId, table.productId)],
+  (table) => [
+    unique('cart_items_cart_product_variant_unique')
+      .on(table.cartId, table.productId, table.variantId)
+      .nullsNotDistinct(),
+  ],
 );
 
 export const orders = pgTable('orders', {
@@ -172,6 +200,9 @@ export const orderItems = pgTable('order_items', {
     .notNull()
     .references(() => products.id, { onDelete: 'restrict' }),
   title: text('title').notNull(),
+  variantId: uuid('variant_id').references(() => productVariants.id, { onDelete: 'set null' }),
+  /** Snapshot of the variant's label at order time, e.g. "Red / M". */
+  variantLabel: text('variant_label'),
   unitPrice: integer('unit_price').notNull(),
   quantity: integer('quantity').notNull(),
   subtotal: integer('subtotal').notNull(),

@@ -3,6 +3,7 @@ import type { Category, Product, ProductInput } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { categories, orderItems, products } from '../db/schema.js';
 import { toCategoryDTO, toProductDTO } from '../db/mappers.js';
+import { loadVariants, syncVariants, validateVariants } from './variants.js';
 import { ApiError } from '../lib/errors.js';
 
 /** Every product of the shop, hidden ones included (the catalog only shows active). */
@@ -12,7 +13,11 @@ export async function listAllProducts(db: Database, shopId: string): Promise<Pro
     .from(products)
     .where(eq(products.shopId, shopId))
     .orderBy(asc(products.createdAt));
-  return rows.map(toProductDTO);
+  const variants = await loadVariants(
+    db,
+    rows.map((row) => row.id),
+  );
+  return rows.map((row) => toProductDTO(row, variants.get(row.id)));
 }
 
 /** Rejects a slug already used by another product of the shop. */
@@ -30,18 +35,47 @@ async function assertProductSlugFree(
   }
 }
 
+/** Saves the product row and its variants in one transaction. */
+async function saveProduct(
+  db: Database,
+  shopId: string,
+  productId: string | null,
+  input: ProductInput,
+): Promise<Product> {
+  await assertProductSlugFree(db, shopId, input.slug, productId ?? undefined);
+  const { variants, ...fields } = input;
+  const options = validateVariants(fields.options, variants);
+  const values = {
+    ...fields,
+    options,
+    // With variants, stock lives on each variant.
+    stock: options.length > 0 ? null : fields.stock,
+  };
+
+  return db.transaction(async (tx) => {
+    const [row] = productId
+      ? await tx
+          .update(products)
+          .set(values)
+          .where(and(eq(products.shopId, shopId), eq(products.id, productId)))
+          .returning()
+      : await tx
+          .insert(products)
+          .values({ shopId, ...values })
+          .returning();
+    if (!row) throw ApiError.notFound('Product not found');
+    await syncVariants(tx, row.id, options.length > 0 ? variants : []);
+    const saved = await loadVariants(tx, [row.id]);
+    return toProductDTO(row, saved.get(row.id));
+  });
+}
+
 export async function createProduct(
   db: Database,
   shopId: string,
   input: ProductInput,
 ): Promise<Product> {
-  await assertProductSlugFree(db, shopId, input.slug);
-  const [row] = await db
-    .insert(products)
-    .values({ shopId, ...input })
-    .returning();
-  if (!row) throw new Error('Failed to create product');
-  return toProductDTO(row);
+  return saveProduct(db, shopId, null, input);
 }
 
 export async function updateProduct(
@@ -50,14 +84,7 @@ export async function updateProduct(
   productId: string,
   input: ProductInput,
 ): Promise<Product> {
-  await assertProductSlugFree(db, shopId, input.slug, productId);
-  const [row] = await db
-    .update(products)
-    .set({ ...input })
-    .where(and(eq(products.shopId, shopId), eq(products.id, productId)))
-    .returning();
-  if (!row) throw ApiError.notFound('Product not found');
-  return toProductDTO(row);
+  return saveProduct(db, shopId, productId, input);
 }
 
 /**
