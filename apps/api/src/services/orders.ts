@@ -3,7 +3,7 @@ import type { Order, OrderChangeRequest, PaymentLogEntry } from '@tma-shop/share
 import type { Database } from '../db/client.js';
 import { cartItems, orderItems, orders, productVariants, products, shops } from '../db/schema.js';
 import { toOrderDTO, variantLabel } from '../db/mappers.js';
-import { basePrice, lineStock, loadVariants } from './variants.js';
+import { lineStock, loadVariants, quantitiesByProduct, tieredPrice } from './variants.js';
 import { ApiError } from '../lib/errors.js';
 
 type OrderItemRow = typeof orderItems.$inferSelect;
@@ -103,24 +103,26 @@ export async function createOrderFromCart(
       tx,
       activeLines.map((l) => l.product.id),
     );
-    const draftLines: DraftLine[] = [];
-    for (const { item, product } of activeLines) {
+    // Same rule as the cart: lines that no longer match the product are dropped.
+    const valid = activeLines.flatMap(({ item, product }) => {
       const variant = item.variantId
         ? (variants.get(product.id)?.find((v) => v.id === item.variantId) ?? null)
         : null;
-      // Same rule as the cart: lines that no longer match the product are dropped.
-      if (product.options.length > 0 && (!variant || !variant.isActive)) continue;
-      if (product.options.length === 0 && item.variantId) continue;
-      draftLines.push({
-        productId: product.id,
-        variantId: variant?.id ?? null,
-        variantLabel: variant ? variantLabel(variant.optionValues) : null,
-        title: product.title,
-        unitPrice: basePrice(product, variant),
-        quantity: item.quantity,
-        stock: lineStock(product, variant),
-      });
-    }
+      if (product.options.length > 0 && (!variant || !variant.isActive)) return [];
+      if (product.options.length === 0 && item.variantId) return [];
+      return [{ item, product, variant }];
+    });
+    // Quantity tiers count every unit of a product, across its variants.
+    const productQty = quantitiesByProduct(valid.map((v) => v.item));
+    const draftLines: DraftLine[] = valid.map(({ item, product, variant }) => ({
+      productId: product.id,
+      variantId: variant?.id ?? null,
+      variantLabel: variant ? variantLabel(variant.optionValues) : null,
+      title: product.title,
+      unitPrice: tieredPrice(product, variant, productQty.get(product.id) ?? item.quantity),
+      quantity: item.quantity,
+      stock: lineStock(product, variant),
+    }));
     const draft = buildOrderDraft(draftLines);
 
     const [order] = await tx
@@ -402,6 +404,9 @@ export async function requestOrderChange(
   const byId = new Map(rows.map((row) => [row.id, row]));
   const variants = await loadVariants(db, productIds);
 
+  const oldProductQty = quantitiesByProduct(current);
+  const newProductQty = quantitiesByProduct([...wanted.values()]);
+
   const items: OrderChangeRequest['items'] = [];
   for (const [key, { productId, variantId, quantity }] of wanted) {
     const product = byId.get(productId);
@@ -433,7 +438,12 @@ export async function requestOrderChange(
         `Only ${stock + held} of "${label ? `${product.title} (${label})` : product.title}" available`,
       );
     }
-    const unitPrice = currentPrice.get(key) ?? basePrice(product, variant);
+    // A product whose total quantity is unchanged keeps the prices paid; when it
+    // changes, every line of it is priced again with the current tiers.
+    const unitPrice =
+      newProductQty.get(productId) === oldProductQty.get(productId)
+        ? (currentPrice.get(key) ?? tieredPrice(product, variant, newProductQty.get(productId) ?? quantity))
+        : tieredPrice(product, variant, newProductQty.get(productId) ?? quantity);
     items.push({
       productId,
       variantId: variant?.id ?? null,

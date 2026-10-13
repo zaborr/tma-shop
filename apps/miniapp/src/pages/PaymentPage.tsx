@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, Input, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
-import type { Order, PaymentMethod } from '@tma-shop/shared';
+import { unitPriceFor, type Order, type PaymentMethod } from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useMainButton } from '../hooks/useMainButton.js';
@@ -457,7 +457,35 @@ function ChangeEditor({
     );
 
   // The order's fee is charged once, whatever the items.
-  const total = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0) + order.fee;
+  // Same rule as the shop: a product whose total quantity is unchanged keeps the
+  // prices paid; otherwise all its lines get the current tier price.
+  const products = new Map((catalog.data?.items ?? []).map((p) => [p.id, p]));
+  const sumByProduct = (list: ReadonlyArray<{ productId: string; quantity: number }>) =>
+    list.reduce(
+      (acc, l) => acc.set(l.productId, (acc.get(l.productId) ?? 0) + l.quantity),
+      new Map<string, number>(),
+    );
+  const oldQty = sumByProduct(order.items);
+  const newQty = sumByProduct(lines);
+  const priced = lines.map((line) => {
+    const product = products.get(line.productId);
+    const paid = order.items.find((i) => itemKey(i) === itemKey(line));
+    if (!product) return line;
+    if (paid && oldQty.get(line.productId) === newQty.get(line.productId)) {
+      return { ...line, unitPrice: paid.unitPrice };
+    }
+    const variant = product.variants.find((v) => v.id === line.variantId) ?? null;
+    return {
+      ...line,
+      unitPrice: unitPriceFor(
+        product.price,
+        variant?.priceOverride ?? null,
+        product.priceTiers,
+        newQty.get(line.productId) ?? line.quantity,
+      ),
+    };
+  });
+  const total = priced.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0) + order.fee;
   const diff = total - coveredAmount(order);
   // One addable entry per product, or per variant for products with options.
   const addable: DraftLine[] = (catalog.data?.items ?? [])
@@ -513,7 +541,7 @@ function ChangeEditor({
     <>
       <Section header="Change your order" footer={differenceLabel(diff, order.currency)}>
         {lines.length === 0 && <Cell multiline>Keep at least one product.</Cell>}
-        {lines.map((line) => (
+        {priced.map((line) => (
           <Cell
             key={itemKey(line)}
             subtitle={formatPrice(line.unitPrice, order.currency)}

@@ -1,5 +1,5 @@
 import { asc, inArray } from 'drizzle-orm';
-import type { ProductOption, VariantInput } from '@tma-shop/shared';
+import { unitPriceFor, type ProductOption, type VariantInput } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { productVariants, type products } from '../db/schema.js';
 import { ApiError } from '../lib/errors.js';
@@ -39,6 +39,29 @@ export async function loadVariants(
 /** Unit price of one unit of a product (or one of its variants), before quantity tiers. */
 export function basePrice(product: ProductRow, variant: VariantRow | null): number {
   return variant?.price ?? product.price;
+}
+
+/**
+ * Unit price with quantity tiers, where `productQuantity` is how many units of
+ * the product (all its variants together) are being bought.
+ */
+export function tieredPrice(
+  product: ProductRow,
+  variant: VariantRow | null,
+  productQuantity: number,
+): number {
+  return unitPriceFor(product.price, variant?.price ?? null, product.priceTiers, productQuantity);
+}
+
+/** Units per product id, summing every line (and variant) of each product. */
+export function quantitiesByProduct(
+  lines: ReadonlyArray<{ productId: string; quantity: number }>,
+): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const line of lines) {
+    totals.set(line.productId, (totals.get(line.productId) ?? 0) + line.quantity);
+  }
+  return totals;
 }
 
 /** Stock that limits a line: the variant's when it has one, else the product's. */

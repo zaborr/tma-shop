@@ -4,7 +4,13 @@ import type { Database } from '../db/client.js';
 import { cartItems, carts, productVariants, products, shops } from '../db/schema.js';
 import { toProductDTO, toVariantDTO, variantLabel } from '../db/mappers.js';
 import { ApiError } from '../lib/errors.js';
-import { basePrice, lineStock, loadVariants, type VariantRow } from './variants.js';
+import {
+  lineStock,
+  loadVariants,
+  quantitiesByProduct,
+  tieredPrice,
+  type VariantRow,
+} from './variants.js';
 
 type CartRow = typeof carts.$inferSelect;
 type ProductRow = typeof products.$inferSelect;
@@ -100,15 +106,20 @@ export async function getCart(db: Database, shopId: string, userId: number): Pro
     active.map((r) => r.product.id),
   );
 
-  const lines: CartLine[] = [];
-  for (const { item, product } of active) {
+  // Keep lines that still match their product (variant on, options unchanged).
+  const valid = active.flatMap(({ item, product }) => {
     const own = variants.get(product.id) ?? [];
     const variant = item.variantId ? (own.find((v) => v.id === item.variantId) ?? null) : null;
-    // Skip lines that no longer match the product (variant disabled, options added).
-    if (product.options.length > 0 && (!variant || !variant.isActive)) continue;
-    if (product.options.length === 0 && item.variantId) continue;
-    const unitPrice = basePrice(product, variant);
-    lines.push({
+    if (product.options.length > 0 && (!variant || !variant.isActive)) return [];
+    if (product.options.length === 0 && item.variantId) return [];
+    return [{ item, product, variant, own }];
+  });
+  // Tiers count every unit of a product in the cart, across its variants.
+  const productQty = quantitiesByProduct(valid.map((v) => v.item));
+
+  const lines: CartLine[] = valid.map(({ item, product, variant, own }) => {
+    const unitPrice = tieredPrice(product, variant, productQty.get(product.id) ?? item.quantity);
+    return {
       id: item.id,
       product: toProductDTO(
         product,
@@ -118,8 +129,8 @@ export async function getCart(db: Database, shopId: string, userId: number): Pro
       unitPrice,
       quantity: item.quantity,
       subtotal: unitPrice * item.quantity,
-    });
-  }
+    };
+  });
 
   // The per-order fee is added once, only when there is something to buy.
   const fee = lines.length > 0 ? (shop?.orderFee ?? 0) : 0;

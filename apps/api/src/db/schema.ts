@@ -14,6 +14,7 @@ import { relations } from 'drizzle-orm';
 import type {
   OrderChangeRequest,
   PaymentLogEntry,
+  PriceTier,
   ProductOption,
   WalletInput,
 } from '@tma-shop/shared';
@@ -87,6 +88,8 @@ export const products = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     /** Option groups (Color, Size…); empty for a product without variants. */
     options: jsonb('options').$type<ProductOption[]>().notNull().default([]),
+    /** Quantity breaks on the product's price, sorted by `minQty`. */
+    priceTiers: jsonb('price_tiers').$type<PriceTier[]>().notNull().default([]),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [unique('products_shop_slug_unique').on(table.shopId, table.slug)],

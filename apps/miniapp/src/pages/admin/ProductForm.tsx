@@ -13,6 +13,7 @@ import {
   type OptionDraft,
   type VariantDraft,
 } from './VariantsEditor.js';
+import { buildTiers, initialTiers, TiersEditor, type TierDraft } from './TiersEditor.js';
 
 /** Create a product, or edit `product` when given. */
 export function ProductForm({
@@ -42,6 +43,7 @@ export function ProductForm({
   const [variantDrafts, setVariantDrafts] = useState<Record<string, VariantDraft>>(() =>
     initialDrafts(product),
   );
+  const [tierDrafts, setTierDrafts] = useState<TierDraft[]>(() => initialTiers(product));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -52,10 +54,16 @@ export function ProductForm({
   const built = buildVariants(optionDrafts, variantDrafts);
   const variantError = 'error' in built ? built.error : null;
   const withVariants = !('error' in built) && built.options.length > 0;
+  const builtTiers = buildTiers(tierDrafts);
+  const formError = variantError ?? ('error' in builtTiers ? builtTiers.error : null);
 
   const submit = async (): Promise<void> => {
     if ('error' in built) {
       setMessage(built.error);
+      return;
+    }
+    if ('error' in builtTiers) {
+      setMessage(builtTiers.error);
       return;
     }
     setBusy(true);
@@ -76,6 +84,7 @@ export function ProductForm({
       isActive: product?.isActive ?? true,
       options: built.options,
       variants: built.variants,
+      priceTiers: builtTiers.tiers,
     };
     try {
       const saved = product
@@ -92,6 +101,7 @@ export function ProductForm({
         setCategoryId(null);
         setOptionDrafts([]);
         setVariantDrafts({});
+        setTierDrafts([]);
       }
       onSaved();
     } catch (err) {
@@ -198,6 +208,14 @@ export function ProductForm({
       />
     </Section>
 
+    <TiersEditor
+      tiers={tierDrafts}
+      setTiers={setTierDrafts}
+      basePrice={price}
+      currency={token}
+      withVariants={withVariants}
+    />
+
     <VariantsEditor
       options={optionDrafts}
       setOptions={setOptionDrafts}
@@ -207,12 +225,12 @@ export function ProductForm({
       currency={token}
     />
 
-    <Section footer={variantError ?? undefined}>
+    <Section footer={formError ?? undefined}>
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <Button
           stretched
           loading={busy}
-          disabled={!title.trim() || imageInvalid || (!withVariants && stockInvalid) || variantError !== null}
+          disabled={!title.trim() || imageInvalid || (!withVariants && stockInvalid) || formError !== null}
           onClick={() => void submit()}
         >
           {product ? 'Save changes' : 'Create product'}

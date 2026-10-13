@@ -57,6 +57,7 @@ export function toInput(product: Product, isActive: boolean): ProductInput {
     stock: product.stock,
     isActive,
     options: product.options,
+    priceTiers: product.priceTiers,
     variants: product.variants.map((v) => ({
       values: v.values,
       price: v.priceOverride,

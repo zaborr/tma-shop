@@ -61,6 +61,7 @@ export function toProductDTO(row: ProductRow, variants: readonly VariantRow[] = 
     stock: row.stock,
     isActive: row.isActive,
     options: row.options,
+    priceTiers: row.priceTiers,
     variants: row.options.length > 0 ? variants.map((v) => toVariantDTO(v, row)) : [],
     createdAt: row.createdAt.toISOString(),
   };

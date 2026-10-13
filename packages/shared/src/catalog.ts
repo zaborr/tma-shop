@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { currencyCode, id, isoDateTime, moneyAmount, paginationQuery, slug } from './common.js';
+import { priceTiers } from './pricing.js';
 
 export const category = z.object({
   id,
@@ -64,6 +65,8 @@ export const product = z.object({
   options: z.array(productOption).max(3),
   /** Every combination of the options (admins also see inactive ones). */
   variants: z.array(productVariant),
+  /** Quantity breaks on the product's price; empty = same price for any quantity. */
+  priceTiers,
   createdAt: isoDateTime,
 });
 export type Product = z.infer<typeof product>;
