@@ -1,0 +1,85 @@
+/*
+ * App-wide styles on top of Telegram UI.
+ *
+ * - The page background follows the theme, so dark mode has no white strips
+ *   (below short screens, while loading, when scrolling past the end).
+ * - Text fields get their own background and a border: on iPhone Telegram UI
+ *   draws them with the same colour as the section, so they were invisible.
+ * - Slightly larger text than Telegram UI's defaults.
+ */
+
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--tg-theme-secondary-bg-color, var(--tg-theme-bg-color, #efeff4));
+}
+
+@media (prefers-color-scheme: dark) {
+  html,
+  body {
+    background: var(--tg-theme-secondary-bg-color, var(--tg-theme-bg-color, #0f0f0f));
+  }
+}
+
+/* Doubled class: wins over Telegram UI's own (single-class) theme rules. */
+.tma-root.tma-root {
+  min-height: 100vh;
+  min-height: var(--tg-viewport-stable-height, 100vh);
+  background: var(--tgui--secondary_bg_color);
+  color-scheme: light;
+
+  --tgui--text--font_size: 17px;
+  --tgui--text--line_height: 24px;
+  --tgui--subheadline1--font_size: 17px;
+  --tgui--subheadline1--line_height: 24px;
+  --tgui--subheadline2--font_size: 16px;
+  --tgui--subheadline2--line_height: 22px;
+  --tgui--caption1--font_size: 14px;
+  --tgui--caption1--line_height: 20px;
+  --tgui--caption2--font_size: 13px;
+  --tgui--caption2--line_height: 18px;
+
+  --tma-field-bg: var(--tgui--secondary_bg_color);
+  --tma-field-border: rgba(0, 0, 0, 0.18);
+}
+
+.tma-root.tma-root.tma-dark {
+  color-scheme: dark;
+  --tma-field-bg: var(--tgui--secondary_bg_color);
+  --tma-field-border: rgba(255, 255, 255, 0.22);
+}
+
+/* Text fields (see components/Field.tsx). */
+label.tma-field.tma-field {
+  border-radius: 12px;
+  background: var(--tma-field-bg);
+  box-shadow: inset 0 0 0 1px var(--tma-field-border);
+}
+
+label.tma-field.tma-field:focus-within {
+  box-shadow: inset 0 0 0 1.5px var(--tgui--link_color);
+}
+
+.tma-field input,
+.tma-field textarea {
+  font-size: 17px;
+}
+
+.tma-field input::placeholder,
+.tma-field textarea::placeholder {
+  color: var(--tgui--hint_color);
+  opacity: 0.8;
+}
+
+/* Visible label above each field. */
+.tma-field-label {
+  padding: 12px 22px 4px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--tgui--section_header_text_color, var(--tgui--hint_color));
+}

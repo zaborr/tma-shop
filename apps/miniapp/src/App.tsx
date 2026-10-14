@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { miniApp, retrieveLaunchParams, useSignal } from '@telegram-apps/sdk-react';
+import { retrieveLaunchParams } from '@telegram-apps/sdk-react';
 import { AppRoot, Placeholder } from '@telegram-apps/telegram-ui';
 import { SessionProvider, useSession } from './providers/SessionProvider.js';
 import { ShopLayout } from './providers/ShopProvider.js';
 import { useBackButton } from './hooks/useBackButton.js';
+import { useAppearance } from './hooks/useAppearance.js';
 import { Loader } from './components/Loader.js';
 import { CatalogPage } from './pages/CatalogPage.js';
 import { ProductPage } from './pages/ProductPage.js';
@@ -83,13 +84,17 @@ function Shell(): React.JSX.Element {
 }
 
 export function App(): React.JSX.Element {
-  const isDark = useSignal(miniApp.isDark);
+  const appearance = useAppearance();
   // Changing the language redraws every screen (same page, same session).
   const [language, setLanguage] = useState(lang());
   useEffect(() => onLangChange(setLanguage), []);
 
   return (
-    <AppRoot appearance={isDark ? 'dark' : 'light'} platform={platform()}>
+    <AppRoot
+      appearance={appearance}
+      platform={platform()}
+      className={appearance === 'dark' ? 'tma-root tma-dark' : 'tma-root'}
+    >
       <SessionProvider>
         <HashRouter key={language}>
           <Shell />
