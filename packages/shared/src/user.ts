@@ -7,7 +7,7 @@ export const telegramUserId = z.number().int().positive();
 export const userRole = z.enum(['customer', 'admin']);
 
 /** Languages the app speaks. */
-export const appLanguage = z.enum(['en', 'es', 'it']);
+export const appLanguage = z.enum(['en', 'es', 'it', 'pt']);
 export type UserRole = z.infer<typeof userRole>;
 
 export const user = z.object({

@@ -3,10 +3,11 @@ import { isLang, langFrom, type Lang } from '@tma-shop/shared';
 import { en, type MessageKey } from './en.js';
 import { es } from './es.js';
 import { it } from './it.js';
+import { pt } from './pt.js';
 
 export type { MessageKey };
 
-const dictionaries: Record<Lang, Record<MessageKey, string>> = { en, es, it };
+const dictionaries: Record<Lang, Record<MessageKey, string>> = { en, es, it, pt };
 
 const STORAGE_KEY = 'tma-shop:lang';
 
@@ -64,7 +65,7 @@ export function onLangChange(listener: (lang: Lang) => void): () => void {
   return () => listeners.delete(listener);
 }
 
-const LOCALES: Record<Lang, string> = { en: 'en-GB', es: 'es-ES', it: 'it-IT' };
+const LOCALES: Record<Lang, string> = { en: 'en-GB', es: 'es-ES', it: 'it-IT', pt: 'pt-PT' };
 
 /** Locale for dates and numbers in the current language. */
 export function locale(): string {

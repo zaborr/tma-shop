@@ -2,7 +2,7 @@ import type { Lang } from '@tma-shop/shared';
 
 /**
  * Texts the bot sends (notifications, /start) and that go into exported
- * files, in English, Spanish and Italian. `{name}` placeholders are filled by `tr`.
+ * files, in English, Spanish, Italian and Portuguese. `{name}` placeholders are filled by `tr`.
  */
 const en = {
   // Shared bits
@@ -220,7 +220,76 @@ const it: Record<BotMessageKey, string> = {
   'export.captionOther': '📊 {shop} — {count} ordini',
 };
 
-const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it };
+const pt: Record<BotMessageKey, string> = {
+  'order.ref': '{shop} · pedido #{id}',
+  'order.number': 'Pedido #{id}',
+  'line.customer': 'Cliente: {customer}',
+  'line.contact': 'Contacto: {contact}',
+  'line.amount': 'Valor: {amount}',
+  'line.shipping': 'Envio: {zone}',
+  'line.method': 'Método: {method}',
+  'line.tx': 'Tx: {tx}',
+  'customer.fallback': 'Cliente',
+
+  'admin.paymentToVerify': '💰 Pagamento por verificar',
+  'admin.differenceToVerify': '💰 Pagamento da diferença por verificar',
+  'admin.openToConfirm': 'Abra a loja → Admin para o confirmar ou cancelar.',
+  'admin.changeRequested': '✏️ Alteração de pedido solicitada',
+  'admin.newItems': 'Novos artigos:',
+  'admin.total': 'Total: {from} → {to}',
+  'admin.customerWouldPay': 'O cliente pagaria: {amount}',
+  'admin.youWouldRefund': 'Teria de reembolsar: {amount}',
+  'admin.sameAmount': 'Mesmo valor, nada a pagar nem a reembolsar',
+  'admin.openToApprove': 'Abra a loja → Admin para a aprovar ou rejeitar.',
+
+  'change.rejected': 'A sua alteração em {ref} não foi aprovada. O pedido fica como estava.',
+  'change.approved': '✅ A sua alteração em {ref} foi aprovada.',
+  'change.newTotal': 'Novo total: {amount}',
+  'change.payDifference': 'Pague a diferença de {amount}: abra a loja → Os meus pedidos.',
+  'refund.willRefund': 'A loja vai reembolsar {amount}.',
+  'status.paid': 'Pagamento confirmado em {ref}. A loja está a preparar o seu pedido.',
+  'status.rejected': 'Não foi possível verificar o seu pagamento em {ref}.',
+  'status.rejectedHint': 'Verifique a transação e envie-a de novo em Os meus pedidos, na loja.',
+  'status.partial': 'Recebemos o seu pagamento em {ref}.',
+  'status.partialHint': 'Falta pagar: {amount}. Abra Os meus pedidos na loja para o pagar.',
+  'status.shipped': 'O seu pedido {ref} foi enviado.',
+  'status.tracking': 'Rastreio: {tracking}',
+  'status.delivered': 'O seu pedido {ref} foi entregue. Obrigado!',
+  'status.cancelled': 'O seu pedido {ref} foi cancelado.',
+  'status.shopMessage': 'Mensagem da loja: {note}',
+  'autoCancel.note': 'Não foi pago em {hours} horas. Pode fazer um novo pedido quando quiser.',
+
+  'start.hello': 'Olá, {name}!',
+  'start.helloAnon': 'Olá!',
+  'start.tapButton': 'Toque no botão abaixo para abrir a loja.',
+  'start.useMenu': 'Abra a loja com o botão de menu ao lado da caixa de texto.',
+  'start.updates':
+    'A partir de agora escrevo-lhe aqui quando os seus pedidos mudarem: pagamento confirmado, enviado, entregue…',
+  'start.button': 'Abrir loja',
+
+  'wallets.changed': '⚠️ {who} alterou os endereços de pagamento de {shop}.',
+  'wallets.evm': 'Base / Ethereum: {before} → {after}',
+  'wallets.solana': 'Solana: {before} → {after}',
+  'wallets.checkIt': 'Se não foi você nem outro administrador, verifique já: os pagamentos iriam para o novo endereço.',
+
+  'check.autoConfirmed': '✅ Pagamento verificado na blockchain e confirmado automaticamente',
+  'check.overpaid': 'O cliente pagou {amount} a mais: reembolse-o a partir do pedido.',
+  'check.failedHeader': '⚠️ Não confirmado automaticamente: {reason}',
+  'check.not_found': 'a transação não foi encontrada em {network}, ou ainda não está confirmada.',
+  'check.tx_failed': 'a transação falhou na blockchain.',
+  'check.no_transfer': 'a transação não envia este token para o endereço da loja.',
+  'check.too_old': 'a transação é anterior ao pedido.',
+  'check.short': 'recebido {received}, esperado {expected}.',
+  'check.ambiguous': 'há {count} pedidos abertos à espera deste mesmo valor; verifique a qual pertence.',
+  'check.stock_short': 'já não há stock suficiente para o confirmar.',
+  'check.no_method': 'a loja já não aceita essa rede ou token.',
+  'check.rpc_error': 'não foi possível ligar à rede {network}.',
+
+  'export.captionOne': '📊 {shop} — {count} pedido',
+  'export.captionOther': '📊 {shop} — {count} pedidos',
+};
+
+const dictionaries: Record<Lang, Record<BotMessageKey, string>> = { en, es, it, pt };
 
 /** Text for `key` in `lang`, with `{name}` placeholders filled from `vars`. */
 export function tr(lang: Lang, key: BotMessageKey, vars?: Record<string, string | number>): string {
