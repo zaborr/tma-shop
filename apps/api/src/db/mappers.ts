@@ -18,7 +18,7 @@ import type {
   shops,
   users,
 } from './schema.js';
-import { EMPTY_PAYMENT_SETUP, paymentMethodsOf, userLang } from '@tma-shop/shared';
+import { EMPTY_PAYMENT_SETUP, isLang, paymentMethodsOf, userLang } from '@tma-shop/shared';
 import { explorerTxUrl } from '../config/payment-methods.js';
 
 type ProductRow = typeof products.$inferSelect;
@@ -129,7 +129,7 @@ export function toSessionUserDTO(row: UserRow): SessionUser {
     languageCode: row.languageCode,
     role: row.role,
     language: userLang(row.preferredLang, row.languageCode),
-    preferredLanguage: row.preferredLang === 'en' || row.preferredLang === 'es' ? row.preferredLang : null,
+    preferredLanguage: isLang(row.preferredLang) ? row.preferredLang : null,
   };
 }
 

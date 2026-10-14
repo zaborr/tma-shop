@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import type { Lang } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import { users } from '../db/schema.js';
 import type { InitDataUser } from '../auth/init-data.js';
@@ -53,7 +54,7 @@ export async function getUser(db: Database, telegramId: number): Promise<UserRow
 export async function setPreferredLanguage(
   db: Database,
   telegramId: number,
-  language: 'en' | 'es' | null,
+  language: Lang | null,
 ): Promise<UserRow> {
   const [row] = await db
     .update(users)

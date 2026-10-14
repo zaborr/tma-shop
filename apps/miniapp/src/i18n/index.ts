@@ -1,11 +1,12 @@
 import { retrieveRawInitData } from '@telegram-apps/sdk-react';
-import { langFrom, type Lang } from '@tma-shop/shared';
+import { isLang, langFrom, type Lang } from '@tma-shop/shared';
 import { en, type MessageKey } from './en.js';
 import { es } from './es.js';
+import { it } from './it.js';
 
 export type { MessageKey };
 
-const dictionaries: Record<Lang, Record<MessageKey, string>> = { en, es };
+const dictionaries: Record<Lang, Record<MessageKey, string>> = { en, es, it };
 
 const STORAGE_KEY = 'tma-shop:lang';
 
@@ -13,7 +14,7 @@ const STORAGE_KEY = 'tma-shop:lang';
 function remembered(): Lang | null {
   try {
     const value = window.localStorage.getItem(STORAGE_KEY);
-    return value === 'en' || value === 'es' ? value : null;
+    return isLang(value) ? value : null;
   } catch {
     return null;
   }
@@ -63,9 +64,11 @@ export function onLangChange(listener: (lang: Lang) => void): () => void {
   return () => listeners.delete(listener);
 }
 
+const LOCALES: Record<Lang, string> = { en: 'en-GB', es: 'es-ES', it: 'it-IT' };
+
 /** Locale for dates and numbers in the current language. */
 export function locale(): string {
-  return lang() === 'es' ? 'es-ES' : 'en-GB';
+  return LOCALES[lang()];
 }
 
 /** Translated text for `key`, with `{name}` placeholders filled from `vars`. */

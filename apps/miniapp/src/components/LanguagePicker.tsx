@@ -7,6 +7,7 @@ import { lang, setLang, t } from '../i18n/index.js';
 const LANGUAGES: Array<{ code: Lang; flag: string; name: string }> = [
   { code: 'es', flag: '🇪🇸', name: 'Español' },
   { code: 'en', flag: '🇬🇧', name: 'English' },
+  { code: 'it', flag: '🇮🇹', name: 'Italiano' },
 ];
 
 /**
