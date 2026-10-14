@@ -1,9 +1,9 @@
 import type { Lang } from '@tma-shop/shared';
 
 /**
- * Spanish and Italian versions of the API's error messages. Errors are
+ * Spanish, Italian and Portuguese versions of the API's error messages. Errors are
  * written in English in the code; these tables translate them when the app
- * asks for another language (`X-Lang: es`, `X-Lang: it`). Unknown messages
+ * asks for another language (`X-Lang: es`, `it`, `pt`). Unknown messages
  * are returned as they are.
  */
 
@@ -171,7 +171,88 @@ const RULES_IT: Rule[] = [
   [/^"(.+)" is priced in (\w+); this order is in (\w+)$/, (p, a, b) => `«${p}» è in ${a} e questo ordine in ${b}`],
 ];
 
-const TABLES: Partial<Record<Lang, Rule[]>> = { es: RULES, it: RULES_IT };
+const STATUS_PT: Record<string, string> = {
+  pending: 'por pagar',
+  awaiting_payment: 'com um pagamento em verificação',
+  paid: 'pago',
+  cancelled: 'cancelado',
+  shipped: 'enviado',
+  fulfilled: 'entregue',
+};
+
+const RULES_PT: Rule[] = [
+  [/^Enter your delivery address$/, 'Escreva a sua morada de entrega'],
+  [/^Cannot create an order from an empty cart$/, 'Não é possível fazer um pedido com o carrinho vazio'],
+  [/^Option names must be different$/, 'Os nomes das opções têm de ser diferentes'],
+  [/^"(.+)" has repeated values$/, (n) => `«${n}» tem valores repetidos`],
+  [/^Invalid quantity for "(.+)"$/, (n) => `Quantidade inválida para «${n}»`],
+  [/^Order total must be positive$/, 'O total do pedido tem de ser maior do que zero'],
+  [/^A product with options needs at least one variant$/, 'Um produto com opções precisa de pelo menos uma variante'],
+  [/^Add options before adding variants$/, 'Adicione opções antes de adicionar variantes'],
+  [/^Each variant needs one value per option$/, 'Cada variante precisa de um valor por opção'],
+  [/^The same combination appears twice$/, 'A mesma combinação aparece duas vezes'],
+  [/^Each wallet needs a network and a token$/, 'Cada carteira precisa de uma rede e de um token'],
+  [/^Two shipping zones have the same name$/, 'Há duas zonas de envio com o mesmo nome'],
+  [/^The name does not match the shop name$/, 'O nome não corresponde ao da loja'],
+  [/^The order is unchanged$/, 'O pedido não mudou'],
+  [/^This product has no variants$/, 'Este produto não tem variantes'],
+  [/^"(.+)" has no options$/, (n) => `«${n}» não tem opções`],
+  [/^No orders match these filters$/, 'Nenhum pedido corresponde a estes filtros'],
+  [/^Choose a shipping zone$/, 'Escolha uma zona de envio'],
+  [/^Stars payments are disabled$/, 'Os pagamentos com Stars estão desativados'],
+  [/^Unknown payment method$/, 'Método de pagamento desconhecido'],
+  [/^That is not a Solana transaction signature$/, 'Isto não é uma assinatura de transação Solana'],
+  [/^That is not a transaction hash \(0x followed by 64 characters\)$/, 'Isto não é um hash de transação (0x seguido de 64 caracteres)'],
+  [/^Only orders with a payment under review can be checked$/, 'Só se podem verificar pedidos com um pagamento em verificação'],
+  [/^A product in the change is no longer available$/, 'Um produto da alteração já não está disponível'],
+  [/^Choose an available option for "(.+)"$/, (n) => `Escolha uma opção disponível de «${n}»`],
+  [/^Choose an option for "(.+)"$/, (n) => `Escolha uma opção de «${n}»`],
+  [/^Order is already paid$/, 'O pedido já está pago'],
+  [/^There is no change to approve$/, 'Não há nenhuma alteração para aprovar'],
+  [/^Order is (\w+) and cannot be changed$/, (s) => `O pedido está ${STATUS_PT[s] ?? s} e não pode ser alterado`],
+  [/^Order is (\w+) and cannot take a payment$/, (s) => `O pedido está ${STATUS_PT[s] ?? s} e não aceita pagamentos`],
+  [/^An order that is (\w+) cannot be set to (\w+)$/, (a, b) => `Um pedido ${STATUS_PT[a] ?? a} não pode passar a ${STATUS_PT[b] ?? b}`],
+  [/^Nothing is left to pay for this order$/, 'Não falta pagar nada neste pedido'],
+  [/^Nothing is owed to the customer$/, 'Não há nada a reembolsar ao cliente'],
+  [/^The order changed meanwhile\. Reload it\.$/, 'O pedido mudou entretanto. Volte a carregá-lo.'],
+  [/^Only (\d+) of "(.+)" in stock$/, (n, p) => `Só restam ${n} de «${p}»`],
+  [/^Only (\d+) of "(.+)" available$/, (n, p) => `Só há ${n} disponíveis de «${p}»`],
+  [/^Not enough stock of "(.+)" \((\d+) left\) to approve$/, (p, n) => `Não há stock suficiente de «${p}» (restam ${n}) para a aprovar`],
+  [/^Not enough stock for this order: (.+)\. Confirm anyway, or reject the payment\.$/, (list) =>
+    `Não há stock suficiente para este pedido: ${list.replace(/: (\d+) left, order needs (\d+)/g, ': restam $1, o pedido precisa de $2')}. Confirme mesmo assim ou rejeite o pagamento.`],
+  [/^A category with the slug "(.+)" already exists$/, (s) => `Já existe uma categoria com o link «${s}»`],
+  [/^A product with the slug "(.+)" already exists$/, (s) => `Já existe um produto com o link «${s}»`],
+  [/^A shop with the slug "(.+)" already exists$/, (s) => `Já existe uma loja com o link «${s}»`],
+  [/^This transaction was already used for a payment$/, 'Esta transação já foi usada noutro pagamento'],
+  [/^Platform admin role required$/, 'É preciso ser administrador da plataforma'],
+  [/^Shop admin role required$/, 'É preciso ser administrador da loja'],
+  [/^Category not found$/, 'Categoria não encontrada'],
+  [/^Item is not in the cart$/, 'Esse artigo não está no carrinho'],
+  [/^Order not found$/, 'Pedido não encontrado'],
+  [/^Product not found$/, 'Produto não encontrado'],
+  [/^Shop not found$/, 'Loja não encontrada'],
+  [/^That option is no longer available$/, 'Essa opção já não está disponível'],
+  [/^Invalid or expired token$/, 'A sessão expirou. Abra a app novamente.'],
+  [/^Missing bearer token$/, 'Falta a sessão. Abra a app novamente.'],
+  [/^initData does not contain a user$/, 'O Telegram não enviou o seu utilizador. Abra a app novamente.'],
+  [/^initData validation failed \((.+)\)$/, (code) => `Não foi possível verificar a sua sessão do Telegram (${code})`],
+  [/^No shop configured — create one first$/, 'Ainda não há nenhuma loja configurada'],
+  [/^Orders with a submitted or confirmed payment cannot be deleted\. Contact the shop\.$/, 'Os pedidos com um pagamento enviado ou confirmado não podem ser eliminados. Contacte a loja.'],
+  [/^The bot could not send you the file\. Open your chat with the bot, press Start, and try again\.$/, 'O bot não conseguiu enviar-lhe o ficheiro. Abra o seu chat com o bot, toque em Iniciar e tente de novo.'],
+  [/^This shop has orders and cannot be deleted\. Hide it instead\.$/, 'Esta loja tem pedidos e não pode ser eliminada assim. Oculte-a ou use «Eliminar loja…».'],
+  [/^Keep at least one product \(or ask the shop to cancel the order\)$/, 'Mantenha pelo menos um produto (ou peça à loja para cancelar o pedido)'],
+  [/^That is not an RSA public key of 2048 bits or more/, 'Isto não é uma chave pública RSA de 2048 bits ou mais («BEGIN PUBLIC KEY»)'],
+  [/^Your cart has (\w+) products and this one is priced in (\w+)\. Check out or empty the cart first\.$/, (a, b) =>
+    `O seu carrinho tem produtos em ${a} e este está em ${b}. Faça o pedido ou esvazie primeiro o carrinho.`],
+  [/^"(.+)" is not a value of "(.+)"$/, (v, o) => `«${v}» não é um valor de «${o}»`],
+  [/^The cart mixes currencies; remove the items priced in the other token$/, 'O carrinho mistura moedas; retire os produtos na outra moeda'],
+  [/^This shop cannot take orders with delivery yet\. Please try again later\.$/, 'Esta loja ainda não aceita pedidos com envio. Tente mais tarde.'],
+  [/^The shop updated its security key\. Please reopen the shop and try again\.$/, 'A loja mudou a sua chave de segurança. Abra a loja novamente e tente de novo.'],
+  [/^Only paid orders, or orders whose payment is being verified, can be changed$/, 'Só se podem alterar pedidos pagos ou com o pagamento em verificação'],
+  [/^"(.+)" is priced in (\w+); this order is in (\w+)$/, (p, a, b) => `«${p}» está em ${a} e este pedido em ${b}`],
+];
+
+const TABLES: Partial<Record<Lang, Rule[]>> = { es: RULES, it: RULES_IT, pt: RULES_PT };
 
 /** The error message in the requested language. */
 export function translateError(message: string, lang: Lang): string {

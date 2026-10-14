@@ -8,6 +8,7 @@ const LANGUAGES: Array<{ code: Lang; flag: string; name: string }> = [
   { code: 'es', flag: '🇪🇸', name: 'Español' },
   { code: 'en', flag: '🇬🇧', name: 'English' },
   { code: 'it', flag: '🇮🇹', name: 'Italiano' },
+  { code: 'pt', flag: '🇵🇹', name: 'Português' },
 ];
 
 /**
