@@ -1,9 +1,16 @@
-/** Languages the shop speaks. Spanish for Spanish-speaking users, English for everyone else. */
-export type Lang = 'en' | 'es';
+/** Languages the shop speaks. English is the fallback for everyone else. */
+export const LANGS = ['en', 'es', 'it'] as const;
+export type Lang = (typeof LANGS)[number];
 
-/** Picks the language from a Telegram/BCP-47 code such as `es`, `es-AR` or `en-US`. */
+/** True if `value` is one of the supported languages. */
+export function isLang(value: unknown): value is Lang {
+  return typeof value === 'string' && (LANGS as readonly string[]).includes(value);
+}
+
+/** Picks the language from a Telegram/BCP-47 code such as `es`, `it-CH` or `en-US`. */
 export function langFrom(code: string | null | undefined): Lang {
-  return code?.toLowerCase().startsWith('es') ? 'es' : 'en';
+  const base = code?.toLowerCase().split(/[-_]/)[0];
+  return isLang(base) ? base : 'en';
 }
 
 /** A user's language: the one they chose in the app, else their Telegram one. */
@@ -11,5 +18,5 @@ export function userLang(
   preferred: string | null | undefined,
   telegramCode: string | null | undefined,
 ): Lang {
-  return preferred === 'en' || preferred === 'es' ? preferred : langFrom(telegramCode);
+  return isLang(preferred) ? preferred : langFrom(telegramCode);
 }

@@ -7,6 +7,7 @@ import type {
   ExportRequest,
   ExportResponse,
   InvoiceResponse,
+  Lang,
   Order,
   PlatformShopInput,
   Product,
@@ -127,7 +128,7 @@ export class ApiClient {
   }
 
   /** Saves the app language for this user (null = follow Telegram). */
-  setLanguage(language: 'en' | 'es' | null): Promise<SessionUser> {
+  setLanguage(language: Lang | null): Promise<SessionUser> {
     return this.request<SessionUser>('/me/language', {
       method: 'PUT',
       body: JSON.stringify({ language }),
