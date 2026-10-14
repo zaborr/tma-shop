@@ -81,19 +81,46 @@ export async function handleBotMessage(
 }
 
 /** Best-effort bot setup at startup: registers the webhook so /start is answered. */
-export async function configureBot(env: Env, telegram = new TelegramApi(env.BOT_TOKEN)): Promise<void> {
+/** Waits between tries when Telegram cannot be reached at startup (~22 min in all). */
+export const WEBHOOK_RETRY_DELAYS_MS = [10_000, 30_000, 120_000, 300_000, 900_000];
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms).unref());
+
+/**
+ * Points the bot's webhook at this API. A network hiccup at startup (Telegram
+ * not reachable for a moment) is retried a few times instead of giving up;
+ * the webhook set on an earlier start keeps working meanwhile.
+ */
+export async function configureBot(
+  env: Env,
+  telegram = new TelegramApi(env.BOT_TOKEN),
+  wait: (ms: number) => Promise<void> = sleep,
+): Promise<boolean> {
   const url = webhookUrl(env);
   if (!url || !env.TELEGRAM_WEBHOOK_SECRET) {
     console.warn(
       'Telegram webhook not set: the bot will not answer /start. ' +
         'Set TELEGRAM_WEBHOOK_SECRET (and PUBLIC_URL outside Render).',
     );
-    return;
+    return false;
   }
-  try {
-    await telegram.setWebhook(url, env.TELEGRAM_WEBHOOK_SECRET, ['message', 'pre_checkout_query']);
-    console.log(`Telegram webhook set to ${url}`);
-  } catch (error) {
-    console.error('Could not set the Telegram webhook:', error);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await telegram.setWebhook(url, env.TELEGRAM_WEBHOOK_SECRET, ['message', 'pre_checkout_query']);
+      console.log(`Telegram webhook set to ${url}`);
+      return true;
+    } catch (error) {
+      const delay = WEBHOOK_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) {
+        console.error('Could not set the Telegram webhook, giving up:', error);
+        return false;
+      }
+      console.warn(
+        `Could not set the Telegram webhook (try ${attempt + 1}), retrying in ${delay / 1000} s:`,
+        error instanceof Error ? error.message : error,
+      );
+      await wait(delay);
+    }
   }
 }

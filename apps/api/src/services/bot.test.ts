@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../config/env.js';
 import { TelegramApi } from '../telegram/api.js';
-import { buildStartReply, handleBotMessage, resetMiniAppUrlCache, webhookUrl } from './bot.js';
+import {
+  WEBHOOK_RETRY_DELAYS_MS,
+  buildStartReply,
+  configureBot,
+  handleBotMessage,
+  resetMiniAppUrlCache,
+  webhookUrl,
+} from './bot.js';
 
 const env = {
   BOT_TOKEN: '1:abc',
@@ -46,5 +53,28 @@ describe('bot', () => {
     expect(send).toHaveBeenCalledWith(5, expect.stringContaining('Tap the button'), {
       inline_keyboard: [[{ text: 'Open shop', web_app: { url: 'https://shop.example.app' } }]],
     });
+  });
+
+  it('retries setting the webhook when Telegram cannot be reached', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const telegram = new TelegramApi('1:abc');
+    const set = vi
+      .spyOn(telegram, 'setWebhook')
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValue(true);
+    const waits: number[] = [];
+    const ok = await configureBot(env, telegram, async (ms) => {
+      waits.push(ms);
+    });
+    expect(ok).toBe(true);
+    expect(set).toHaveBeenCalledTimes(3);
+    expect(waits).toEqual(WEBHOOK_RETRY_DELAYS_MS.slice(0, 2));
+
+    set.mockReset().mockRejectedValue(new TypeError('fetch failed'));
+    expect(await configureBot(env, telegram, async () => undefined)).toBe(false);
+    expect(set).toHaveBeenCalledTimes(WEBHOOK_RETRY_DELAYS_MS.length + 1);
   });
 });
