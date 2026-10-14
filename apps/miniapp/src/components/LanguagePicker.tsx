@@ -39,9 +39,12 @@ export function LanguagePicker(): React.JSX.Element {
             size="s"
             mode={option.code === current ? 'filled' : 'bezeled'}
             loading={busy === option.code}
+            title={option.name}
             onClick={() => void choose(option.code)}
           >
-            {`${option.flag} ${option.name}`}
+            <span aria-label={option.name} role="img" style={{ fontSize: 22, lineHeight: 1 }}>
+              {option.flag}
+            </span>
           </Button>
         ))}
       </div>
