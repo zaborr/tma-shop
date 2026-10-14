@@ -38,7 +38,7 @@ export function ProductImage({
       style={{
         display: 'flex',
         justifyContent: 'center',
-        background: 'var(--tg-theme-secondary-bg-color, rgba(127, 127, 127, 0.08))',
+        background: 'var(--tgui--secondary_bg_color)',
       }}
     >
       <img

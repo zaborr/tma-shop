@@ -2,39 +2,42 @@ import type { ComponentProps, ReactNode } from 'react';
 import { Input as TgInput, Textarea as TgTextarea } from '@telegram-apps/telegram-ui';
 
 /**
- * Drop-in `Input` and `Textarea` that always show their `header` as a label.
- * Telegram UI only draws that header on Android ("base") and hides it on
- * iPhone, which left fields without any label there.
+ * Drop-in `Input` and `Textarea` that always show their `header` as a label
+ * and draw a visible box (styles in styles.css, `.tma-field`). Telegram UI only
+ * draws the header on Android ("base") and, on iPhone, paints the field the
+ * same colour as the section, so fields had neither label nor outline there.
  */
 
-const labelStyle: React.CSSProperties = {
-  padding: '12px 22px 4px',
-  fontSize: 13,
-  lineHeight: '18px',
-  color: 'var(--tgui--hint_color, var(--tg-theme-hint-color, #8e8e93))',
-};
-
 function Label({ children }: { children: ReactNode }): React.JSX.Element {
-  return <div style={labelStyle}>{children}</div>;
+  return <div className="tma-field-label">{children}</div>;
 }
 
-export function Input({ header, ...props }: ComponentProps<typeof TgInput>): React.JSX.Element {
+function fieldClass(className: string | undefined): string {
+  return className ? `tma-field ${className}` : 'tma-field';
+}
+
+export function Input({
+  header,
+  className,
+  ...props
+}: ComponentProps<typeof TgInput>): React.JSX.Element {
   return (
     <div>
       {header ? <Label>{header}</Label> : null}
-      <TgInput {...props} />
+      <TgInput className={fieldClass(className)} {...props} />
     </div>
   );
 }
 
 export function Textarea({
   header,
+  className,
   ...props
 }: ComponentProps<typeof TgTextarea>): React.JSX.Element {
   return (
     <div>
       {header ? <Label>{header}</Label> : null}
-      <TgTextarea {...props} />
+      <TgTextarea className={fieldClass(className)} {...props} />
     </div>
   );
 }

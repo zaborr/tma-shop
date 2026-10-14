@@ -54,7 +54,7 @@ function Platform(): React.JSX.Element {
               after={
                 <span
                   role="button"
-                  style={{ color: 'var(--tg-theme-link-color, #2481cc)' }}
+                  style={{ color: 'var(--tgui--link_color)' }}
                   onClick={(event) => {
                     event.stopPropagation();
                     navigate(shopPath(shop.slug));
