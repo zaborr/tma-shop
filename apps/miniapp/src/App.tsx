@@ -5,7 +5,7 @@ import { AppRoot, Placeholder } from '@telegram-apps/telegram-ui';
 import { SessionProvider, useSession } from './providers/SessionProvider.js';
 import { ShopLayout } from './providers/ShopProvider.js';
 import { useBackButton } from './hooks/useBackButton.js';
-import { useAppearance } from './hooks/useAppearance.js';
+import { useAppearance, useAppearanceChrome } from './hooks/useAppearance.js';
 import { Loader } from './components/Loader.js';
 import { CatalogPage } from './pages/CatalogPage.js';
 import { ProductPage } from './pages/ProductPage.js';
@@ -85,6 +85,7 @@ function Shell(): React.JSX.Element {
 
 export function App(): React.JSX.Element {
   const appearance = useAppearance();
+  useAppearanceChrome(appearance);
   // Changing the language redraws every screen (same page, same session).
   const [language, setLanguage] = useState(lang());
   useEffect(() => onLangChange(setLanguage), []);
