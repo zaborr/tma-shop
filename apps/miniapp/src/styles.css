@@ -1,28 +1,41 @@
 /*
  * App-wide styles on top of Telegram UI.
  *
- * - The page background follows the theme, so dark mode has no white strips
- *   (below short screens, while loading, when scrolling past the end).
+ * - One background colour per theme: off-white in light mode, grey in dark
+ *   mode, for the page, the sections and Telegram's header alike. Text
+ *   fields use the other shade (white / near-black) so they stand out.
  * - Text fields get their own background and a border: on iPhone Telegram UI
  *   draws them with the same colour as the section, so they were invisible.
  * - Slightly larger text than Telegram UI's defaults.
+ *
+ * `html[data-theme]` is set by the app (hooks/useAppearance.ts).
  */
 
 :root {
   color-scheme: light dark;
+  --tma-light-surface: var(--tg-theme-secondary-bg-color, #efeff4);
+  --tma-light-field: var(--tg-theme-bg-color, #ffffff);
+  --tma-dark-surface: var(--tg-theme-bg-color, #212121);
+  --tma-dark-field: var(--tg-theme-secondary-bg-color, #0f0f0f);
 }
 
 html,
 body {
   margin: 0;
   min-height: 100%;
-  background: var(--tg-theme-secondary-bg-color, var(--tg-theme-bg-color, #efeff4));
+  background: var(--tma-light-surface);
 }
 
+html[data-theme='dark'],
+html[data-theme='dark'] body {
+  background: var(--tma-dark-surface);
+}
+
+/* Before the app has decided (first paint), follow the device. */
 @media (prefers-color-scheme: dark) {
-  html,
-  body {
-    background: var(--tg-theme-secondary-bg-color, var(--tg-theme-bg-color, #0f0f0f));
+  html:not([data-theme]),
+  html:not([data-theme]) body {
+    background: var(--tma-dark-surface);
   }
 }
 
@@ -30,8 +43,16 @@ body {
 .tma-root.tma-root {
   min-height: 100vh;
   min-height: var(--tg-viewport-stable-height, 100vh);
-  background: var(--tgui--secondary_bg_color);
   color-scheme: light;
+
+  /* Same colour for the page, the sections and the header. */
+  --tma-surface: var(--tma-light-surface);
+  --tgui--bg_color: var(--tma-surface);
+  --tgui--secondary_bg_color: var(--tma-surface);
+  --tgui--section_bg_color: var(--tma-surface);
+  --tgui--header_bg_color: var(--tma-surface);
+  --tgui--card_bg_color: var(--tma-field-bg);
+  background: var(--tma-surface);
 
   --tgui--text--font_size: 17px;
   --tgui--text--line_height: 24px;
@@ -44,13 +65,14 @@ body {
   --tgui--caption2--font_size: 13px;
   --tgui--caption2--line_height: 18px;
 
-  --tma-field-bg: var(--tgui--secondary_bg_color);
+  --tma-field-bg: var(--tma-light-field);
   --tma-field-border: rgba(0, 0, 0, 0.18);
 }
 
 .tma-root.tma-root.tma-dark {
   color-scheme: dark;
-  --tma-field-bg: var(--tgui--secondary_bg_color);
+  --tma-surface: var(--tma-dark-surface);
+  --tma-field-bg: var(--tma-dark-field);
   --tma-field-border: rgba(255, 255, 255, 0.22);
 }
 
