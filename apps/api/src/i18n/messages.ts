@@ -45,6 +45,10 @@ const en = {
   'status.cancelled': 'Your order {ref} was cancelled.',
   'status.shopMessage': 'Message from the shop: {note}',
   'autoCancel.note': 'It was not paid within {hours} hours. You can place a new order any time.',
+  'reminder.unpaid': 'Your order {ref} is still waiting for payment ({amount}).',
+  'reminder.cancelIn': 'It will be cancelled in about {hours} h if it is not paid.',
+  'reminder.pay': 'Pay now',
+  'reminder.openShop': 'Open the shop → My orders to pay it.',
 
   // /start
   'start.hello': 'Hi {name}!',
@@ -125,6 +129,10 @@ const es: Record<BotMessageKey, string> = {
   'status.cancelled': 'Tu pedido {ref} se ha cancelado.',
   'status.shopMessage': 'Mensaje de la tienda: {note}',
   'autoCancel.note': 'No se pagó en {hours} horas. Puedes hacer un pedido nuevo cuando quieras.',
+  'reminder.unpaid': 'Tu pedido {ref} sigue pendiente de pago ({amount}).',
+  'reminder.cancelIn': 'Se cancelará en unas {hours} h si no se paga.',
+  'reminder.pay': 'Pagar ahora',
+  'reminder.openShop': 'Abre la tienda → Mis pedidos para pagarlo.',
 
   'start.hello': '¡Hola, {name}!',
   'start.helloAnon': '¡Hola!',
@@ -198,6 +206,10 @@ const it: Record<BotMessageKey, string> = {
   'status.cancelled': 'Il tuo ordine {ref} è stato annullato.',
   'status.shopMessage': 'Messaggio dal negozio: {note}',
   'autoCancel.note': 'Non è stato pagato entro {hours} ore. Puoi fare un nuovo ordine quando vuoi.',
+  'reminder.unpaid': 'Il tuo ordine {ref} è ancora in attesa di pagamento ({amount}).',
+  'reminder.cancelIn': 'Verrà annullato tra circa {hours} h se non viene pagato.',
+  'reminder.pay': 'Paga ora',
+  'reminder.openShop': 'Apri il negozio → I miei ordini per pagarlo.',
 
   'start.hello': 'Ciao {name}!',
   'start.helloAnon': 'Ciao!',
@@ -271,6 +283,10 @@ const pt: Record<BotMessageKey, string> = {
   'status.cancelled': 'O seu pedido {ref} foi cancelado.',
   'status.shopMessage': 'Mensagem da loja: {note}',
   'autoCancel.note': 'Não foi pago em {hours} horas. Pode fazer um novo pedido quando quiser.',
+  'reminder.unpaid': 'O seu pedido {ref} continua à espera de pagamento ({amount}).',
+  'reminder.cancelIn': 'Será cancelado dentro de cerca de {hours} h se não for pago.',
+  'reminder.pay': 'Pagar agora',
+  'reminder.openShop': 'Abra a loja → Os meus pedidos para o pagar.',
 
   'start.hello': 'Olá, {name}!',
   'start.helloAnon': 'Olá!',

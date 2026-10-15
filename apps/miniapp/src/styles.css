@@ -105,3 +105,23 @@ label.tma-field.tma-field:focus-within {
   line-height: 20px;
   color: var(--tgui--section_header_text_color, var(--tgui--hint_color));
 }
+
+/*
+ * Shop list: a clearly visible thin line between shops (Telegram UI's own
+ * divider is almost invisible), so each shop reads as its own entry.
+ */
+.tma-shop-list hr {
+  border: 0;
+  height: 1px;
+  margin: 0 16px;
+  background: var(--tgui--hint_color);
+  opacity: 0.3;
+}
+
+/* Quiet note at the top of the catalog (orders still to pay). */
+.tma-notice.tma-notice {
+  border-radius: 12px;
+  margin: 0 12px;
+  width: auto;
+  background: var(--tgui--secondary_fill);
+}

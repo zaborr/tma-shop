@@ -8,18 +8,35 @@ import { shopPath } from '../providers/ShopProvider.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
 import { ProductImage } from '../components/ProductImage.js';
-import { t } from '../i18n/index.js';
+import { t, tn } from '../i18n/index.js';
 import { LanguagePicker } from '../components/LanguagePicker.js';
 
 let startParamUsed = false;
 
-/** Shop slug from a `?startapp=<slug>` launch link, returned only the first time. */
-function takeStartShop(): string | null {
+const SLUG_RE = /^[a-z0-9-]{1,64}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Where a launch link points, returned only the first time:
+ * `?startapp=<slug>` opens a shop; `?shop=<slug>&order=<id>` (the bot's
+ * payment reminders) opens that order.
+ */
+function takeStartPath(): string | null {
   if (startParamUsed) return null;
   startParamUsed = true;
   try {
+    const query = new URLSearchParams(window.location.search);
+    const shop = query.get('shop');
+    const order = query.get('order');
+    if (shop && order && SLUG_RE.test(shop) && UUID_RE.test(order)) {
+      return shopPath(shop, `/orders/${order}`);
+    }
+  } catch {
+    // No usable query string.
+  }
+  try {
     const param = retrieveLaunchParams().tgWebAppStartParam;
-    return typeof param === 'string' && /^[a-z0-9-]{1,64}$/.test(param) ? param : null;
+    return typeof param === 'string' && SLUG_RE.test(param) ? shopPath(param) : null;
   } catch {
     return null;
   }
@@ -30,10 +47,11 @@ export function ShopsPage(): React.JSX.Element {
   const navigate = useNavigate();
   const result = useAsync(() => api.getShops(), []);
 
-  // Links like t.me/<bot>/<app>?startapp=<shop-slug> open that shop directly.
+  // Links like t.me/<bot>/<app>?startapp=<shop-slug> open that shop directly,
+  // and the bot's reminders open the order to pay.
   useEffect(() => {
-    const slug = takeStartShop();
-    if (slug) navigate(shopPath(slug));
+    const path = takeStartPath();
+    if (path) navigate(path);
   }, [navigate]);
 
   if (result.loading) return <Loader />;
@@ -51,7 +69,7 @@ export function ShopsPage(): React.JSX.Element {
           <span style={{ fontSize: 48 }}>🏪</span>
         </Placeholder>
       ) : (
-        <Section header={t('shops.title')}>
+        <Section header={t('shops.title')} className="tma-shop-list">
           {shops.map((shop) => (
             <Cell
               key={shop.id}
@@ -60,6 +78,10 @@ export function ShopsPage(): React.JSX.Element {
               subtitle={shop.description || undefined}
               description={
                 [
+                  shop.unpaidOrders > 0
+                    ? tn(shop.unpaidOrders, 'shops.unpaid.one', 'shops.unpaid.other')
+                    : null,
+                  shop.cartItems > 0 ? t('shops.inCart', { count: shop.cartItems }) : null,
                   shop.isVisible ? null : t('shops.hidden'),
                   shop.isVisible && shop.vipOnly ? t('shops.vip') : null,
                   shop.canManage ? t('shops.youManage') : null,

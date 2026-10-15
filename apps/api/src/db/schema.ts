@@ -237,6 +237,8 @@ export const orders = pgTable('orders', {
   closedAt: timestamp('closed_at', { withTimezone: true }),
   /** When the address and the link to the customer were removed (retention). */
   anonymizedAt: timestamp('anonymized_at', { withTimezone: true }),
+  /** When the bot reminded the customer to pay (sent once per order). */
+  paymentReminderAt: timestamp('payment_reminder_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

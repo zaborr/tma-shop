@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Pool } from 'pg';
 import { createApp } from '../app.js';
@@ -17,6 +17,9 @@ import {
 } from '../db/schema.js';
 import { runRetention } from '../services/retention.js';
 import { cancelExpiredOrders } from '../services/autoCancel.js';
+import { sendPaymentReminders } from '../services/reminders.js';
+import { resetMiniAppUrlCache } from '../services/bot.js';
+import { TelegramApi } from '../telegram/api.js';
 
 /**
  * Full-stack integration test against a real Postgres. Skipped automatically
@@ -51,6 +54,7 @@ describeDb('API integration', () => {
   let app: ReturnType<typeof createApp>;
   let shopId: string;
   let productId: string;
+  let testEnv: Env;
 
   beforeAll(async () => {
     pool = createPool(DATABASE_URL as string);
@@ -103,6 +107,7 @@ describeDb('API integration', () => {
       CORS_ORIGIN: '*',
       PAYMENT_METHODS: [],
     };
+    testEnv = env;
     app = createApp({ env, db });
   });
 
@@ -656,6 +661,53 @@ describeDb('API integration', () => {
     expect(denied.status).toBe(403);
 
     await db.delete(shops).where(inArray(shops.id, [from!.id, into!.id]));
+  });
+
+  it('reminds customers once about orders still to pay, with a link to the order', async () => {
+    await authToken(CUSTOMER_ID, 'Alice');
+    const [shop] = await db
+      .insert(shops)
+      .values({ slug: `remind-${Date.now()}`, name: 'Remind', description: '', currency: 'USDC', autoCancelHours: 48 })
+      .returning();
+    const hoursAgo = (h: number): Date => new Date(Date.now() - h * 3_600_000);
+    const [due] = await db
+      .insert(orders)
+      .values({ shopId: shop!.id, userId: CUSTOMER_ID, total: 500, currency: 'USDC', updatedAt: hoursAgo(30) })
+      .returning();
+    const [fresh] = await db
+      .insert(orders)
+      .values({ shopId: shop!.id, userId: CUSTOMER_ID, total: 700, currency: 'USDC', updatedAt: hoursAgo(2) })
+      .returning();
+
+    // The shop list shows the unpaid orders.
+    const alice = await authToken(CUSTOMER_ID, 'Alice');
+    const list = await app.request('/api/shops', { headers: { Authorization: `Bearer ${alice}` } });
+    const listed = ((await list.json()) as { shops: Array<{ id: string; unpaidOrders: number }> }).shops;
+    expect(listed.find((s) => s.id === shop!.id)?.unpaidOrders).toBe(2);
+
+    const telegram = new TelegramApi(BOT_TOKEN);
+    resetMiniAppUrlCache();
+    vi.spyOn(telegram, 'getChatMenuButton').mockResolvedValue({
+      type: 'web_app',
+      web_app: { url: 'https://shop.example.app/' },
+    });
+    const send = vi.spyOn(telegram, 'sendMessage').mockResolvedValue(true);
+    await sendPaymentReminders(db, testEnv, telegram);
+    const mine = send.mock.calls.filter(([, text]) => text.includes(due!.id.slice(0, 8)));
+    expect(mine).toHaveLength(1);
+    expect(mine[0]?.[1]).toContain('5.00 USDC');
+    expect(mine[0]?.[1]).toContain('18 h');
+    expect(mine[0]?.[2]?.inline_keyboard[0]?.[0]?.web_app?.url).toBe(
+      `https://shop.example.app/?shop=${shop!.slug}&order=${due!.id}`,
+    );
+    expect(send.mock.calls.some(([, text]) => text.includes(fresh!.id.slice(0, 8)))).toBe(false);
+
+    // Only once.
+    send.mockClear();
+    await sendPaymentReminders(db, testEnv, telegram);
+    expect(send.mock.calls.some(([, text]) => text.includes(due!.id.slice(0, 8)))).toBe(false);
+    resetMiniAppUrlCache();
+    await db.delete(shops).where(eq(shops.id, shop!.id));
   });
 
   it('enforces admin-only routes', async () => {

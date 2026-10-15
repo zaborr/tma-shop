@@ -12,7 +12,7 @@ import type {
 import { EMPTY_PAYMENT_SETUP } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import type { Env } from '../config/env.js';
-import { carts, categories, orders, products, shops } from '../db/schema.js';
+import { cartItems, carts, categories, orders, products, shops } from '../db/schema.js';
 import { toShopAdminDTO, toShopConfigDTO, toShopSummaryDTO } from '../db/mappers.js';
 import { legacyToSetup } from '../config/payment-methods.js';
 import { ApiError } from '../lib/errors.js';
@@ -72,14 +72,53 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
     .from(shops)
     .orderBy(asc(shops.sortOrder), asc(shops.createdAt));
   const isVip = createVipChecker(db, env, userId);
+  const activity = await userActivity(db, userId);
   const result: ShopSummary[] = [];
   for (const row of rows) {
     const canManage = canManageShop(env, row, userId);
     const vip = row.isVisible && row.vipOnly ? await isVip(row) : false;
     if (canManage || (row.isVisible && (!row.vipOnly || vip))) {
-      result.push(toShopSummaryDTO(row, canManage, vip));
+      result.push(toShopSummaryDTO(row, canManage, vip, activity.get(row.id)));
     }
   }
+  return result;
+}
+
+/** Per shop: units in the user's cart and orders still waiting for a payment. */
+async function userActivity(
+  db: Database,
+  userId: number,
+): Promise<Map<string, { cartItems: number; unpaidOrders: number }>> {
+  const [cartRows, orderRows] = await Promise.all([
+    db
+      .select({ shopId: carts.shopId, units: sql<number>`coalesce(sum(${cartItems.quantity}), 0)::int` })
+      .from(carts)
+      .innerJoin(cartItems, eq(cartItems.cartId, carts.id))
+      .where(eq(carts.userId, userId))
+      .groupBy(carts.shopId),
+    db
+      .select({ shopId: orders.shopId, count: sql<number>`count(*)::int` })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.userId, userId),
+          eq(orders.status, 'pending'),
+          sql`${orders.total} - ${orders.amountPaid} > 0`,
+        ),
+      )
+      .groupBy(orders.shopId),
+  ]);
+  const result = new Map<string, { cartItems: number; unpaidOrders: number }>();
+  const entry = (shopId: string): { cartItems: number; unpaidOrders: number } => {
+    let value = result.get(shopId);
+    if (!value) {
+      value = { cartItems: 0, unpaidOrders: 0 };
+      result.set(shopId, value);
+    }
+    return value;
+  };
+  for (const row of cartRows) entry(row.shopId).cartItems = Number(row.units);
+  for (const row of orderRows) entry(row.shopId).unpaidOrders = Number(row.count);
   return result;
 }
 

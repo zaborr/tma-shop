@@ -98,7 +98,14 @@ export const shopSummary = shop
     isVisible: true,
     vipOnly: true,
   })
-  .extend({ canManage: z.boolean(), isVip: z.boolean() });
+  .extend({
+    canManage: z.boolean(),
+    isVip: z.boolean(),
+    /** Units in the user's cart in this shop. */
+    cartItems: z.number().int().nonnegative(),
+    /** The user's orders here still waiting for a payment. */
+    unpaidOrders: z.number().int().nonnegative(),
+  });
 export type ShopSummary = z.infer<typeof shopSummary>;
 
 /** Everything about a shop that its admins (and super-admins) can see. */
