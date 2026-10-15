@@ -25,6 +25,7 @@ import { AdminShippingPage } from './pages/admin/AdminShippingPage.js';
 import { AdminAddressKeyPage } from './pages/admin/AdminAddressKeyPage.js';
 import { AdminExportPage } from './pages/admin/AdminExportPage.js';
 import { AdminVipPage } from './pages/admin/AdminVipPage.js';
+import { AdminClonePage } from './pages/admin/AdminClonePage.js';
 import { ShopsPage } from './pages/ShopsPage.js';
 import { PlatformPage } from './pages/platform/PlatformPage.js';
 import { PlatformShopPage } from './pages/platform/PlatformShopPage.js';
@@ -80,6 +81,7 @@ function Shell(): React.JSX.Element {
         <Route path="admin/summary" element={<AdminSummaryPage />} />
         <Route path="admin/export" element={<AdminExportPage />} />
         <Route path="admin/vip" element={<AdminVipPage />} />
+        <Route path="admin/clone" element={<AdminClonePage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

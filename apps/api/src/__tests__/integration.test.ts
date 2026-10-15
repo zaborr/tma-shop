@@ -5,8 +5,16 @@ import type { Pool } from 'pg';
 import { createApp } from '../app.js';
 import type { Env } from '../config/env.js';
 import { createDb, createPool, type Database } from '../db/client.js';
-import { eq } from 'drizzle-orm';
-import { categories, orderItems, orders, products, shops, users } from '../db/schema.js';
+import { and, eq, inArray } from 'drizzle-orm';
+import {
+  categories,
+  orderItems,
+  orders,
+  productVariants,
+  products,
+  shops,
+  users,
+} from '../db/schema.js';
 import { runRetention } from '../services/retention.js';
 import { cancelExpiredOrders } from '../services/autoCancel.js';
 
@@ -557,6 +565,97 @@ describeDb('API integration', () => {
       body: JSON.stringify({ groups: [], userIds: [], usernames: [] }),
     });
     await db.delete(shops).where(eq(shops.id, shopRef));
+  });
+
+  it('copies products with variants and categories from another shop', async () => {
+    const admin = await authToken(ADMIN_ID, 'Ivan');
+    const auth = { Authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
+    const stamp = Date.now();
+    const [from] = await db
+      .insert(shops)
+      .values({ slug: `from-${stamp}`, name: 'From', description: '', currency: 'USDC' })
+      .returning();
+    const [into] = await db
+      .insert(shops)
+      .values({ slug: `into-${stamp}`, name: 'Into', description: '', currency: 'USDC' })
+      .returning();
+    const [cat] = await db
+      .insert(categories)
+      .values({ shopId: from!.id, slug: 'shirts', title: 'Shirts', sortOrder: 3 })
+      .returning();
+    const [shirt] = await db
+      .insert(products)
+      .values({
+        shopId: from!.id,
+        categoryId: cat!.id,
+        slug: 'shirt',
+        title: 'Shirt',
+        description: 'Cotton',
+        price: 1000,
+        currency: 'USDC',
+        stock: null,
+        isActive: true,
+        options: [{ name: 'Size', values: ['S', 'M'] }],
+        priceTiers: [{ minQty: 5, price: 900 }],
+      })
+      .returning();
+    await db.insert(productVariants).values([
+      { productId: shirt!.id, optionValues: ['S'], price: null, stock: 4, sortOrder: 0 },
+      { productId: shirt!.id, optionValues: ['M'], price: 1100, stock: 2, sortOrder: 1 },
+    ]);
+    // The target already has a product with the same link name.
+    await db.insert(products).values({
+      shopId: into!.id,
+      slug: 'shirt',
+      title: 'Old shirt',
+      description: '',
+      price: 500,
+      currency: 'USDC',
+      stock: null,
+      isActive: true,
+    });
+
+    const sources = await app.request('/api/admin/clone-sources', {
+      headers: { ...auth, 'X-Shop': into!.id },
+    });
+    const list = (await sources.json()) as Array<{ id: string; products: Array<{ variantCount: number }> }>;
+    expect(list.find((s) => s.id === from!.id)?.products[0]?.variantCount).toBe(2);
+
+    const res = await app.request('/api/admin/clone', {
+      method: 'POST',
+      headers: { ...auth, 'X-Shop': into!.id },
+      body: JSON.stringify({ sourceShopId: from!.id, productIds: [shirt!.id], copyStock: false }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ products: 1, categories: 1 });
+
+    const [copy] = await db
+      .select()
+      .from(products)
+      .where(and(eq(products.shopId, into!.id), eq(products.slug, 'shirt-2')));
+    expect(copy).toMatchObject({ title: 'Shirt', price: 1000, isActive: false, stock: null });
+    expect(copy?.priceTiers).toEqual([{ minQty: 5, price: 900 }]);
+    const copiedVariants = await db
+      .select()
+      .from(productVariants)
+      .where(eq(productVariants.productId, copy!.id));
+    expect(copiedVariants.map((v) => [v.optionValues, v.price, v.stock])).toEqual([
+      [['S'], null, null],
+      [['M'], 1100, null],
+    ]);
+    const [newCat] = await db.select().from(categories).where(eq(categories.id, copy!.categoryId!));
+    expect(newCat).toMatchObject({ shopId: into!.id, slug: 'shirts', title: 'Shirts' });
+
+    // Customers cannot copy.
+    const alice = await authToken(CUSTOMER_ID, 'Alice');
+    const denied = await app.request('/api/admin/clone', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${alice}`, 'content-type': 'application/json', 'X-Shop': into!.id },
+      body: JSON.stringify({ sourceShopId: from!.id, productIds: [shirt!.id], copyStock: false }),
+    });
+    expect(denied.status).toBe(403);
+
+    await db.delete(shops).where(inArray(shops.id, [from!.id, into!.id]));
   });
 
   it('enforces admin-only routes', async () => {

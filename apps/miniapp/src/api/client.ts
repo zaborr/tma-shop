@@ -23,6 +23,9 @@ import type {
   ShopSummary,
   PaymentSetup,
   ShopVipClub,
+  CloneProductsRequest,
+  CloneProductsResult,
+  CloneSource,
   UpdateVipClubRequest,
   VipClub,
 } from '@tma-shop/shared';
@@ -312,6 +315,18 @@ export class ApiClient {
   /** Sets the fixed fee added once to each new order (0 = none) and its label. */
   adminGetShop(): Promise<ShopAdminView> {
     return this.request<ShopAdminView>('/admin/shop');
+  }
+
+  /** Other shops the user manages, to copy products from. */
+  adminGetCloneSources(): Promise<CloneSource[]> {
+    return this.request<CloneSource[]>('/admin/clone-sources');
+  }
+
+  adminCloneProducts(input: CloneProductsRequest): Promise<CloneProductsResult> {
+    return this.request<CloneProductsResult>('/admin/clone', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
   }
 
   /** The shop's own VIP club. */
