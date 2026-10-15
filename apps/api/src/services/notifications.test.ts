@@ -53,7 +53,7 @@ describe('buildStatusMessage', () => {
     const text = buildStatusMessage('en', 'Demo', order, 'paid');
     expect(text).toContain('has been shipped');
     expect(text).toContain('Tracking: RR123456789ES');
-    expect(text).toContain('Message from the shop: Arrives on Friday');
+    expect(text).toContain('Message from the organiser: Arrives on Friday');
   });
 
   it('mentions the refund when a paid order is cancelled', () => {
