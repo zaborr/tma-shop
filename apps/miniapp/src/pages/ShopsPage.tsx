@@ -69,7 +69,7 @@ export function ShopsPage(): React.JSX.Element {
           <span style={{ fontSize: 48 }}>🏪</span>
         </Placeholder>
       ) : (
-        <Section header={t('shops.title')} className="tma-shop-list">
+        <Section header={t('shops.title')} footer={t('shops.footer')} className="tma-shop-list">
           {shops.map((shop) => (
             <Cell
               key={shop.id}

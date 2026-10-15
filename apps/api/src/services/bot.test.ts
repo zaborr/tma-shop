@@ -51,7 +51,7 @@ describe('bot', () => {
       telegram,
     );
     expect(send).toHaveBeenCalledWith(5, expect.stringContaining('Tap the button'), {
-      inline_keyboard: [[{ text: 'Open shop', web_app: { url: 'https://shop.example.app' } }]],
+      inline_keyboard: [[{ text: 'Open GBs', web_app: { url: 'https://shop.example.app' } }]],
     });
   });
 
