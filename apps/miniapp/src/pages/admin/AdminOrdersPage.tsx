@@ -5,6 +5,7 @@ import { Input } from '../../components/Field.js';
 import type { Order } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
+import { useLiveRefresh } from '../../hooks/useLiveRefresh.js';
 import { formatPrice } from '../../lib/format.js';
 import { itemName } from '../../lib/variants.js';
 import { Loader } from '../../components/Loader.js';
@@ -45,9 +46,16 @@ function AdminOrders(): React.JSX.Element {
   const filterParam = params.get('filter');
   const filter: FilterKey = isFilterKey(filterParam) ? filterParam : 'all';
   const [search, setSearch] = useState('');
-  const orders = useAsync(() => api.adminGetOrders(), []);
+  const [reloadKey, setReloadKey] = useState(0);
+  const orders = useAsync(() => api.adminGetOrders(), [reloadKey]);
+  // New orders and payments arrive while away: refresh on return.
+  useLiveRefresh(
+    () => setReloadKey((k) => k + 1),
+    (orders.data ?? []).some((o) => o.paymentCheck?.status === 'checking'),
+    10_000,
+  );
 
-  if (orders.loading) return <Loader />;
+  if (orders.loading && !orders.data) return <Loader />;
   if (orders.error) return <ErrorView message={orders.error} />;
 
   const all = orders.data ?? [];

@@ -5,6 +5,7 @@ import { Input, Textarea } from '../../components/Field.js';
 import { ADMIN_STATUS_CHANGES, type Order } from '@tma-shop/shared';
 import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
+import { useLiveRefresh } from '../../hooks/useLiveRefresh.js';
 import { formatPrice } from '../../lib/format.js';
 import { itemKey, itemName } from '../../lib/variants.js';
 import { Loader } from '../../components/Loader.js';
@@ -41,6 +42,11 @@ function AdminOrder(): React.JSX.Element {
   const actions = useAdminActions(() => setReloadKey((k) => k + 1));
   const order = useAsync(() => api.adminGetOrder(id), [id, reloadKey]);
   const shop = useAsync(() => api.getShop(), []);
+  // While the blockchain check runs (e.g. after "Check again"), follow it live.
+  useLiveRefresh(
+    () => setReloadKey((k) => k + 1),
+    order.data?.paymentCheck?.status === 'checking',
+  );
 
   if (order.loading && !order.data) return <Loader />;
   if (order.error) return <ErrorView message={order.error} />;

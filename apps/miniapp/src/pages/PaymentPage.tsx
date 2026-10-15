@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
 import { Input } from '../components/Field.js';
@@ -6,6 +6,7 @@ import { payBefore, unitPriceFor, type Order, type PaymentMethod } from '@tma-sh
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useMainButton } from '../hooks/useMainButton.js';
+import { useLiveRefresh } from '../hooks/useLiveRefresh.js';
 import { copyText } from '../lib/clipboard.js';
 import { formatPrice, formatTokenAmount } from '../lib/format.js';
 import { activeVariants, hasVariants, itemKey, itemName } from '../lib/variants.js';
@@ -51,13 +52,12 @@ export function PaymentPage(): React.JSX.Element {
     onClick: () => navigate(to('/')),
   });
 
-  // While the blockchain check runs, refresh the order now and then.
-  const checking = current?.paymentCheck?.status === 'checking';
-  useEffect(() => {
-    if (!checking) return undefined;
-    const timer = setInterval(() => setReloadKey((k) => k + 1), 10_000);
-    return () => clearInterval(timer);
-  }, [checking]);
+  // While the blockchain check runs, follow it live; and refresh when the
+  // customer comes back from reading the bot's message.
+  useLiveRefresh(
+    () => setReloadKey((k) => k + 1),
+    current?.paymentCheck?.status === 'checking',
+  );
 
   // Refreshes keep showing the order instead of flashing a spinner.
   if ((order.loading && !order.data) || (shop.loading && !shop.data)) return <Loader />;
