@@ -479,6 +479,86 @@ describeDb('API integration', () => {
     );
   });
 
+  it('shows VIP-only shops only to members of their VIP club', async () => {
+    const BOB_ID = 555000222;
+    const alice = await authToken(CUSTOMER_ID, 'Alice');
+    const bob = await authToken(BOB_ID, 'Bob');
+    const admin = await authToken(ADMIN_ID, 'Ivan');
+    await db.update(users).set({ username: 'Bob_Vip' }).where(eq(users.telegramId, BOB_ID));
+
+    const [shop] = await db
+      .insert(shops)
+      .values({
+        slug: `vip-${Date.now()}`,
+        name: 'VIP Shop',
+        description: '',
+        currency: 'USDC',
+        vipOnly: true,
+        useGlobalVipClub: false,
+        vipClub: { groups: [], userIds: [], usernames: ['bob_vip'] },
+      })
+      .returning();
+    const shopRef = shop!.id;
+
+    const listed = async (token: string): Promise<Array<{ id: string; isVip: boolean }>> => {
+      const res = await app.request('/api/shops', { headers: { Authorization: `Bearer ${token}` } });
+      return ((await res.json()) as { shops: Array<{ id: string; isVip: boolean }> }).shops;
+    };
+    const open = (token: string): Promise<Response> =>
+      Promise.resolve(
+        app.request('/api/shop', { headers: { Authorization: `Bearer ${token}`, 'X-Shop': shopRef } }),
+      );
+
+    // Not in the club: the shop does not exist for Alice.
+    expect((await listed(alice)).some((s) => s.id === shopRef)).toBe(false);
+    expect((await open(alice)).status).toBe(404);
+
+    // Listed by @username: Bob sees it, and the username becomes his id.
+    expect((await listed(bob)).find((s) => s.id === shopRef)?.isVip).toBe(true);
+    const bobOpens = await open(bob);
+    expect(bobOpens.status).toBe(200);
+    expect(((await bobOpens.json()) as { isVip: boolean }).isVip).toBe(true);
+    const [row] = await db.select().from(shops).where(eq(shops.id, shopRef));
+    expect(row?.vipClub).toEqual({ groups: [], userIds: [BOB_ID], usernames: [] });
+
+    // Admins always see it.
+    expect((await listed(admin)).some((s) => s.id === shopRef)).toBe(true);
+
+    // The platform club counts once the shop accepts it.
+    const adminAuth = { Authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
+    const saved = await app.request('/api/platform/vip-club', {
+      method: 'PUT',
+      headers: adminAuth,
+      body: JSON.stringify({ groups: [], userIds: [CUSTOMER_ID], usernames: [] }),
+    });
+    expect(saved.status).toBe(200);
+    expect((await listed(alice)).some((s) => s.id === shopRef)).toBe(false);
+    await db.update(shops).set({ useGlobalVipClub: true }).where(eq(shops.id, shopRef));
+    expect((await listed(alice)).some((s) => s.id === shopRef)).toBe(true);
+
+    // Shop admins edit the shop's own club.
+    const own = await app.request('/api/admin/shop/vip-club', {
+      method: 'PUT',
+      headers: { ...adminAuth, 'X-Shop': shopRef },
+      body: JSON.stringify({ groups: [], userIds: [], usernames: ['carol_x'], useGlobalClub: false }),
+    });
+    expect(own.status).toBe(200);
+    expect(await own.json()).toEqual({
+      groups: [],
+      userIds: [],
+      usernames: ['carol_x'],
+      useGlobalClub: false,
+    });
+    expect((await listed(bob)).some((s) => s.id === shopRef)).toBe(false);
+
+    await app.request('/api/platform/vip-club', {
+      method: 'PUT',
+      headers: adminAuth,
+      body: JSON.stringify({ groups: [], userIds: [], usernames: [] }),
+    });
+    await db.delete(shops).where(eq(shops.id, shopRef));
+  });
+
   it('enforces admin-only routes', async () => {
     const customer = await authToken(CUSTOMER_ID, 'Alice');
     const denied = await app.request('/api/admin/orders', {

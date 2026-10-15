@@ -24,10 +24,12 @@ import { AdminWalletsPage } from './pages/admin/AdminWalletsPage.js';
 import { AdminShippingPage } from './pages/admin/AdminShippingPage.js';
 import { AdminAddressKeyPage } from './pages/admin/AdminAddressKeyPage.js';
 import { AdminExportPage } from './pages/admin/AdminExportPage.js';
+import { AdminVipPage } from './pages/admin/AdminVipPage.js';
 import { ShopsPage } from './pages/ShopsPage.js';
 import { PlatformPage } from './pages/platform/PlatformPage.js';
 import { PlatformShopPage } from './pages/platform/PlatformShopPage.js';
 import { PlatformRetentionPage } from './pages/platform/PlatformRetentionPage.js';
+import { PlatformVipPage } from './pages/platform/PlatformVipPage.js';
 import { lang, onLangChange, t } from './i18n/index.js';
 
 function platform(): 'ios' | 'base' {
@@ -57,6 +59,7 @@ function Shell(): React.JSX.Element {
       <Route path="/platform" element={<PlatformPage />} />
       <Route path="/platform/shops/:id" element={<PlatformShopPage />} />
       <Route path="/platform/retention" element={<PlatformRetentionPage />} />
+      <Route path="/platform/vip" element={<PlatformVipPage />} />
 
       <Route path="/s/:shopRef" element={<ShopLayout />}>
         <Route index element={<CatalogPage />} />
@@ -76,6 +79,7 @@ function Shell(): React.JSX.Element {
         <Route path="admin/orders/:id" element={<AdminOrderPage />} />
         <Route path="admin/summary" element={<AdminSummaryPage />} />
         <Route path="admin/export" element={<AdminExportPage />} />
+        <Route path="admin/vip" element={<AdminVipPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

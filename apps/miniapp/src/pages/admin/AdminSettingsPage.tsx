@@ -120,7 +120,15 @@ function ProfileForm({
         footer={t('settings.accessFooter')}
       >
         <Cell after={`/${view.slug}`}>{t('settings.linkName')}</Cell>
-        <Cell after={view.isVisible ? t('settings.visible') : t('shops.hidden')}>
+        <Cell
+          after={
+            !view.isVisible
+              ? t('shops.hidden')
+              : view.vipOnly
+                ? t('platformShop.vipOnly')
+                : t('settings.visible')
+          }
+        >
           {t('settings.visibility')}
         </Cell>
         <Cell after={view.adminIds.join(', ') || '—'} multiline>

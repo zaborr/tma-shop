@@ -16,6 +16,7 @@ import { carts, categories, orders, products, shops } from '../db/schema.js';
 import { toShopAdminDTO, toShopConfigDTO, toShopSummaryDTO } from '../db/mappers.js';
 import { legacyToSetup } from '../config/payment-methods.js';
 import { ApiError } from '../lib/errors.js';
+import { createVipChecker } from './vip.js';
 
 export type ShopRow = typeof shops.$inferSelect;
 
@@ -61,19 +62,29 @@ export async function resolveShop(db: Database, env: Env, ref: string | undefine
   return shop;
 }
 
-/** Shops shown on the start screen: visible ones, plus hidden ones the user manages. */
+/**
+ * Shops shown on the start screen: visible ones (VIP-only ones just for their
+ * VIPs), plus any the user manages.
+ */
 export async function listShops(db: Database, env: Env, userId: number): Promise<ShopSummary[]> {
   const rows = await db
     .select()
     .from(shops)
     .orderBy(asc(shops.sortOrder), asc(shops.createdAt));
-  return rows
-    .map((row) => toShopSummaryDTO(row, canManageShop(env, row, userId)))
-    .filter((shop) => shop.isVisible || shop.canManage);
+  const isVip = createVipChecker(db, env, userId);
+  const result: ShopSummary[] = [];
+  for (const row of rows) {
+    const canManage = canManageShop(env, row, userId);
+    const vip = row.isVisible && row.vipOnly ? await isVip(row) : false;
+    if (canManage || (row.isVisible && (!row.vipOnly || vip))) {
+      result.push(toShopSummaryDTO(row, canManage, vip));
+    }
+  }
+  return result;
 }
 
-export function getShopConfig(shop: ShopRow, canManage: boolean): ShopConfig {
-  return toShopConfigDTO(shop, canManage);
+export function getShopConfig(shop: ShopRow, canManage: boolean, isVip = false): ShopConfig {
+  return toShopConfigDTO(shop, canManage, isVip);
 }
 
 export function getShopAdminView(shop: ShopRow): ShopAdminView {

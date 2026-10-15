@@ -59,7 +59,11 @@ export function ShopsPage(): React.JSX.Element {
               before={<ProductImage url={shop.imageUrl} alt={shop.name} size={56} />}
               subtitle={shop.description || undefined}
               description={
-                [shop.isVisible ? null : t('shops.hidden'), shop.canManage ? t('shops.youManage') : null]
+                [
+                  shop.isVisible ? null : t('shops.hidden'),
+                  shop.isVisible && shop.vipOnly ? t('shops.vip') : null,
+                  shop.canManage ? t('shops.youManage') : null,
+                ]
                   .filter(Boolean)
                   .join(' · ') || undefined
               }

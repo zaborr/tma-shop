@@ -30,6 +30,8 @@ export const shop = z.object({
   imageUrl: z.url().nullable(),
   /** Hidden shops are only visible to their admins and platform super-admins. */
   isVisible: z.boolean(),
+  /** Visible only to VIP club members (and admins). Only matters while visible. */
+  vipOnly: z.boolean(),
   /** Position in the shop list (ascending). */
   sortOrder: z.number().int(),
   currency: currencyCode,
@@ -64,6 +66,7 @@ export const shopConfig = shop
     description: true,
     imageUrl: true,
     isVisible: true,
+    vipOnly: true,
     currency: true,
     botUsername: true,
     starsEnabled: true,
@@ -79,13 +82,23 @@ export const shopConfig = shop
     paymentMethods: z.array(paymentMethod),
     /** Whether the current user can manage this shop (shop admin or super-admin). */
     canManage: z.boolean(),
+    /** Whether the current user is a VIP of this shop (only checked for VIP-only shops). */
+    isVip: z.boolean(),
   });
 export type ShopConfig = z.infer<typeof shopConfig>;
 
 /** A shop as listed on the start screen. */
 export const shopSummary = shop
-  .pick({ id: true, slug: true, name: true, description: true, imageUrl: true, isVisible: true })
-  .extend({ canManage: z.boolean() });
+  .pick({
+    id: true,
+    slug: true,
+    name: true,
+    description: true,
+    imageUrl: true,
+    isVisible: true,
+    vipOnly: true,
+  })
+  .extend({ canManage: z.boolean(), isVip: z.boolean() });
 export type ShopSummary = z.infer<typeof shopSummary>;
 
 /** Everything about a shop that its admins (and super-admins) can see. */
@@ -108,6 +121,7 @@ export type ShopProfileInput = z.infer<typeof shopProfileInput>;
 export const platformShopInput = shopProfileInput.extend({
   slug,
   isVisible: z.boolean(),
+  vipOnly: z.boolean(),
   sortOrder: z.number().int().min(-1000).max(1000),
   adminIds: z.array(telegramUserId).max(50),
 });

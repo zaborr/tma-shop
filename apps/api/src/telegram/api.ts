@@ -20,6 +20,19 @@ export interface InlineKeyboard {
   inline_keyboard: Array<Array<{ text: string; web_app?: { url: string }; url?: string }>>;
 }
 
+export interface TelegramChat {
+  id: number;
+  type: string;
+  title?: string;
+  username?: string;
+}
+
+export interface TelegramChatMember {
+  status: string;
+  /** For "restricted" members: whether they are still in the chat. */
+  is_member?: boolean;
+}
+
 interface TelegramResponse<T> {
   ok: boolean;
   result?: T;
@@ -90,6 +103,16 @@ export class TelegramApi {
       link_preview_options: { is_disabled: true },
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     });
+  }
+
+  /** A group, supergroup or channel, by numeric id or "@publicname". */
+  getChat(chatId: number | string): Promise<TelegramChat> {
+    return this.call<TelegramChat>('getChat', { chat_id: chatId });
+  }
+
+  /** Someone's membership of a chat. The bot must be in it (an admin, for channels). */
+  getChatMember(chatId: number, userId: number): Promise<TelegramChatMember> {
+    return this.call<TelegramChatMember>('getChatMember', { chat_id: chatId, user_id: userId });
   }
 
   /** Points Telegram's updates at this API, authenticated with `secret`. */

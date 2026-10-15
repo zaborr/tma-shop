@@ -78,7 +78,7 @@ export function toCategoryDTO(row: CategoryRow): Category {
   };
 }
 
-export function toShopConfigDTO(row: ShopRow, canManage = false): ShopConfig {
+export function toShopConfigDTO(row: ShopRow, canManage = false, isVip = false): ShopConfig {
   return {
     id: row.id,
     slug: row.slug,
@@ -86,6 +86,7 @@ export function toShopConfigDTO(row: ShopRow, canManage = false): ShopConfig {
     description: row.description,
     imageUrl: row.imageUrl,
     isVisible: row.isVisible,
+    vipOnly: row.vipOnly,
     currency: row.currency,
     botUsername: row.botUsername,
     starsEnabled: row.starsEnabled,
@@ -97,10 +98,11 @@ export function toShopConfigDTO(row: ShopRow, canManage = false): ShopConfig {
     addressKeyFingerprint: row.addressKeyFingerprint,
     paymentMethods: paymentMethodsOf(row.paymentSetup),
     canManage,
+    isVip,
   };
 }
 
-export function toShopSummaryDTO(row: ShopRow, canManage: boolean): ShopSummary {
+export function toShopSummaryDTO(row: ShopRow, canManage: boolean, isVip = false): ShopSummary {
   return {
     id: row.id,
     slug: row.slug,
@@ -108,7 +110,9 @@ export function toShopSummaryDTO(row: ShopRow, canManage: boolean): ShopSummary 
     description: row.description,
     imageUrl: row.imageUrl,
     isVisible: row.isVisible,
+    vipOnly: row.vipOnly,
     canManage,
+    isVip,
   };
 }
 

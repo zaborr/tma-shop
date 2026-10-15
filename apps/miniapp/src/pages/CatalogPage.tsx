@@ -33,7 +33,9 @@ export function CatalogPage(): React.JSX.Element {
         <Cell
           before={<ProductImage url={shop.imageUrl} alt={shop.name} size={48} />}
           subtitle={shop.description || undefined}
-          description={shop.isVisible ? undefined : t('catalog.hiddenShop')}
+          description={
+            !shop.isVisible ? t('catalog.hiddenShop') : shop.vipOnly ? t('catalog.vipShop') : undefined
+          }
           multiline
         >
           <strong>{shop.name}</strong>

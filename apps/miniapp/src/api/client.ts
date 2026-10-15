@@ -22,6 +22,9 @@ import type {
   ShippingZone,
   ShopSummary,
   PaymentSetup,
+  ShopVipClub,
+  UpdateVipClubRequest,
+  VipClub,
 } from '@tma-shop/shared';
 import { lang } from '../i18n/index.js';
 
@@ -186,6 +189,18 @@ export class ApiClient {
     });
   }
 
+  /** The platform-wide VIP club. */
+  platformGetVipClub(): Promise<VipClub> {
+    return this.request<VipClub>('/platform/vip-club');
+  }
+
+  platformUpdateVipClub(input: UpdateVipClubRequest): Promise<VipClub> {
+    return this.request<VipClub>('/platform/vip-club', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
+  }
+
   platformRunRetention(): Promise<RetentionReport> {
     return this.request<RetentionReport>('/platform/retention/run', { method: 'POST' });
   }
@@ -297,6 +312,18 @@ export class ApiClient {
   /** Sets the fixed fee added once to each new order (0 = none) and its label. */
   adminGetShop(): Promise<ShopAdminView> {
     return this.request<ShopAdminView>('/admin/shop');
+  }
+
+  /** The shop's own VIP club. */
+  adminGetVipClub(): Promise<ShopVipClub> {
+    return this.request<ShopVipClub>('/admin/shop/vip-club');
+  }
+
+  adminUpdateVipClub(input: UpdateVipClubRequest): Promise<ShopVipClub> {
+    return this.request<ShopVipClub>('/admin/shop/vip-club', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
   }
 
   adminUpdateProfile(input: ShopProfileInput): Promise<ShopAdminView> {

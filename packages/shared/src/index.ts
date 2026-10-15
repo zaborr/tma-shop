@@ -8,3 +8,4 @@ export * from './order.js';
 export * from './api.js';
 export * from './i18n.js';
 export * from './payments.js';
+export * from './vip.js';
