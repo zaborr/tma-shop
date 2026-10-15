@@ -19,6 +19,8 @@ const STATUS_ES: Record<string, string> = {
 type Rule = [RegExp, string | ((...groups: string[]) => string)];
 
 const RULES: Rule[] = [
+  [/^Choose another shop to copy from$/, 'Elige otra tienda de la que copiar'],
+  [/^Choose at least one product$/, 'Elige al menos un producto'],
   [/^Telegram group "(.+)" not found\. Add the bot to it first\.$/, (g) => `No se encuentra el grupo de Telegram «${g}». Añade primero el bot.`],
   [/^"(.+)" is not a group or channel$/, (g) => `«${g}» no es un grupo ni un canal`],
   [/^The bot is not in "(.+)"\. Add it to the group \(as an admin in channels\) and try again\.$/, (g) => `El bot no está en «${g}». Añádelo al grupo (en los canales, como administrador) y vuelve a intentarlo.`],
@@ -103,6 +105,8 @@ const STATUS_IT: Record<string, string> = {
 };
 
 const RULES_IT: Rule[] = [
+  [/^Choose another shop to copy from$/, 'Scegli un altro negozio da cui copiare'],
+  [/^Choose at least one product$/, 'Scegli almeno un prodotto'],
   [/^Telegram group "(.+)" not found\. Add the bot to it first\.$/, (g) => `Gruppo Telegram «${g}» non trovato. Aggiungi prima il bot.`],
   [/^"(.+)" is not a group or channel$/, (g) => `«${g}» non è un gruppo né un canale`],
   [/^The bot is not in "(.+)"\. Add it to the group \(as an admin in channels\) and try again\.$/, (g) => `Il bot non è in «${g}». Aggiungilo al gruppo (nei canali come amministratore) e riprova.`],
@@ -187,6 +191,8 @@ const STATUS_PT: Record<string, string> = {
 };
 
 const RULES_PT: Rule[] = [
+  [/^Choose another shop to copy from$/, 'Escolha outra loja de onde copiar'],
+  [/^Choose at least one product$/, 'Escolha pelo menos um produto'],
   [/^Telegram group "(.+)" not found\. Add the bot to it first\.$/, (g) => `Grupo do Telegram «${g}» não encontrado. Adicione primeiro o bot.`],
   [/^"(.+)" is not a group or channel$/, (g) => `«${g}» não é um grupo nem um canal`],
   [/^The bot is not in "(.+)"\. Add it to the group \(as an admin in channels\) and try again\.$/, (g) => `O bot não está em «${g}». Adicione-o ao grupo (nos canais, como administrador) e tente de novo.`],

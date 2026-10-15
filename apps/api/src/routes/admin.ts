@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import {
+  cloneProductsRequest,
   exportRequest,
   langFrom,
   productInput,
@@ -59,6 +60,7 @@ import { TelegramApi } from '../telegram/api.js';
 import { tr } from '../i18n/messages.js';
 import { describeCustomer } from '../services/customers.js';
 import { shopVipClubView, updateShopVipClub } from '../services/vip.js';
+import { cloneProducts, listCloneSources } from '../services/clone.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -78,6 +80,24 @@ export function adminRoutes(): Hono<AppBindings> {
 
   // Shop settings (admin view includes the payment setup and admin ids).
   app.get('/shop', (c) => c.json(getShopAdminView(c.get('shop'))));
+  // Copy products from another shop the user manages.
+  app.get('/clone-sources', async (c) =>
+    c.json(
+      await listCloneSources(c.get('db'), c.get('env'), c.get('claims').sub, c.get('shopId')),
+    ),
+  );
+  app.post('/clone', zValidator('json', cloneProductsRequest), async (c) =>
+    c.json(
+      await cloneProducts(
+        c.get('db'),
+        c.get('env'),
+        c.get('claims').sub,
+        c.get('shopId'),
+        c.req.valid('json'),
+      ),
+    ),
+  );
+
   // The shop's own VIP club.
   app.get('/shop/vip-club', (c) => c.json(shopVipClubView(c.get('shop'))));
   app.put('/shop/vip-club', zValidator('json', updateVipClubRequest), async (c) =>

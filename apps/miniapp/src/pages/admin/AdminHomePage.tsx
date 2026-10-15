@@ -70,6 +70,7 @@ function AdminHome(): React.JSX.Element {
           {t('adminHome.catalog')}
         </Cell>
         <Cell onClick={() => navigate(to('/admin/products/new'))}>{t('adminHome.newProduct')}</Cell>
+        <Cell onClick={() => navigate(to('/admin/clone'))}>{t('adminHome.clone')}</Cell>
       </Section>
 
       <Section header={t('adminHome.settings')}>
