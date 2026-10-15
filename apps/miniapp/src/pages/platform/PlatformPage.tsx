@@ -28,6 +28,7 @@ function Platform(): React.JSX.Element {
     <List>
       <Section>
         <Cell onClick={() => navigate('/platform/shops/new')}>{t('platform.newShop')}</Cell>
+        <Cell onClick={() => navigate('/platform/vip')}>{t('platform.vipClub')}</Cell>
         <Cell onClick={() => navigate('/platform/retention')}>{t('platform.retention')}</Cell>
       </Section>
 
@@ -47,7 +48,11 @@ function Platform(): React.JSX.Element {
               before={<ProductImage url={shop.imageUrl} alt={shop.name} size={48} />}
               subtitle={[
                 `/${shop.slug}`,
-                shop.isVisible ? t('platform.visible') : t('platform.hidden'),
+                !shop.isVisible
+                  ? t('platform.hidden')
+                  : shop.vipOnly
+                    ? t('platform.vipOnly')
+                    : t('platform.visible'),
                 tn(shop.adminIds.length, 'count.admins.one', 'count.admins.other'),
                 tn(shop.paymentMethods.length, 'count.paymentOptions.one', 'count.paymentOptions.other'),
               ].join(' · ')}

@@ -67,6 +67,10 @@ export async function handleBotMessage(
   telegram = new TelegramApi(env.BOT_TOKEN),
   db?: Database,
 ): Promise<void> {
+  if (update.my_chat_member) {
+    await handleAddedToChat(update.my_chat_member, telegram, db);
+    return;
+  }
   const message = update.message;
   if (!message?.text || message.chat?.type !== 'private') return;
   // The language chosen in the app wins over Telegram's.
@@ -107,7 +111,11 @@ export async function configureBot(
   }
   for (let attempt = 0; ; attempt++) {
     try {
-      await telegram.setWebhook(url, env.TELEGRAM_WEBHOOK_SECRET, ['message', 'pre_checkout_query']);
+      await telegram.setWebhook(url, env.TELEGRAM_WEBHOOK_SECRET, [
+        'message',
+        'pre_checkout_query',
+        'my_chat_member',
+      ]);
       console.log(`Telegram webhook set to ${url}`);
       return true;
     } catch (error) {
@@ -122,5 +130,31 @@ export async function configureBot(
       );
       await wait(delay);
     }
+  }
+}
+
+/**
+ * When someone adds the bot to a group or channel, tell them (privately) the
+ * chat id, which is what a VIP club needs for private groups.
+ */
+export async function handleAddedToChat(
+  event: NonNullable<TelegramUpdate['my_chat_member']>,
+  telegram: TelegramApi,
+  db?: Database,
+): Promise<void> {
+  const { chat, from, new_chat_member: member } = event;
+  if (chat.type === 'private') return;
+  if (member.status !== 'member' && member.status !== 'administrator') return;
+  const known = db ? (await languagesOf(db, [from.id])).get(from.id) : undefined;
+  const lang = known ?? langFrom(from.language_code);
+  const title = chat.title ?? (chat.username ? `@${chat.username}` : String(chat.id));
+  const lines = [tr(lang, 'vipGroup.added', { title }), '', tr(lang, 'vipGroup.useIt', { id: chat.id })];
+  if (chat.type === 'channel' && member.status !== 'administrator') {
+    lines.push('', tr(lang, 'vipGroup.channelAdmin'));
+  }
+  try {
+    await telegram.sendMessage(from.id, lines.join('\n'));
+  } catch {
+    // They never started the bot in private: nothing to do (public groups can use @name).
   }
 }

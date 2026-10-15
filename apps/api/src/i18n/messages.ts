@@ -55,6 +55,11 @@ const en = {
     'From now on I will message you here when your orders change: payment confirmed, shipped, delivered…',
   'start.button': 'Open shop',
 
+  // The bot was added to a group or channel (to the person who added it)
+  'vipGroup.added': '✅ I have been added to "{title}".',
+  'vipGroup.useIt': "To use it in a VIP club, add this to the club's groups: {id}",
+  'vipGroup.channelAdmin': 'In channels I must be an administrator to see who is subscribed.',
+
   // Wallet changes (to every admin)
   'wallets.changed': '⚠️ The payment addresses of {shop} were changed by {who}.',
   'wallets.evm': 'Base / Ethereum: {before} → {after}',
@@ -129,6 +134,10 @@ const es: Record<BotMessageKey, string> = {
     'A partir de ahora te escribiré aquí cuando cambien tus pedidos: pago confirmado, enviado, entregado…',
   'start.button': 'Abrir tienda',
 
+  'vipGroup.added': '✅ Me han añadido a «{title}».',
+  'vipGroup.useIt': 'Para usarlo en un club VIP, añade esto a los grupos del club: {id}',
+  'vipGroup.channelAdmin': 'En los canales tengo que ser administrador para ver quién está suscrito.',
+
   'wallets.changed': '⚠️ {who} ha cambiado las direcciones de cobro de {shop}.',
   'wallets.evm': 'Base / Ethereum: {before} → {after}',
   'wallets.solana': 'Solana: {before} → {after}',
@@ -198,6 +207,10 @@ const it: Record<BotMessageKey, string> = {
     "D'ora in poi ti scriverò qui quando i tuoi ordini cambiano: pagamento confermato, spedito, consegnato…",
   'start.button': 'Apri negozio',
 
+  'vipGroup.added': '✅ Sono stato aggiunto a «{title}».',
+  'vipGroup.useIt': 'Per usarlo in un club VIP, aggiungi questo ai gruppi del club: {id}',
+  'vipGroup.channelAdmin': 'Nei canali devo essere amministratore per vedere chi è iscritto.',
+
   'wallets.changed': '⚠️ {who} ha cambiato gli indirizzi di pagamento di {shop}.',
   'wallets.evm': 'Base / Ethereum: {before} → {after}',
   'wallets.solana': 'Solana: {before} → {after}',
@@ -266,6 +279,10 @@ const pt: Record<BotMessageKey, string> = {
   'start.updates':
     'A partir de agora escrevo-lhe aqui quando os seus pedidos mudarem: pagamento confirmado, enviado, entregue…',
   'start.button': 'Abrir loja',
+
+  'vipGroup.added': '✅ Fui adicionado a «{title}».',
+  'vipGroup.useIt': 'Para o usar num clube VIP, adicione isto aos grupos do clube: {id}',
+  'vipGroup.channelAdmin': 'Nos canais tenho de ser administrador para ver quem está inscrito.',
 
   'wallets.changed': '⚠️ {who} alterou os endereços de pagamento de {shop}.',
   'wallets.evm': 'Base / Ethereum: {before} → {after}',

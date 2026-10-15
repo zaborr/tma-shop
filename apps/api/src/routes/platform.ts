@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { platformShopInput, retentionSettings } from '@tma-shop/shared';
+import { platformShopInput, retentionSettings, updateVipClubRequest } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { requireAuth, requireSuperAdmin } from '../auth/middleware.js';
 import {
@@ -13,6 +13,7 @@ import {
   updatePlatformShop,
 } from '../services/shop.js';
 import { getRetention, runRetention, updateRetention } from '../services/retention.js';
+import { getPlatformVipClub, updatePlatformVipClub } from '../services/vip.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -64,6 +65,12 @@ export function platformRoutes(): Hono<AppBindings> {
     c.json(await updateRetention(c.get('db'), c.req.valid('json'))),
   );
   app.post('/retention/run', async (c) => c.json(await runRetention(c.get('db'))));
+
+  // The platform-wide VIP club (shops can count its members as their VIPs).
+  app.get('/vip-club', async (c) => c.json(await getPlatformVipClub(c.get('db'))));
+  app.put('/vip-club', zValidator('json', updateVipClubRequest), async (c) =>
+    c.json(await updatePlatformVipClub(c.get('db'), c.get('env'), c.req.valid('json'))),
+  );
 
   return app;
 }

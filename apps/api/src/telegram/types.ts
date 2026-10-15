@@ -25,4 +25,10 @@ export interface TelegramUpdate {
     successful_payment?: SuccessfulPayment;
   };
   pre_checkout_query?: PreCheckoutQuery;
+  /** The bot was added to, or removed from, a chat. */
+  my_chat_member?: {
+    chat: { id: number; type: string; title?: string; username?: string };
+    from: { id: number; first_name?: string; language_code?: string };
+    new_chat_member: { status: string };
+  };
 }

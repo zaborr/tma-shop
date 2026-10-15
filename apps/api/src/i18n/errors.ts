@@ -19,6 +19,9 @@ const STATUS_ES: Record<string, string> = {
 type Rule = [RegExp, string | ((...groups: string[]) => string)];
 
 const RULES: Rule[] = [
+  [/^Telegram group "(.+)" not found\. Add the bot to it first\.$/, (g) => `No se encuentra el grupo de Telegram «${g}». Añade primero el bot.`],
+  [/^"(.+)" is not a group or channel$/, (g) => `«${g}» no es un grupo ni un canal`],
+  [/^The bot is not in "(.+)"\. Add it to the group \(as an admin in channels\) and try again\.$/, (g) => `El bot no está en «${g}». Añádelo al grupo (en los canales, como administrador) y vuelve a intentarlo.`],
   [/^Enter your delivery address$/, 'Escribe tu dirección de entrega'],
   [/^Cannot create an order from an empty cart$/, 'No se puede hacer un pedido con el carrito vacío'],
   [/^Option names must be different$/, 'Los nombres de las opciones tienen que ser distintos'],
@@ -100,6 +103,9 @@ const STATUS_IT: Record<string, string> = {
 };
 
 const RULES_IT: Rule[] = [
+  [/^Telegram group "(.+)" not found\. Add the bot to it first\.$/, (g) => `Gruppo Telegram «${g}» non trovato. Aggiungi prima il bot.`],
+  [/^"(.+)" is not a group or channel$/, (g) => `«${g}» non è un gruppo né un canale`],
+  [/^The bot is not in "(.+)"\. Add it to the group \(as an admin in channels\) and try again\.$/, (g) => `Il bot non è in «${g}». Aggiungilo al gruppo (nei canali come amministratore) e riprova.`],
   [/^Enter your delivery address$/, "Inserisci l'indirizzo di consegna"],
   [/^Cannot create an order from an empty cart$/, 'Non si può fare un ordine con il carrello vuoto'],
   [/^Option names must be different$/, 'I nomi delle opzioni devono essere diversi'],
@@ -181,6 +187,9 @@ const STATUS_PT: Record<string, string> = {
 };
 
 const RULES_PT: Rule[] = [
+  [/^Telegram group "(.+)" not found\. Add the bot to it first\.$/, (g) => `Grupo do Telegram «${g}» não encontrado. Adicione primeiro o bot.`],
+  [/^"(.+)" is not a group or channel$/, (g) => `«${g}» não é um grupo nem um canal`],
+  [/^The bot is not in "(.+)"\. Add it to the group \(as an admin in channels\) and try again\.$/, (g) => `O bot não está em «${g}». Adicione-o ao grupo (nos canais, como administrador) e tente de novo.`],
   [/^Enter your delivery address$/, 'Escreva a sua morada de entrega'],
   [/^Cannot create an order from an empty cart$/, 'Não é possível fazer um pedido com o carrinho vazio'],
   [/^Option names must be different$/, 'Os nomes das opções têm de ser diferentes'],

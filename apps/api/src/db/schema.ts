@@ -19,6 +19,7 @@ import type {
   ShippingZone,
   PaymentCheck,
   PaymentSetup,
+  VipClub,
 } from '@tma-shop/shared';
 
 /** A wallet as the old free-text form stored it ("Base/Ethereum", "USDC/EURC"). */
@@ -48,6 +49,12 @@ export const shops = pgTable('shops', {
   imageUrl: text('image_url'),
   /** Hidden shops are only visible to their admins and platform super-admins. */
   isVisible: boolean('is_visible').notNull().default(true),
+  /** Visible shops only show to VIP club members (and admins). */
+  vipOnly: boolean('vip_only').notNull().default(false),
+  /** The shop's own VIP club. */
+  vipClub: jsonb('vip_club').$type<VipClub>().notNull().default({ groups: [], userIds: [], usernames: [] }),
+  /** Whether members of the platform's VIP club count as VIPs here too. */
+  useGlobalVipClub: boolean('use_global_vip_club').notNull().default(true),
   sortOrder: integer('sort_order').notNull().default(0),
   /** Telegram ids of this shop's admins. */
   adminIds: jsonb('admin_ids').$type<number[]>().notNull().default([]),
@@ -244,6 +251,8 @@ export const platformSettings = pgTable('platform_settings', {
   /** Days without opening the app before a user with no orders is deleted. */
   inactiveUserDays: integer('inactive_user_days').notNull().default(30),
   lastRetentionRunAt: timestamp('last_retention_run_at', { withTimezone: true }),
+  /** The platform-wide VIP club (shops can count its members as their VIPs). */
+  vipClub: jsonb('vip_club').$type<VipClub>().notNull().default({ groups: [], userIds: [], usernames: [] }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

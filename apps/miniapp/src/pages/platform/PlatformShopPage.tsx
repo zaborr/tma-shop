@@ -55,7 +55,9 @@ function ShopForm({ shop }: { shop: ShopAdminView | null }): React.JSX.Element {
   const [slug, setSlug] = useState(shop?.slug ?? '');
   const [description, setDescription] = useState(shop?.description ?? '');
   const [imageUrl, setImageUrl] = useState(shop?.imageUrl ?? '');
-  const [isVisible, setIsVisible] = useState(shop?.isVisible ?? false);
+  const [visibility, setVisibility] = useState<'visible' | 'vip' | 'hidden'>(
+    !shop || !shop.isVisible ? 'hidden' : shop.vipOnly ? 'vip' : 'visible',
+  );
   const [sortOrder, setSortOrder] = useState(String(shop?.sortOrder ?? 0));
   const [admins, setAdmins] = useState(
     (shop?.adminIds ?? (user ? [user.telegramId] : [])).join(', '),
@@ -78,7 +80,8 @@ function ShopForm({ shop }: { shop: ShopAdminView | null }): React.JSX.Element {
       slug: slugValue,
       description: description.trim(),
       imageUrl: image === '' ? null : image,
-      isVisible,
+      isVisible: visibility !== 'hidden',
+      vipOnly: visibility === 'vip',
       sortOrder: order,
       adminIds,
     };
@@ -132,27 +135,30 @@ function ShopForm({ shop }: { shop: ShopAdminView | null }): React.JSX.Element {
         header={t('settings.visibility')}
         footer={t('platformShop.visibilityFooter')}
       >
-        <Cell
-          after={
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button
-                size="s"
-                mode={isVisible ? 'filled' : 'bezeled'}
-                onClick={() => setIsVisible(true)}
-              >
-                {t('settings.visible')}
-              </Button>
-              <Button
-                size="s"
-                mode={isVisible ? 'bezeled' : 'filled'}
-                onClick={() => setIsVisible(false)}
-              >
-                {t('platformShop.hidden')}
-              </Button>
-            </div>
-          }
-        >
-          {isVisible ? t('platformShop.customersSee') : t('platformShop.onlyAdmins')}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '12px 16px 0' }}>
+          {(
+            [
+              ['visible', t('settings.visible')],
+              ['vip', t('platformShop.vipOnly')],
+              ['hidden', t('platformShop.hidden')],
+            ] as const
+          ).map(([value, label]) => (
+            <Button
+              key={value}
+              size="s"
+              mode={visibility === value ? 'filled' : 'bezeled'}
+              onClick={() => setVisibility(value)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+        <Cell multiline>
+          {visibility === 'visible'
+            ? t('platformShop.customersSee')
+            : visibility === 'vip'
+              ? t('platformShop.onlyVip')
+              : t('platformShop.onlyAdmins')}
         </Cell>
         <Input
           header={t('platformShop.order')}

@@ -120,6 +120,13 @@
       "when": 1791990000000,
       "tag": "0016_payment_check",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792000000000,
+      "tag": "0017_vip_club",
+      "breakpoints": true
     }
   ]
 }

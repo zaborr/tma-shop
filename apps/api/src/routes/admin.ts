@@ -14,6 +14,7 @@ import {
   updateOrderStatusRequest,
   updateShippingRequest,
   updatePaymentSetupRequest,
+  updateVipClubRequest,
 } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth } from '../auth/middleware.js';
@@ -57,6 +58,7 @@ import { buildReport } from '../export/report.js';
 import { TelegramApi } from '../telegram/api.js';
 import { tr } from '../i18n/messages.js';
 import { describeCustomer } from '../services/customers.js';
+import { shopVipClubView, updateShopVipClub } from '../services/vip.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -76,6 +78,13 @@ export function adminRoutes(): Hono<AppBindings> {
 
   // Shop settings (admin view includes the payment setup and admin ids).
   app.get('/shop', (c) => c.json(getShopAdminView(c.get('shop'))));
+  // The shop's own VIP club.
+  app.get('/shop/vip-club', (c) => c.json(shopVipClubView(c.get('shop'))));
+  app.put('/shop/vip-club', zValidator('json', updateVipClubRequest), async (c) =>
+    c.json(
+      await updateShopVipClub(c.get('db'), c.get('env'), c.get('shop'), c.req.valid('json')),
+    ),
+  );
   app.put('/shop/profile', zValidator('json', shopProfileInput), async (c) =>
     c.json(await updateShopProfile(c.get('db'), c.get('shopId'), c.req.valid('json'))),
   );

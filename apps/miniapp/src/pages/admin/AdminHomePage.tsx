@@ -80,6 +80,12 @@ function AdminHome(): React.JSX.Element {
           {t('adminHome.profile')}
         </Cell>
         <Cell
+          onClick={() => navigate(to('/admin/vip'))}
+          subtitle={config.vipOnly ? t('adminHome.vipOnlyShop') : t('adminHome.vipHint')}
+        >
+          {t('adminHome.vip')}
+        </Cell>
+        <Cell
           onClick={() => navigate(to('/admin/wallets'))}
           subtitle={
             config.paymentMethods.length > 0

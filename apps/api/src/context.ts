@@ -19,6 +19,8 @@ export interface AppVariables {
   shop: ShopRow;
   /** Whether the caller (if signed in) is this shop's admin or a super-admin. */
   canManage: boolean;
+  /** Whether the caller is in this shop's VIP club (only checked for VIP-only shops). */
+  isVip: boolean;
   /** Present only on routes behind the auth middleware. */
   claims: SessionClaims;
 }
