@@ -4,6 +4,7 @@ import { Badge, Button, Cell, List, Placeholder, Section } from '@telegram-apps/
 import type { OrderStatus } from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
+import { useLiveRefresh } from '../hooks/useLiveRefresh.js';
 import { formatPrice } from '../lib/format.js';
 import { Loader } from '../components/Loader.js';
 import { ErrorView } from '../components/ErrorView.js';
@@ -33,6 +34,11 @@ export function OrdersPage(): React.JSX.Element {
   const { data: orders, loading, error } = useAsync(() => api.getOrders(), [reloadKey]);
   const [armed, setArmed] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Statuses change while away (payment confirmed, shipped…): refresh on return.
+  useLiveRefresh(
+    () => setReloadKey((k) => k + 1),
+    (orders ?? []).some((o) => o.paymentCheck?.status === 'checking'),
+  );
 
   // Two taps: the first arms the button, the second deletes.
   const remove = async (orderId: string): Promise<void> => {
@@ -50,7 +56,7 @@ export function OrdersPage(): React.JSX.Element {
     }
   };
 
-  if (loading) return <Loader />;
+  if (loading && !orders) return <Loader />;
   if (error) return <ErrorView message={error} />;
   if (!orders || orders.length === 0) {
     return (
