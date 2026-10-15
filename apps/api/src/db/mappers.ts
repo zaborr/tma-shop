@@ -102,7 +102,12 @@ export function toShopConfigDTO(row: ShopRow, canManage = false, isVip = false):
   };
 }
 
-export function toShopSummaryDTO(row: ShopRow, canManage: boolean, isVip = false): ShopSummary {
+export function toShopSummaryDTO(
+  row: ShopRow,
+  canManage: boolean,
+  isVip = false,
+  activity: { cartItems: number; unpaidOrders: number } = { cartItems: 0, unpaidOrders: 0 },
+): ShopSummary {
   return {
     id: row.id,
     slug: row.slug,
@@ -113,6 +118,8 @@ export function toShopSummaryDTO(row: ShopRow, canManage: boolean, isVip = false
     vipOnly: row.vipOnly,
     canManage,
     isVip,
+    cartItems: activity.cartItems,
+    unpaidOrders: activity.unpaidOrders,
   };
 }
 

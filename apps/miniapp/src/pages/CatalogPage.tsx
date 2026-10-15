@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
+import { awaitsPayment } from '@tma-shop/shared';
 import { Input } from '../components/Field.js';
+import { UnpaidOrdersBanner } from '../components/UnpaidOrdersBanner.js';
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useCart } from '../providers/CartProvider.js';
@@ -22,6 +24,9 @@ export function CatalogPage(): React.JSX.Element {
   const [search, setSearch] = useState('');
 
   const categories = useAsync(() => api.getCategories(), []);
+  // Orders still to pay: a note at the top and a badge on "My orders".
+  const myOrders = useAsync(() => api.getOrders(), []);
+  const unpaid = (myOrders.data ?? []).filter(awaitsPayment);
   const products = useAsync(
     () => api.getProducts({ categoryId, search: search.trim() || undefined }),
     [categoryId, search],
@@ -41,6 +46,7 @@ export function CatalogPage(): React.JSX.Element {
           <strong>{shop.name}</strong>
         </Cell>
       </Section>
+      <UnpaidOrdersBanner orders={unpaid} />
       <Section>
         <Cell
           onClick={() => navigate(to('/cart'))}
@@ -48,7 +54,18 @@ export function CatalogPage(): React.JSX.Element {
         >
           {t('catalog.cart')}
         </Cell>
-        <Cell onClick={() => navigate(to('/orders'))}>{t('catalog.myOrders')}</Cell>
+        <Cell
+          onClick={() => navigate(to('/orders'))}
+          after={
+            unpaid.length > 0 ? (
+              <Badge type="number" mode="critical">
+                {unpaid.length}
+              </Badge>
+            ) : undefined
+          }
+        >
+          {t('catalog.myOrders')}
+        </Cell>
         {canManage && <Cell onClick={() => navigate(to('/admin'))}>{t('catalog.admin')}</Cell>}
       </Section>
 

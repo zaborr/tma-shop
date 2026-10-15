@@ -138,3 +138,12 @@ export const order = z.object({
   updatedAt: isoDateTime,
 });
 export type Order = z.infer<typeof order>;
+
+/**
+ * Whether the customer still has to pay this order: unpaid, or with a
+ * difference left after an approved change. Not when a payment is already
+ * being verified.
+ */
+export function awaitsPayment(order: Pick<Order, 'status' | 'amountDue'>): boolean {
+  return order.status === 'pending' && order.amountDue > 0;
+}

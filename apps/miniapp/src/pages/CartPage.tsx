@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { shippingCost, type DeliveryAddress } from '@tma-shop/shared';
+import { awaitsPayment, shippingCost, type DeliveryAddress } from '@tma-shop/shared';
 import { useNavigate } from 'react-router-dom';
 import { openInvoice } from '@telegram-apps/sdk-react';
 import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
@@ -40,6 +40,11 @@ export function CartPage(): React.JSX.Element {
   const contactName = contact.trim().replace(/^@/, '');
   const contactValid = /^[A-Za-z0-9_]{5,32}$/.test(contactName);
   const shop = useAsync(() => api.getShop(), []);
+  // An order already waiting for payment: warn before placing a second one.
+  const myOrders = useAsync(() => api.getOrders(), []);
+  const unpaid = (myOrders.data ?? []).filter(awaitsPayment);
+  const [duplicateWarning, setDuplicateWarning] = useState(false);
+  const [duplicateOk, setDuplicateOk] = useState(false);
 
   // Shipping: shops with active zones ask for a zone and a delivery address.
   const zones = (shop.data?.shippingZones ?? []).filter((z) => z.isActive);
@@ -66,7 +71,13 @@ export function CartPage(): React.JSX.Element {
     shop.data.paymentMethods.length === 0 &&
     cart?.currency === 'XTR';
 
-  const checkout = useCallback(async () => {
+  const checkout = useCallback(async (force = false) => {
+    if (!force && !duplicateOk && unpaid.length > 0) {
+      setDuplicateWarning(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    setDuplicateWarning(false);
     setBusy(true);
     setError(null);
     try {
@@ -136,9 +147,12 @@ export function CartPage(): React.JSX.Element {
     zone,
     address,
     remember,
+    unpaid.length,
+    duplicateOk,
   ]);
 
   const hasItems = (cart?.lines.length ?? 0) > 0;
+  const onCheckout = useCallback(() => void checkout(), [checkout]);
 
   useMainButton({
     text: cart
@@ -148,7 +162,7 @@ export function CartPage(): React.JSX.Element {
     // Wait for the shop config so checkout never picks the wrong payment flow.
     enabled: shop.data !== null && contactValid && shippingReady,
     loading: busy || shop.loading,
-    onClick: checkout,
+    onClick: onCheckout,
   });
 
   if (loading && !cart) return <Loader />;
@@ -161,8 +175,42 @@ export function CartPage(): React.JSX.Element {
     );
   }
 
+  const firstUnpaid = unpaid[0];
+
   return (
     <List>
+      {duplicateWarning && firstUnpaid && (
+        <Section header={t('cart.duplicateTitle')}>
+          <Cell multiline>
+            {unpaid.length === 1
+              ? t('cart.duplicateOne', {
+                  id: firstUnpaid.id.slice(0, 8),
+                  amount: formatPrice(firstUnpaid.amountDue, firstUnpaid.currency),
+                })
+              : t('cart.duplicateMany', { count: unpaid.length })}
+          </Cell>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 16px 16px' }}>
+            <Button
+              stretched
+              onClick={() =>
+                navigate(to(unpaid.length === 1 ? `/orders/${firstUnpaid.id}` : '/orders'))
+              }
+            >
+              {unpaid.length === 1 ? t('cart.duplicatePay') : t('cart.duplicateSee')}
+            </Button>
+            <Button
+              stretched
+              mode="bezeled"
+              onClick={() => {
+                setDuplicateOk(true);
+                void checkout(true);
+              }}
+            >
+              {t('cart.duplicateContinue')}
+            </Button>
+          </div>
+        </Section>
+      )}
       {error && (
         <Section>
           <Cell style={{ color: 'var(--tgui--destructive_text_color)' }}>{error}</Cell>
