@@ -5,6 +5,7 @@ import { AppRoot, Placeholder } from '@telegram-apps/telegram-ui';
 import { SessionProvider, useSession } from './providers/SessionProvider.js';
 import { ShopLayout } from './providers/ShopProvider.js';
 import { useBackButton } from './hooks/useBackButton.js';
+import { useMainButtonReset } from './hooks/useMainButton.js';
 import { useAppearance, useAppearanceChrome } from './hooks/useAppearance.js';
 import { Loader } from './components/Loader.js';
 import { CatalogPage } from './pages/CatalogPage.js';
@@ -43,6 +44,7 @@ function platform(): 'ios' | 'base' {
 
 function Shell(): React.JSX.Element {
   useBackButton();
+  useMainButtonReset();
   const { status, error } = useSession();
 
   if (status === 'loading') return <Loader />;
