@@ -32,6 +32,10 @@ export const shop = z.object({
   isVisible: z.boolean(),
   /** Visible only to VIP club members (and admins). Only matters while visible. */
   vipOnly: z.boolean(),
+  /** When the GB was closed (no new orders), or null while open. */
+  closedAt: isoDateTime.nullable(),
+  /** Scheduled closing, or null. */
+  closesAt: isoDateTime.nullable(),
   /** Position in the shop list (ascending). */
   sortOrder: z.number().int(),
   currency: currencyCode,
@@ -67,6 +71,8 @@ export const shopConfig = shop
     imageUrl: true,
     isVisible: true,
     vipOnly: true,
+    closedAt: true,
+    closesAt: true,
     currency: true,
     botUsername: true,
     starsEnabled: true,
@@ -84,6 +90,8 @@ export const shopConfig = shop
     canManage: z.boolean(),
     /** Whether the current user is a VIP of this shop (only checked for VIP-only shops). */
     isVip: z.boolean(),
+    /** Closed now (closed by hand, or its scheduled closing has passed). */
+    isClosed: z.boolean(),
   });
 export type ShopConfig = z.infer<typeof shopConfig>;
 
@@ -97,9 +105,11 @@ export const shopSummary = shop
     imageUrl: true,
     isVisible: true,
     vipOnly: true,
+    closesAt: true,
   })
   .extend({
     canManage: z.boolean(),
+    isClosed: z.boolean(),
     isVip: z.boolean(),
     /** Units in the user's cart in this shop. */
     cartItems: z.number().int().nonnegative(),
@@ -213,3 +223,29 @@ export const retentionReport = z.object({
   ranAt: z.string(),
 });
 export type RetentionReport = z.infer<typeof retentionReport>;
+
+/** Whether a GB is closed at `now`: closed by hand, or past its scheduled closing. */
+export function isClosedAt(
+  shop: { closedAt: string | Date | null; closesAt: string | Date | null },
+  now: Date = new Date(),
+): boolean {
+  if (shop.closedAt) return true;
+  return shop.closesAt !== null && new Date(shop.closesAt).getTime() <= now.getTime();
+}
+
+/** Sets (or, with null, clears) the scheduled closing of a GB. */
+export const updateClosingRequest = z.object({ closesAt: isoDateTime.nullable() });
+export type UpdateClosingRequest = z.infer<typeof updateClosingRequest>;
+
+/** What closing a GB now would do. */
+export const closePreview = z.object({
+  /** Orders with nothing paid nor sent: deleted. */
+  unpaidOrders: z.number().int().nonnegative(),
+  /** Customers' carts: emptied. */
+  carts: z.number().int().nonnegative(),
+  /** Change requests waiting for approval: rejected. */
+  pendingChanges: z.number().int().nonnegative(),
+  /** Payments still to review (they stay). */
+  paymentsToReview: z.number().int().nonnegative(),
+});
+export type ClosePreview = z.infer<typeof closePreview>;

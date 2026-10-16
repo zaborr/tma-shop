@@ -4,6 +4,9 @@ import { verifySession } from '../auth/jwt.js';
 import { ApiError } from '../lib/errors.js';
 import { canManageShop, resolveShop } from '../services/shop.js';
 import { isVipOf } from '../services/vip.js';
+import { and, eq } from 'drizzle-orm';
+import { isClosedAt } from '@tma-shop/shared';
+import { orders } from '../db/schema.js';
 
 /** Telegram id of the caller when a valid session token is present, else undefined. */
 async function peekUserId(header: string | undefined, secret: string): Promise<number | undefined> {
@@ -30,6 +33,16 @@ export const withShop = createMiddleware<AppBindings>(async (c, next) => {
   const isVip =
     shop.vipOnly && userId !== undefined ? await isVipOf(c.get('db'), env, shop, userId) : false;
   if (shop.vipOnly && !canManage && !isVip) throw ApiError.notFound('Shop not found');
+  // A closed GB is still open for consultation to those who ordered in it.
+  if (isClosedAt(shop) && !canManage) {
+    const ordered =
+      userId !== undefined &&
+      (await c.get('db').query.orders.findFirst({
+        where: and(eq(orders.shopId, shop.id), eq(orders.userId, userId)),
+        columns: { id: true },
+      })) !== undefined;
+    if (!ordered) throw ApiError.notFound('Shop not found');
+  }
 
   c.set('shop', shop);
   c.set('isVip', isVip);

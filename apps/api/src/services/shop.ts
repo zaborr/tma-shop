@@ -9,7 +9,7 @@ import type {
   UpdateShippingRequest,
   PaymentSetup,
 } from '@tma-shop/shared';
-import { EMPTY_PAYMENT_SETUP } from '@tma-shop/shared';
+import { EMPTY_PAYMENT_SETUP, isClosedAt } from '@tma-shop/shared';
 import type { Database } from '../db/client.js';
 import type { Env } from '../config/env.js';
 import { cartItems, carts, categories, orders, products, shops } from '../db/schema.js';
@@ -77,8 +77,11 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
   for (const row of rows) {
     const canManage = canManageShop(env, row, userId);
     const vip = row.isVisible && row.vipOnly ? await isVip(row) : false;
-    if (canManage || (row.isVisible && (!row.vipOnly || vip))) {
-      result.push(toShopSummaryDTO(row, canManage, vip, activity.get(row.id)));
+    const mine = activity.get(row.id);
+    // A closed GB stays listed only for those who have orders in it.
+    const closedForThem = isClosedAt(row) && (mine?.orders ?? 0) === 0;
+    if (canManage || (row.isVisible && (!row.vipOnly || vip) && !closedForThem)) {
+      result.push(toShopSummaryDTO(row, canManage, vip, mine));
     }
   }
   return result;
@@ -88,7 +91,7 @@ export async function listShops(db: Database, env: Env, userId: number): Promise
 async function userActivity(
   db: Database,
   userId: number,
-): Promise<Map<string, { cartItems: number; unpaidOrders: number }>> {
+): Promise<Map<string, { cartItems: number; unpaidOrders: number; orders: number }>> {
   const [cartRows, orderRows] = await Promise.all([
     db
       .select({ shopId: carts.shopId, units: sql<number>`coalesce(sum(${cartItems.quantity}), 0)::int` })
@@ -97,28 +100,30 @@ async function userActivity(
       .where(eq(carts.userId, userId))
       .groupBy(carts.shopId),
     db
-      .select({ shopId: orders.shopId, count: sql<number>`count(*)::int` })
+      .select({
+        shopId: orders.shopId,
+        count: sql<number>`count(*)::int`,
+        unpaid: sql<number>`count(*) filter (where ${orders.status} = 'pending' and ${orders.total} - ${orders.amountPaid} > 0)::int`,
+      })
       .from(orders)
-      .where(
-        and(
-          eq(orders.userId, userId),
-          eq(orders.status, 'pending'),
-          sql`${orders.total} - ${orders.amountPaid} > 0`,
-        ),
-      )
+      .where(eq(orders.userId, userId))
       .groupBy(orders.shopId),
   ]);
-  const result = new Map<string, { cartItems: number; unpaidOrders: number }>();
-  const entry = (shopId: string): { cartItems: number; unpaidOrders: number } => {
+  type Activity = { cartItems: number; unpaidOrders: number; orders: number };
+  const result = new Map<string, Activity>();
+  const entry = (shopId: string): Activity => {
     let value = result.get(shopId);
     if (!value) {
-      value = { cartItems: 0, unpaidOrders: 0 };
+      value = { cartItems: 0, unpaidOrders: 0, orders: 0 };
       result.set(shopId, value);
     }
     return value;
   };
   for (const row of cartRows) entry(row.shopId).cartItems = Number(row.units);
-  for (const row of orderRows) entry(row.shopId).unpaidOrders = Number(row.count);
+  for (const row of orderRows) {
+    entry(row.shopId).unpaidOrders = Number(row.unpaid);
+    entry(row.shopId).orders = Number(row.count);
+  }
   return result;
 }
 

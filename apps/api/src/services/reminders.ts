@@ -63,6 +63,9 @@ export async function sendPaymentReminders(
         sql`${orders.total} - ${orders.amountPaid} > 0`,
         isNotNull(orders.userId),
         isNull(orders.paymentReminderAt),
+        // Closed GBs drop their unpaid orders instead.
+        isNull(shops.closedAt),
+        sql`(${shops.closesAt} IS NULL OR ${shops.closesAt} > now())`,
         sql`${orders.updatedAt} < now() - (CASE WHEN ${shops.autoCancelHours} > 0 AND ${orders.amountPaid} = 0 THEN ${shops.autoCancelHours} / 2.0 ELSE ${DEFAULT_REMINDER_HOURS} END) * interval '1 hour'`,
       ),
     );

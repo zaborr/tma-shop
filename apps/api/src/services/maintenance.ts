@@ -3,16 +3,24 @@ import type { Database } from '../db/client.js';
 import { cancelExpiredOrders } from './autoCancel.js';
 import { runRetention } from './retention.js';
 import { sendPaymentReminders } from './reminders.js';
+import { closeDueShops } from './closing.js';
 
 /** Hours between maintenance runs. Fewer runs keep the database asleep longer (Neon). */
 export const MAINTENANCE_EVERY_HOURS = 3;
 
 /**
  * Background housekeeping, all in one go so the database wakes up once:
+ * closes GBs whose closing time has passed (and cleans up closed ones),
  * cancels unpaid orders past their shop's deadline, reminds customers of
  * orders still to pay, then applies the data retention policy.
  */
 export async function runMaintenance(db: Database, env: Env): Promise<void> {
+  try {
+    const closed = await closeDueShops(db, env);
+    if (closed > 0) console.log(`Closed ${closed} GB(s) on schedule.`);
+  } catch (error) {
+    console.error('Closing GBs failed:', error);
+  }
   try {
     const cancelled = await cancelExpiredOrders(db, env);
     if (cancelled > 0) console.log(`Auto-cancelled ${cancelled} unpaid order(s).`);

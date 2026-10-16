@@ -18,7 +18,7 @@ import {
   tierTable,
 } from '../lib/variants.js';
 import { ProductImage } from '../components/ProductImage.js';
-import { useShopPath } from '../providers/ShopProvider.js';
+import { useShop, useShopPath } from '../providers/ShopProvider.js';
 import { t, tn } from '../i18n/index.js';
 
 export function ProductPage(): React.JSX.Element {
@@ -33,6 +33,7 @@ export function ProductPage(): React.JSX.Element {
 function ProductView({ product }: { product: Product }): React.JSX.Element {
   const navigate = useNavigate();
   const to = useShopPath();
+  const { shop } = useShop();
   const { add } = useCart();
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -85,7 +86,9 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
   }, [product.id, withVariants, variant, qty, add, navigate, to]);
 
   useMainButton({
-    text: outOfStock
+    text: shop.isClosed
+      ? t('closed.short')
+      : outOfStock
       ? t('product.outOfStock')
       : missing
         ? t('product.chooseOption')
@@ -96,7 +99,7 @@ function ProductView({ product }: { product: Product }): React.JSX.Element {
             })
           : t('product.addToCart'),
     visible: true,
-    enabled: !outOfStock && !missing,
+    enabled: !shop.isClosed && !outOfStock && !missing,
     loading: adding,
     onClick: onAdd,
   });

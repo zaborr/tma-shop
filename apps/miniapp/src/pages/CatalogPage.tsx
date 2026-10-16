@@ -4,6 +4,7 @@ import { Badge, Button, Cell, List, Section } from '@telegram-apps/telegram-ui';
 import { awaitsPayment } from '@tma-shop/shared';
 import { Input } from '../components/Field.js';
 import { UnpaidOrdersBanner } from '../components/UnpaidOrdersBanner.js';
+import { ClosingNotice } from '../components/ClosingNotice.js';
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useCart } from '../providers/CartProvider.js';
@@ -46,14 +47,17 @@ export function CatalogPage(): React.JSX.Element {
           <strong>{shop.name}</strong>
         </Cell>
       </Section>
+      <ClosingNotice shop={shop} />
       <UnpaidOrdersBanner orders={unpaid} />
       <Section>
-        <Cell
-          onClick={() => navigate(to('/cart'))}
-          after={itemCount > 0 ? <Badge type="number">{itemCount}</Badge> : undefined}
-        >
-          {t('catalog.cart')}
-        </Cell>
+        {!shop.isClosed && (
+          <Cell
+            onClick={() => navigate(to('/cart'))}
+            after={itemCount > 0 ? <Badge type="number">{itemCount}</Badge> : undefined}
+          >
+            {t('catalog.cart')}
+          </Cell>
+        )}
         <Cell
           onClick={() => navigate(to('/orders'))}
           after={

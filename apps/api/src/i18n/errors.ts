@@ -19,6 +19,8 @@ const STATUS_ES: Record<string, string> = {
 type Rule = [RegExp, string | ((...groups: string[]) => string)];
 
 const RULES: Rule[] = [
+  [/^This GB is closed: it no longer takes orders$/, 'Este GB está cerrado: ya no admite pedidos'],
+  [/^The closing date must be in the future$/, 'La fecha de cierre tiene que ser futura'],
   [/^Choose another shop to copy from$/, 'Elige otro GB del que copiar'],
   [/^Choose at least one product$/, 'Elige al menos un producto'],
   [/^Telegram group "(.+)" not found\. Add the bot to it first\.$/, (g) => `No se encuentra el grupo de Telegram «${g}». Añade primero el bot.`],
@@ -105,6 +107,8 @@ const STATUS_IT: Record<string, string> = {
 };
 
 const RULES_IT: Rule[] = [
+  [/^This GB is closed: it no longer takes orders$/, 'Questo GB è chiuso: non accetta più ordini'],
+  [/^The closing date must be in the future$/, 'La data di chiusura deve essere futura'],
   [/^Choose another shop to copy from$/, 'Scegli un altro GB da cui copiare'],
   [/^Choose at least one product$/, 'Scegli almeno un prodotto'],
   [/^Telegram group "(.+)" not found\. Add the bot to it first\.$/, (g) => `Gruppo Telegram «${g}» non trovato. Aggiungi prima il bot.`],
@@ -191,6 +195,8 @@ const STATUS_PT: Record<string, string> = {
 };
 
 const RULES_PT: Rule[] = [
+  [/^This GB is closed: it no longer takes orders$/, 'Este GB está fechado: já não aceita pedidos'],
+  [/^The closing date must be in the future$/, 'A data de fecho tem de ser futura'],
   [/^Choose another shop to copy from$/, 'Escolha outro GB de onde copiar'],
   [/^Choose at least one product$/, 'Escolha pelo menos um produto'],
   [/^Telegram group "(.+)" not found\. Add the bot to it first\.$/, (g) => `Grupo do Telegram «${g}» não encontrado. Adicione primeiro o bot.`],
@@ -269,6 +275,7 @@ const RULES_PT: Rule[] = [
 
 /** English: the code's messages say "shop"; users see "GB". */
 const RULES_EN: Rule[] = [
+  [/^This GB is closed: it no longer takes orders$/, 'This GB is closed: it no longer takes orders'],
   [/^Choose another shop to copy from$/, 'Choose another GB to copy from'],
   [/^The name does not match the shop name$/, 'The name does not match the GB name'],
   [/^A shop with the slug "(.+)" already exists$/, (s) => `A GB with the link name "${s}" already exists`],

@@ -10,6 +10,7 @@ import { ErrorView } from '../components/ErrorView.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { t, tn } from '../i18n/index.js';
 import { LanguagePicker } from '../components/LanguagePicker.js';
+import { closingDate } from '../components/ClosingNotice.js';
 
 let startParamUsed = false;
 
@@ -82,6 +83,11 @@ export function ShopsPage(): React.JSX.Element {
                     ? tn(shop.unpaidOrders, 'shops.unpaid.one', 'shops.unpaid.other')
                     : null,
                   shop.cartItems > 0 ? t('shops.inCart', { count: shop.cartItems }) : null,
+                  shop.isClosed
+                    ? t('shops.closed')
+                    : shop.closesAt
+                      ? t('shops.closes', { date: closingDate(shop.closesAt) })
+                      : null,
                   shop.isVisible ? null : t('shops.hidden'),
                   shop.isVisible && shop.vipOnly ? t('shops.vip') : null,
                   shop.canManage ? t('shops.youManage') : null,

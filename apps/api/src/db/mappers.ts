@@ -18,7 +18,7 @@ import type {
   shops,
   users,
 } from './schema.js';
-import { EMPTY_PAYMENT_SETUP, isLang, paymentMethodsOf, userLang } from '@tma-shop/shared';
+import { EMPTY_PAYMENT_SETUP, isClosedAt, isLang, paymentMethodsOf, userLang } from '@tma-shop/shared';
 import { explorerTxUrl } from '../config/payment-methods.js';
 
 type ProductRow = typeof products.$inferSelect;
@@ -87,6 +87,8 @@ export function toShopConfigDTO(row: ShopRow, canManage = false, isVip = false):
     imageUrl: row.imageUrl,
     isVisible: row.isVisible,
     vipOnly: row.vipOnly,
+    closedAt: row.closedAt?.toISOString() ?? null,
+    closesAt: row.closesAt?.toISOString() ?? null,
     currency: row.currency,
     botUsername: row.botUsername,
     starsEnabled: row.starsEnabled,
@@ -99,6 +101,7 @@ export function toShopConfigDTO(row: ShopRow, canManage = false, isVip = false):
     paymentMethods: paymentMethodsOf(row.paymentSetup),
     canManage,
     isVip,
+    isClosed: isClosedAt(row),
   };
 }
 
@@ -116,8 +119,10 @@ export function toShopSummaryDTO(
     imageUrl: row.imageUrl,
     isVisible: row.isVisible,
     vipOnly: row.vipOnly,
+    closesAt: row.closesAt?.toISOString() ?? null,
     canManage,
     isVip,
+    isClosed: isClosedAt(row),
     cartItems: activity.cartItems,
     unpaidOrders: activity.unpaidOrders,
   };
