@@ -2,7 +2,15 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Cell, List, Placeholder, Section } from '@telegram-apps/telegram-ui';
 import { Input } from '../components/Field.js';
-import { payBefore, unitPriceFor, type Order, type PaymentMethod } from '@tma-shop/shared';
+import {
+  editableDirectly,
+  payBefore,
+  shippingCost,
+  unitPriceFor,
+  type Order,
+  type PaymentMethod,
+  type ShippingZone,
+} from '@tma-shop/shared';
 import { api, ApiClientError } from '../api/client.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useMainButton } from '../hooks/useMainButton.js';
@@ -65,6 +73,8 @@ export function PaymentPage(): React.JSX.Element {
   if (shop.error) return <ErrorView message={shop.error} />;
   if (!current || !shop.data) return <Loader />;
 
+  // Nothing paid or sent yet: the customer edits the order directly.
+  const direct = editableDirectly(current);
   // Pay in the order's token (USDC/EURC); legacy USD/XTR orders accept any wallet.
   const methods =
     current.currency === 'USD' || current.currency === 'XTR'
@@ -116,7 +126,7 @@ export function PaymentPage(): React.JSX.Element {
 
       {!done && <StatusSection order={current} autoCancelHours={shop.data.autoCancelHours} />}
 
-      {needsPayment && methods.length > 0 && (
+      {needsPayment && !editing && methods.length > 0 && (
         <PaymentForm
           key={`${current.paymentTxHash ?? 'new'}-${current.amountDue}`}
           order={current}
@@ -139,23 +149,26 @@ export function PaymentPage(): React.JSX.Element {
       {current.changeRequest ? (
         <PendingChange order={current} feeLabel={feeLabel} onWithdrawn={reload} />
       ) : (
-        CHANGEABLE.includes(current.status) &&
+        (direct || CHANGEABLE.includes(current.status)) &&
         (editing ? (
           <ChangeEditor
             order={current}
             feeLabel={feeLabel}
+            direct={direct}
+            zones={shop.data.shippingZones}
             onCancel={() => setEditing(false)}
             onRequested={() => {
               setEditing(false);
-              setDone('change');
+              // An unpaid order changes at once; a paid one waits for approval.
+              if (!direct) setDone('change');
               reload();
             }}
           />
         ) : (
-          <Section footer={t('order.changeFooter')}>
+          <Section footer={direct ? t('order.editFooter') : t('order.changeFooter')}>
             <div style={{ padding: 16 }}>
               <Button stretched mode="bezeled" onClick={() => setEditing(true)}>
-                {t('order.requestChange')}
+                {direct ? t('order.edit') : t('order.requestChange')}
               </Button>
             </div>
           </Section>
@@ -510,11 +523,16 @@ interface DraftLine {
 function ChangeEditor({
   order,
   feeLabel,
+  direct,
+  zones,
   onCancel,
   onRequested,
 }: {
   order: Order;
   feeLabel: string;
+  /** Unpaid order: saved at once instead of sent for approval. */
+  direct: boolean;
+  zones: ShippingZone[];
   onCancel: () => void;
   onRequested: () => void;
 }): React.JSX.Element {
@@ -568,9 +586,12 @@ function ChangeEditor({
       ),
     };
   });
-  // Fee and shipping are charged once per order and do not change.
-  const total =
-    priced.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0) + order.fee + order.shipping;
+  const itemsTotal = priced.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
+  // The fee is charged once per order. Shipping stays as it was, except for an
+  // unpaid order, where it follows the zone again (free shipping threshold).
+  const zone = direct ? zones.find((z) => z.name === order.shippingZoneName) : undefined;
+  const shipping = zone ? shippingCost(zone, itemsTotal) : order.shipping;
+  const total = itemsTotal + order.fee + shipping;
   const diff = total - coveredAmount(order);
   // One addable entry per product, or per variant for products with options.
   const addable: DraftLine[] = (catalog.data?.items ?? [])
@@ -624,7 +645,10 @@ function ChangeEditor({
 
   return (
     <>
-      <Section header={t('change.title')} footer={differenceLabel(diff, order.currency)}>
+      <Section
+        header={direct ? t('order.edit') : t('change.title')}
+        footer={direct ? undefined : differenceLabel(diff, order.currency)}
+      >
         {lines.length === 0 && <Cell multiline>{t('change.keepOne')}</Cell>}
         {priced.map((line) => (
           <Cell
@@ -661,8 +685,10 @@ function ChangeEditor({
         {order.fee > 0 && (
           <Cell after={formatPrice(order.fee, order.currency)}>{feeLabel}</Cell>
         )}
-        {order.shipping > 0 && (
-          <Cell after={formatPrice(order.shipping, order.currency)}>{t('cart.shipping')}</Cell>
+        {(order.shipping > 0 || shipping > 0) && (
+          <Cell after={shipping > 0 ? formatPrice(shipping, order.currency) : t('cart.free')}>
+            {t('cart.shipping')}
+          </Cell>
         )}
         <Cell after={formatPrice(total, order.currency)}>{t('change.newTotal')}</Cell>
       </Section>
@@ -698,7 +724,7 @@ function ChangeEditor({
             disabled={lines.length === 0}
             onClick={() => void submit()}
           >
-            {t('change.send')}
+            {direct ? t('change.save') : t('change.send')}
           </Button>
           <Button stretched mode="plain" onClick={onCancel}>
             {t('common.cancel')}

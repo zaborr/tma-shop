@@ -147,3 +147,13 @@ export type Order = z.infer<typeof order>;
 export function awaitsPayment(order: Pick<Order, 'status' | 'amountDue'>): boolean {
   return order.status === 'pending' && order.amountDue > 0;
 }
+
+/**
+ * Whether the customer can edit the order directly, without the organiser's
+ * approval: nothing paid and no payment sent for review yet.
+ */
+export function editableDirectly(
+  order: Pick<Order, 'status' | 'amountPaid' | 'amountSubmitted'>,
+): boolean {
+  return order.status === 'pending' && order.amountPaid === 0 && order.amountSubmitted === 0;
+}

@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
   ADMIN_STATUS_CHANGES,
+  editableDirectly,
   shippingCost,
   type Order,
   type OrderStatus,
@@ -632,7 +633,8 @@ export async function requestOrderChange(
     where: and(eq(orders.shopId, shopId), eq(orders.id, orderId), eq(orders.userId, userId)),
   });
   if (!order) throw ApiError.notFound('Order not found');
-  if (!CHANGEABLE.includes(order.status)) {
+  const direct = editableDirectly(order);
+  if (!direct && !CHANGEABLE.includes(order.status)) {
     throw ApiError.conflict(
       'not_changeable',
       'Only paid orders, or orders whose payment is being verified, can be changed',
@@ -722,6 +724,9 @@ export async function requestOrderChange(
     items.every((item) => currentQty.get(lineKey(item.productId, item.variantId)) === item.quantity);
   if (unchanged) throw ApiError.badRequest('no_changes', 'The order is unchanged');
 
+  // Nothing paid yet: the change applies at once, no approval needed.
+  if (direct) return applyUnpaidEdit(db, shopId, order.id, items);
+
   const changeRequest: OrderChangeRequest = {
     items,
     // Fee and shipping stay the same: they are charged once per order.
@@ -735,6 +740,60 @@ export async function requestOrderChange(
     .returning();
   if (!updated) throw new Error('Failed to update order');
   return toOrderDTO(updated, current);
+}
+
+/**
+ * Replaces the items of an order with nothing paid and no payment sent. The
+ * total is worked out again (shipping too, in case the order now reaches or
+ * drops below free shipping), the auto-cancel countdown starts again, and a
+ * new payment reminder can be sent later. No stock is held by such an order.
+ */
+async function applyUnpaidEdit(
+  db: Database,
+  shopId: string,
+  orderId: string,
+  items: OrderChangeRequest['items'],
+): Promise<Order> {
+  return db.transaction(async (tx) => {
+    const order = await lockOrder(tx, and(eq(orders.shopId, shopId), eq(orders.id, orderId)));
+    if (!order) throw ApiError.notFound('Order not found');
+    if (!editableDirectly(order)) {
+      throw ApiError.conflict('order_changed', 'The order changed meanwhile. Reload it.');
+    }
+    const itemsTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
+    let shipping = order.shipping;
+    if (order.shippingZoneName) {
+      const shop = await tx.query.shops.findFirst({ where: eq(shops.id, shopId) });
+      const zone = shop?.shippingZones.find((z) => z.name === order.shippingZoneName);
+      if (zone) shipping = shippingCost(zone, itemsTotal);
+    }
+
+    await tx.delete(orderItems).where(eq(orderItems.orderId, order.id));
+    const inserted = await tx
+      .insert(orderItems)
+      .values(
+        items.map((item) => ({
+          orderId: order.id,
+          ...item,
+          variantId: item.variantId ?? null,
+          variantLabel: item.variantLabel ?? null,
+        })),
+      )
+      .returning();
+    const [updated] = await tx
+      .update(orders)
+      .set({
+        total: itemsTotal + order.fee + shipping,
+        shipping,
+        changeRequest: null,
+        paymentReminderAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, order.id))
+      .returning();
+    if (!updated) throw new Error('Failed to update order');
+    return toOrderDTO(updated, inserted);
+  });
 }
 
 /** Withdraws (customer) or rejects (admin, no `userId`) a pending change. */
