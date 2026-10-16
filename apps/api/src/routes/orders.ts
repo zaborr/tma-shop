@@ -123,7 +123,8 @@ export function orderRoutes(): Hono<AppBindings> {
     },
   );
 
-  // Customer asks to modify a paid order; an admin must approve it.
+  // Customer modifies an order. Unpaid ones change at once; paid ones (or with
+  // a payment under review) become a request the organiser must approve.
   app.post(
     '/:id/change',
     zValidator('param', idParam),
@@ -139,10 +140,12 @@ export function orderRoutes(): Hono<AppBindings> {
         sub,
         c.req.valid('json').items,
       );
-      const customer = await describeCustomer(db, sub);
-      await notifyUsers(db, env.BOT_TOKEN, shopNotificationChatIds(env, c.get('shop')), (lang) =>
-        buildChangeRequestMessage(lang, order, customer),
-      );
+      if (order.changeRequest) {
+        const customer = await describeCustomer(db, sub);
+        await notifyUsers(db, env.BOT_TOKEN, shopNotificationChatIds(env, c.get('shop')), (lang) =>
+          buildChangeRequestMessage(lang, order, customer),
+        );
+      }
       return c.json(order);
     },
   );

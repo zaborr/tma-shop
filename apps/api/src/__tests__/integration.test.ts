@@ -199,6 +199,47 @@ describeDb('API integration', () => {
     expect(((await prod.json()) as { stock: number }).stock).toBe(8);
   });
 
+  it('lets the customer edit an unpaid order at once, without approval', async () => {
+    const token = await authToken(CUSTOMER_ID, 'Alice');
+    const auth = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    await app.request('/api/cart/items', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ productId, quantity: 2 }),
+    });
+    const create = await app.request('/api/orders', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ contactUsername: '@test_user' }),
+    });
+    const { orderId } = (await create.json()) as { orderId: string };
+    await db
+      .update(orders)
+      .set({ updatedAt: new Date(Date.now() - 10 * 3_600_000), paymentReminderAt: new Date() })
+      .where(eq(orders.id, orderId));
+
+    const edit = await app.request(`/api/orders/${orderId}/change`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ items: [{ productId, quantity: 3 }] }),
+    });
+    expect(edit.status).toBe(200);
+    const edited = (await edit.json()) as {
+      status: string;
+      total: number;
+      changeRequest: unknown;
+      items: Array<{ quantity: number }>;
+    };
+    expect(edited).toMatchObject({ status: 'pending', total: 450, changeRequest: null });
+    expect(edited.items.map((i) => i.quantity)).toEqual([3]);
+    // The countdown to auto-cancel starts again, and a new reminder can be sent.
+    const [row] = await db.select().from(orders).where(eq(orders.id, orderId));
+    expect(Date.now() - row!.updatedAt.getTime()).toBeLessThan(60_000);
+    expect(row!.paymentReminderAt).toBeNull();
+
+    await app.request(`/api/orders/${orderId}`, { method: 'DELETE', headers: auth });
+  });
+
   it('rejects the webhook with a wrong secret', async () => {
     const res = await app.request('/webhook/telegram', {
       method: 'POST',
