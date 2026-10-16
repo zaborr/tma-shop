@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { mainButton } from '@telegram-apps/sdk-react';
 
@@ -10,17 +10,49 @@ export interface MainButtonOptions {
   onClick: () => void;
 }
 
+type ButtonParams = NonNullable<Parameters<typeof mainButton.setParams>[0]>;
+
+let pending: ButtonParams | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Sends button changes to Telegram a moment later, merged into one. Leaving a
+ * screen hides the button and the next screen shows it again within the same
+ * instant; sent separately, some Telegram clients keep the "hide" and drop the
+ * "show". Merged, Telegram only gets the final state.
+ */
+function applyMainButton(update: ButtonParams): void {
+  pending = { ...pending, ...update };
+  if (timer !== null) return;
+  timer = setTimeout(() => {
+    timer = null;
+    const params = pending;
+    pending = null;
+    try {
+      if (params && mainButton.isMounted()) mainButton.setParams(params);
+    } catch {
+      // Not inside Telegram (or too old a client).
+    }
+  }, 30);
+}
+
 function hideMainButton(): void {
-  try {
-    if (mainButton.isMounted()) mainButton.setParams({ isVisible: false, isLoaderVisible: false });
-  } catch {
-    // Not inside Telegram (or too old a client): nothing to hide.
-  }
+  applyMainButton({ isVisible: false, isLoaderVisible: false });
+}
+
+function ensureMounted(): boolean {
+  if (!mainButton.mount.isAvailable()) return false;
+  if (!mainButton.isMounted()) mainButton.mount();
+  return true;
 }
 
 /**
  * Declaratively drives the Telegram MainButton from a component. The button is
- * hidden automatically when the owning component unmounts.
+ * hidden when the owning component unmounts.
+ *
+ * Changes (text, loading…) are applied in place. The button is never hidden
+ * and shown again just to update it: some Telegram clients drop a "show" that
+ * comes right after a "hide", which left screens without their button.
  */
 export function useMainButton({
   text,
@@ -29,27 +61,31 @@ export function useMainButton({
   loading = false,
   onClick,
 }: MainButtonOptions): void {
-  // Re-applied after every screen change, so a hide from the screen we left
-  // can never win over the screen we are on.
   const { pathname } = useLocation();
+  const handler = useRef(onClick);
+  handler.current = onClick;
 
+  // One click listener for the life of the screen (always calls the latest handler).
   useEffect(() => {
-    if (!mainButton.mount.isAvailable()) return;
-    if (!mainButton.isMounted()) mainButton.mount();
+    if (!ensureMounted()) return undefined;
+    const off = mainButton.onClick(() => handler.current());
+    return () => {
+      off();
+      hideMainButton();
+    };
+  }, []);
 
-    mainButton.setParams({
+  // Look of the button; re-applied after every screen change, so the reset
+  // of the screen change can never win over the screen we are on.
+  useEffect(() => {
+    if (!ensureMounted()) return;
+    applyMainButton({
       text,
       isVisible: visible,
       isEnabled: enabled && !loading,
       isLoaderVisible: loading && visible,
     });
-
-    const off = mainButton.onClick(onClick);
-    return () => {
-      off();
-      hideMainButton();
-    };
-  }, [text, visible, enabled, loading, onClick, pathname]);
+  }, [text, visible, enabled, loading, pathname]);
 }
 
 /**
