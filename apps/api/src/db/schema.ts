@@ -51,6 +51,10 @@ export const shops = pgTable('shops', {
   isVisible: boolean('is_visible').notNull().default(true),
   /** Visible shops only show to VIP club members (and admins). */
   vipOnly: boolean('vip_only').notNull().default(false),
+  /** Closed: no new orders; existing ones can still be looked at and managed. */
+  closedAt: timestamp('closed_at', { withTimezone: true }),
+  /** Scheduled closing: from this moment the GB is closed. */
+  closesAt: timestamp('closes_at', { withTimezone: true }),
   /** The shop's own VIP club. */
   vipClub: jsonb('vip_club').$type<VipClub>().notNull().default({ groups: [], userIds: [], usernames: [] }),
   /** Whether members of the platform's VIP club count as VIPs here too. */

@@ -75,6 +75,9 @@ export function PaymentPage(): React.JSX.Element {
 
   // Nothing paid or sent yet: the customer edits the order directly.
   const direct = editableDirectly(current);
+  // A closed GB takes no changes, and only the difference left on paid orders.
+  const closed = shop.data.isClosed;
+  const canPay = !closed || current.amountPaid > 0;
   // Pay in the order's token (USDC/EURC); legacy USD/XTR orders accept any wallet.
   const methods =
     current.currency === 'USD' || current.currency === 'XTR'
@@ -126,7 +129,7 @@ export function PaymentPage(): React.JSX.Element {
 
       {!done && <StatusSection order={current} autoCancelHours={shop.data.autoCancelHours} />}
 
-      {needsPayment && !editing && methods.length > 0 && (
+      {needsPayment && canPay && !editing && methods.length > 0 && (
         <PaymentForm
           key={`${current.paymentTxHash ?? 'new'}-${current.amountDue}`}
           order={current}
@@ -137,7 +140,7 @@ export function PaymentPage(): React.JSX.Element {
           }}
         />
       )}
-      {needsPayment && methods.length === 0 && (
+      {needsPayment && canPay && methods.length === 0 && (
         <Placeholder
           header={t('order.noWallet', { currency: current.currency })}
           description={t('order.noWalletHint')}
@@ -149,6 +152,7 @@ export function PaymentPage(): React.JSX.Element {
       {current.changeRequest ? (
         <PendingChange order={current} feeLabel={feeLabel} onWithdrawn={reload} />
       ) : (
+        !closed &&
         (direct || CHANGEABLE.includes(current.status)) &&
         (editing ? (
           <ChangeEditor

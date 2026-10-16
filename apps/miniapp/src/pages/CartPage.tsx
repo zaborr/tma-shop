@@ -12,7 +12,7 @@ import { formatPrice } from '../lib/format.js';
 import { lineName } from '../lib/variants.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { Loader } from '../components/Loader.js';
-import { useShopPath } from '../providers/ShopProvider.js';
+import { useShop, useShopPath } from '../providers/ShopProvider.js';
 import {
   AddressForm,
   addressComplete,
@@ -31,6 +31,7 @@ import { t } from '../i18n/index.js';
 export function CartPage(): React.JSX.Element {
   const navigate = useNavigate();
   const to = useShopPath();
+  const closed = useShop().shop.isClosed;
   const { cart, loading, setQuantity, remove, refresh } = useCart();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -158,7 +159,7 @@ export function CartPage(): React.JSX.Element {
     text: cart
       ? t('cart.checkoutTotal', { total: formatPrice(grandTotal, cart.currency) })
       : t('cart.checkout'),
-    visible: hasItems,
+    visible: hasItems && !closed,
     // Wait for the shop config so checkout never picks the wrong payment flow.
     enabled: shop.data !== null && contactValid && shippingReady,
     loading: busy || shop.loading,
@@ -166,6 +167,14 @@ export function CartPage(): React.JSX.Element {
   });
 
   if (loading && !cart) return <Loader />;
+
+  if (closed) {
+    return (
+      <Placeholder header={t('closed.title')} description={t('closed.hint')}>
+        <span style={{ fontSize: 48 }}>🔒</span>
+      </Placeholder>
+    );
+  }
 
   if (!hasItems) {
     return (

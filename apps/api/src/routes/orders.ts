@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
   createOrderRequest,
+  isClosedAt,
   paymentMethodsOf,
   requestOrderChangeRequest,
   submitPaymentRequest,
@@ -32,6 +33,7 @@ import { SOLANA_SIGNATURE_RE } from '../chain/solana.js';
 import { paymentMethodLabel } from '../config/payment-methods.js';
 import { shopNotificationChatIds } from '../services/shop.js';
 import { ApiError } from '../lib/errors.js';
+import { assertOpen } from '../services/closing.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -42,6 +44,7 @@ export function orderRoutes(): Hono<AppBindings> {
   app.post('/', zValidator('json', createOrderRequest), async (c) => {
     const { sub } = c.get('claims');
     const { contactUsername, shippingZoneId, encryptedAddress } = c.req.valid('json');
+    assertOpen(c.get('shop'));
     const order = await createOrderFromCart(c.get('db'), c.get('shopId'), sub, contactUsername, {
       shippingZoneId,
       encryptedAddress,
@@ -70,6 +73,7 @@ export function orderRoutes(): Hono<AppBindings> {
 
   app.post('/:id/invoice', zValidator('param', idParam), async (c) => {
     const { sub } = c.get('claims');
+    assertOpen(c.get('shop'));
     const env = c.get('env');
     const invoiceLink = await createStarsInvoice(
       c.get('db'),
@@ -105,6 +109,13 @@ export function orderRoutes(): Hono<AppBindings> {
         );
       }
 
+      // A closed GB still takes the difference left on a paid order, but not
+      // the payment of an order with nothing paid (it is removed on closing).
+      if (isClosedAt(c.get('shop'))) {
+        const current = await getOrder(db, c.get('shopId'), c.req.valid('param').id, sub);
+        if (current && current.amountPaid === 0) assertOpen(c.get('shop'));
+      }
+
       const order = await submitCryptoPayment(
         db,
         c.get('shopId'),
@@ -133,6 +144,7 @@ export function orderRoutes(): Hono<AppBindings> {
       const { sub } = c.get('claims');
       const env = c.get('env');
       const db = c.get('db');
+      assertOpen(c.get('shop'));
       const order = await requestOrderChange(
         db,
         c.get('shopId'),

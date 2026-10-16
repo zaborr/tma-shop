@@ -134,6 +134,13 @@
       "when": 1792010000000,
       "tag": "0018_payment_reminder",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792020000000,
+      "tag": "0019_close_gb",
+      "breakpoints": true
     }
   ]
 }

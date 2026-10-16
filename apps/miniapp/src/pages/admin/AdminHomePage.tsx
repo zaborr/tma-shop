@@ -4,6 +4,7 @@ import { api } from '../../api/client.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { AdminOnly, isSale, needsAttention, toMajor } from './common.js';
 import { useShop, useShopPath } from '../../providers/ShopProvider.js';
+import { closingDate } from '../../components/ClosingNotice.js';
 import { t, tn } from '../../i18n/index.js';
 
 /** Admin menu: one entry per section, with live counters. */
@@ -74,6 +75,18 @@ function AdminHome(): React.JSX.Element {
       </Section>
 
       <Section header={t('adminHome.settings')}>
+        <Cell
+          onClick={() => navigate(to('/admin/close'))}
+          subtitle={
+            config.isClosed
+              ? t('closed.title')
+              : config.closesAt
+                ? t('closing.title', { date: closingDate(config.closesAt) })
+                : t('adminHome.closeOpen')
+          }
+        >
+          {t('adminHome.close')}
+        </Cell>
         <Cell
           onClick={() => navigate(to('/admin/settings'))}
           subtitle={config.isVisible ? config.name : t('adminHome.nameHidden', { name: config.name })}

@@ -26,6 +26,7 @@ import type {
   CloneProductsRequest,
   CloneProductsResult,
   CloneSource,
+  ClosePreview,
   UpdateVipClubRequest,
   VipClub,
 } from '@tma-shop/shared';
@@ -315,6 +316,27 @@ export class ApiClient {
   /** Sets the fixed fee added once to each new order (0 = none) and its label. */
   adminGetShop(): Promise<ShopAdminView> {
     return this.request<ShopAdminView>('/admin/shop');
+  }
+
+  /** What closing the GB now would do. */
+  adminClosePreview(): Promise<ClosePreview> {
+    return this.request<ClosePreview>('/admin/shop/close-preview');
+  }
+
+  adminCloseShop(): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/close', { method: 'POST' });
+  }
+
+  adminReopenShop(): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/reopen', { method: 'POST' });
+  }
+
+  /** Schedules (ISO date) or, with null, cancels the closing of the GB. */
+  adminScheduleClosing(closesAt: string | null): Promise<ShopAdminView> {
+    return this.request<ShopAdminView>('/admin/shop/closing', {
+      method: 'PUT',
+      body: JSON.stringify({ closesAt }),
+    });
   }
 
   /** Other shops the user manages, to copy products from. */

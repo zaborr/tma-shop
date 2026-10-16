@@ -7,6 +7,8 @@ import type { Env } from '../config/env.js';
 import { createDb, createPool, type Database } from '../db/client.js';
 import { and, eq, inArray } from 'drizzle-orm';
 import {
+  cartItems,
+  carts,
   categories,
   orderItems,
   orders,
@@ -19,6 +21,7 @@ import { runRetention } from '../services/retention.js';
 import { cancelExpiredOrders } from '../services/autoCancel.js';
 import { sendPaymentReminders } from '../services/reminders.js';
 import { resetMiniAppUrlCache } from '../services/bot.js';
+import { closeDueShops } from '../services/closing.js';
 import { TelegramApi } from '../telegram/api.js';
 
 /**
@@ -749,6 +752,86 @@ describeDb('API integration', () => {
     expect(send.mock.calls.some(([, text]) => text.includes(due!.id.slice(0, 8)))).toBe(false);
     resetMiniAppUrlCache();
     await db.delete(shops).where(eq(shops.id, shop!.id));
+  });
+
+  it('closes a GB: no new orders, unpaid ones and carts go, paid ones stay', async () => {
+    const BOB_ID = 555000222;
+    const admin = await authToken(ADMIN_ID, 'Ivan');
+    const alice = await authToken(CUSTOMER_ID, 'Alice');
+    const bob = await authToken(BOB_ID, 'Bob');
+    const [shop] = await db
+      .insert(shops)
+      .values({ slug: `closing-${Date.now()}`, name: 'Closing', description: '', currency: 'USDC' })
+      .returning();
+    const ref = shop!.id;
+    const [product] = await db
+      .insert(products)
+      .values({ shopId: ref, slug: 'thing', title: 'Thing', description: '', price: 100, currency: 'USDC', stock: null, isActive: true })
+      .returning();
+    const [unpaid] = await db
+      .insert(orders)
+      .values({ shopId: ref, userId: CUSTOMER_ID, total: 100, currency: 'USDC' })
+      .returning();
+    const [paid] = await db
+      .insert(orders)
+      .values({ shopId: ref, userId: BOB_ID, total: 100, amountPaid: 100, status: 'paid', currency: 'USDC' })
+      .returning();
+    const [cart] = await db.insert(carts).values({ shopId: ref, userId: BOB_ID }).returning();
+    await db.insert(cartItems).values({ cartId: cart!.id, productId: product!.id, quantity: 1 });
+
+    const as = (token: string) => ({ Authorization: `Bearer ${token}`, 'content-type': 'application/json', 'X-Shop': ref });
+    const listed = async (token: string) =>
+      ((await (await app.request('/api/shops', { headers: as(token) })).json()) as {
+        shops: Array<{ id: string; isClosed: boolean }>;
+      }).shops.find((s) => s.id === ref);
+
+    const preview = await app.request('/api/admin/shop/close-preview', { headers: as(admin) });
+    expect(await preview.json()).toMatchObject({ unpaidOrders: 1, carts: 1, paymentsToReview: 0 });
+
+    const close = await app.request('/api/admin/shop/close', { method: 'POST', headers: as(admin) });
+    expect(((await close.json()) as { isClosed: boolean }).isClosed).toBe(true);
+    expect(await db.select().from(orders).where(eq(orders.id, unpaid!.id))).toHaveLength(0);
+    expect(await db.select().from(orders).where(eq(orders.id, paid!.id))).toHaveLength(1);
+    expect(await db.select().from(carts).where(eq(carts.shopId, ref))).toHaveLength(0);
+
+    // Alice has no orders left there: it is gone for her. Bob can still look.
+    expect(await listed(alice)).toBeUndefined();
+    expect((await listed(bob))?.isClosed).toBe(true);
+    expect((await app.request(`/api/orders/${paid!.id}`, { headers: as(bob) })).status).toBe(200);
+    const add = await app.request('/api/cart/items', {
+      method: 'POST',
+      headers: as(bob),
+      body: JSON.stringify({ productId: product!.id, quantity: 1 }),
+    });
+    expect(add.status).toBe(409);
+
+    // Reopen, then a scheduled closing: closed from that moment, finalized by maintenance.
+    await app.request('/api/admin/shop/reopen', { method: 'POST', headers: as(admin) });
+    const past = await app.request('/api/admin/shop/closing', {
+      method: 'PUT',
+      headers: as(admin),
+      body: JSON.stringify({ closesAt: new Date(Date.now() - 60_000).toISOString() }),
+    });
+    expect(past.status).toBe(400);
+    const future = await app.request('/api/admin/shop/closing', {
+      method: 'PUT',
+      headers: as(admin),
+      body: JSON.stringify({ closesAt: new Date(Date.now() + 3_600_000).toISOString() }),
+    });
+    expect(((await future.json()) as { isClosed: boolean; closesAt: string }).isClosed).toBe(false);
+    await db.update(shops).set({ closesAt: new Date(Date.now() - 1000) }).where(eq(shops.id, ref));
+    const late = await app.request('/api/cart/items', {
+      method: 'POST',
+      headers: as(bob),
+      body: JSON.stringify({ productId: product!.id, quantity: 1 }),
+    });
+    expect(late.status).toBe(409);
+    expect(await closeDueShops(db, testEnv)).toBeGreaterThanOrEqual(1);
+    const [row] = await db.select().from(shops).where(eq(shops.id, ref));
+    expect(row?.closedAt).not.toBeNull();
+    expect(row?.closesAt).toBeNull();
+
+    await db.delete(shops).where(eq(shops.id, ref));
   });
 
   it('enforces admin-only routes', async () => {

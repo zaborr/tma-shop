@@ -16,6 +16,7 @@ import {
   updateShippingRequest,
   updatePaymentSetupRequest,
   updateVipClubRequest,
+  updateClosingRequest,
 } from '@tma-shop/shared';
 import type { AppBindings } from '../context.js';
 import { requireAdmin, requireAuth } from '../auth/middleware.js';
@@ -61,6 +62,7 @@ import { tr } from '../i18n/messages.js';
 import { describeCustomer } from '../services/customers.js';
 import { shopVipClubView, updateShopVipClub } from '../services/vip.js';
 import { cloneProducts, listCloneSources } from '../services/clone.js';
+import { closePreview, closeShop, reopenShop, scheduleClosing } from '../services/closing.js';
 
 const idParam = z.object({ id: z.uuid() });
 
@@ -80,6 +82,25 @@ export function adminRoutes(): Hono<AppBindings> {
 
   // Shop settings (admin view includes the payment setup and admin ids).
   app.get('/shop', (c) => c.json(getShopAdminView(c.get('shop'))));
+  // Closing the GB: no new orders, existing ones can still be managed.
+  app.get('/shop/close-preview', async (c) =>
+    c.json(await closePreview(c.get('db'), c.get('shopId'))),
+  );
+  app.post('/shop/close', async (c) =>
+    c.json(getShopAdminView(await closeShop(c.get('db'), c.get('env'), c.get('shop')))),
+  );
+  app.post('/shop/reopen', async (c) =>
+    c.json(getShopAdminView(await reopenShop(c.get('db'), c.get('shop')))),
+  );
+  app.put('/shop/closing', zValidator('json', updateClosingRequest), async (c) => {
+    const { closesAt } = c.req.valid('json');
+    return c.json(
+      getShopAdminView(
+        await scheduleClosing(c.get('db'), c.get('shop'), closesAt ? new Date(closesAt) : null),
+      ),
+    );
+  });
+
   // Copy products from another shop the user manages.
   app.get('/clone-sources', async (c) =>
     c.json(
